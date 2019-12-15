@@ -1,0 +1,92 @@
+#! /bin/sh
+
+# Emacs `make'.
+#
+# Copyright (C) 2019 Paul Pogonyshev
+#
+# Author:   Paul Pogonyshev <pogonyshev@gmail.com>
+# Homepage: https://github.com/doublep/emake
+
+set -e
+
+if [ -z "$EMAKE_EMACS" ]; then
+    if [ -z "$EMACS" ]; then
+        EMAKE_EMACS=emacs
+    else
+        EMAKE_EMACS=$EMACS
+    fi
+fi
+
+EMAKE_CMD=$0
+
+# For determining whether to enable coloring in automatic mode; Elisp has no `isatty' and
+# it doesn't look like we could use `terminal-parameters' etc. in batch mode.  Also could
+# try determining background color with "\e]11;?\a", but that doesn't work in a subshell
+# and cutting it out of our own output in compatible manner is a nightmare.
+EMAKE_TTY=
+if test -t 1; then
+    EMAKE_TTY=t
+fi
+
+export EMAKE_EMACS
+export EMAKE_CMD
+export EMAKE_TTY
+
+$EMAKE_EMACS --batch --no-site-file --no-site-lisp                                                     \
+             --execute '(let ((emake--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
+      (emake--dir           (getenv "EMAKE_DIR"))
+      ;; This is intentional.  First, this is in case EMAKE_LOCAL is
+      ;; defined, second, this is just Emake default for packages.
+      (load-prefer-newer    t))
+  ;; Setting `debug-on-error'\'' would be useful, but it can break many
+  ;; `package-*'\'' functions, since those use `with-demoted-errors'\'' and
+  ;; so `condition-case-unless-debug'\''.
+  (unless (and (fboundp '\''version<=) (version<= "24.1" emake--emacs-version))
+    (error "Emake requires Emacs 24.1 or newer"))
+  (setf package-user-dir       (expand-file-name "bootstrap" (expand-file-name emake--emacs-version (if (= (length emake--dir) 0) "~/.emake" emake--dir)))
+        package-directory-list nil
+        package-archives       nil)
+  (require '\''package)
+  (package-initialize t)
+  (let ((package-archives '\''(("melpa-stable" . "http://stable.melpa.org/packages/")))
+        (archive-name      "Melpa stable")
+        (inhibit-message  t)
+        (emake-local      (getenv "EMAKE_LOCAL"))
+        emake-pkg
+        requirements)
+    (unless (= (length emake-local) 0)
+      (if (string-prefix-p ":pa:" emake-local)
+          (setf package-archives `(("bootstrap-pa" . ,(file-name-as-directory (substring emake-local (length ":pa:")))))
+                archive-name     "a local package archive")
+        (with-temp-buffer
+          (insert-file-contents-literally (expand-file-name "emake.el" emake-local))
+          (setf emake-pkg                    (package-buffer-info)
+                (package-desc-dir emake-pkg) (expand-file-name emake-local))
+          ;; Currently Emake has no external dependencies, but let'\''s be generic.
+          (dolist (requirement (package-desc-reqs emake-pkg))
+            (unless (package-activate (car requirement))
+              (push requirement requirements))))))
+    (when (if emake-pkg
+              requirements
+            (not (package-activate '\''emake)))
+      (let ((inhibit-message nil))
+        (message "Bootstrapping Emake from %s...\n" archive-name)
+        (when emake-pkg
+          (message "Emake package itself will be used from `%s'\''\n" emake-local)))
+      (package-refresh-contents)
+      (if emake-pkg
+          (package-download-transaction (package-compute-transaction nil requirements))
+        (package-install '\''emake)))
+    (when emake-pkg
+      (push `(emake . (,emake-pkg)) package-alist)
+      ;; `package--autoloads-file-name'\'' is package-private.
+      (let* ((autoloads-file     (expand-file-name (format "%s-autoloads" (package-desc-name emake-pkg))
+                                                   (package-desc-dir emake-pkg)))
+             (autoloads-disabler (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args)))))
+        (advice-add #'\''load :around autoloads-disabler)
+        (package-activate-1 emake-pkg)
+        (advice-remove #'\''load autoloads-disabler))))
+  (require '\''emake)
+  (emake-start-up))'   \
+             --execute "(kill-emacs (emake-cli (append (cdr (member \"--\" command-line-args)) nil)))" \
+             -- "$@"

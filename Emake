@@ -1,0 +1,89 @@
+; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+
+(setf emake-files-to-package (append emake-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+
+;; To avoid including files in test "projects".
+(setf emake-standard-excludes (append emake-standard-excludes '("./test/*/")))
+
+;; Only to simplify `eval' usage, Emake itself doesn't depend on Dash.
+(emake-use-package-archive 'melpa-stable)
+(emake-add-extra-dependencies '(eval exec emacs) 'dash)
+(setq emake-default-required-features '(:project-name dash))
+
+
+(add-hook 'emake-test-hook (lambda () (emake-print "Emake tests are fairly slow, since they spawn lots of child processes")))
+
+
+(emake-defbuilder emake-builder-preprocess-.in (source target)
+  :short-name     "SUBST"
+  :message        source-and-target
+  :source-files   "*.in"
+  :targets        (".in" -> "")
+  :collect        ":default"
+  :define-cleaner (emake-cleaner-preprocessed
+                   "Delete results of preprocessing `.in' files.  This is specific
+to Emake itself."
+                   :aliases prep)
+  (let ((modes (file-modes target)))
+    (emake-substitute source target)
+    (when (or modes (string-prefix-p "bin/" target))
+      (set-file-modes target (or modes #o755)))))
+
+
+(emake-defcleaner emake-cleaner-test-caches ()
+  "Delete `.emake' directories in test projects.  This is specific
+to Emake itself."
+  (let (directories)
+    (dolist (project (directory-files "test"))
+      (when (and (not (member project '("." ".." ".testroot"))) (file-directory-p (expand-file-name project "test")))
+        (push (expand-file-name emake-cache-dir (expand-file-name project "test")) directories)))
+    directories))
+
+
+(defmacro emake--install-self-error (error directory format-string &rest arguments)
+  `(signal 'emake-error (append (unless (file-writable-p directory) '(:hint "You probably need to log in as root"))
+                                (list ,format-string ,@arguments (error-message-string ,error)))))
+
+(emake-defcommand emake-install-self (&rest parameters)
+  "Install Emake.  You only need this command if you want to
+install from sources (clone of Git repository).  Should probably
+be executed via `install.sh'."
+  :parameters     "DIRECTORY"
+  (unless parameters
+    (emake-error "Missing target directory")
+    (when (boundp 'emake--install-sh)
+      (emake-error "Run as `./install.sh DIRECTORY'"))
+    (emake-print "Suggested directories:")
+    (dolist (directory '("~/bin" "~/.bin" "~/local/bin" "~/.local/bin" "/usr/local/bin" "/usr/bin"))
+      (when (emake-directory-in-exec-path directory)
+        (emake-print "  %s" directory)))
+    (emake-print "\nIf you use a different directory, make sure to add it to `PATH'\nenvironment variable.")
+    (signal 'emake-quit 1))
+  (let ((directory (car parameters)))
+    (if (file-exists-p directory)
+        (unless (file-directory-p directory)
+          (signal 'emake-error `("File `%s' exists, but is not a directory" ,directory)))
+      (if (emake-y-or-n-p (emake-format-message "Directory `%s' doesn't exist; attempt to create it? " directory))
+          (condition-case error
+              (make-directory directory t)
+            (error (emake--install-self-error error (file-name-directory directory) "When creating directory `%s': %s" directory)))
+        (signal 'emake-error `("Installation aborted"))))
+    (when (file-exists-p (expand-file-name "emake" directory))
+      (signal 'emake-error `("File `emake' already exists in directory `%s'" ,directory)))
+    ;; Unless verbosity level is set explicitly, make it `quiet' for
+    ;; building process.
+    (let ((emake-verbosity-level (or emake-verbosity-level 'quiet)))
+      (emake-build ":package"))
+    (condition-case error
+        (copy-file "bin/emake" (file-name-as-directory directory))
+      (error (emake--install-self-error error (file-name-as-directory directory) "When copying file `emake' to directory `%s': %s" directory)))
+    ;; Several duplicates with bootstrapping code, but I think it's
+    ;; one of those rare cases where this is fine.
+    (let* ((emake--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
+           (emake--dir           (emake-getenv "EMAKE_DIR" "~/.emake"))
+           (package-user-dir     (expand-file-name "bootstrap" (expand-file-name emake--emacs-version emake--dir))))
+      (emake-install-package-file (expand-file-name (format "dist/emake-%s.tar" (emake-message-version (emake-package-descriptor))))))
+    (emake-print "Installation complete%s"
+                 (if (emake-directory-in-exec-path directory)
+                     "; you can execute `emake' now"
+                   (format "\nDon't forget to add `%s' to `PATH' environment variable" directory)))))

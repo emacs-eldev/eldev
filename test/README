@@ -1,0 +1,39 @@
+                              FILES HERE
+
+common.el
+
+    Not a test file, but contains common utilities needed by many
+    other files.
+
+*.el
+
+    Actual ERT tests.  Most files are named after Emake commands they
+    test.
+
+files/
+
+    Nested tree of a variously named files and directories used in
+    fileset tests.
+
+package-archive-*/
+
+    Used to look up dependencies for tests projects and not ping Melpa
+    or something like that all the time.  Not having to look up real
+    packages in the internet speeds testing up considerably and also
+    makes results more predictable, because real packages in real
+    archives could change.
+
+dependency-*/
+
+    Test "projects" also available from the local test archives above.
+    Used to test local dependencies.
+
+missing-dependency-*/
+
+    Projects that don't provide a way to look up at least one
+    dependency.  Can only be repaired using local dependencies.  Used
+    to test that certain Emake commands work anyway.
+
+*/
+
+    Various other test "projects" of varying complexity.

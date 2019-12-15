@@ -1,0 +1,11 @@
+Emake-local
+.emake
+
+*.elc
+
+/dist
+
+/test/*/*.info
+/test/*/dir
+/test/*/dist
+/test/.tmp

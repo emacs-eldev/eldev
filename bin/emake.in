@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# Emacs `make'.
+#
+# Copyright (C) 2019 Paul Pogonyshev
+#
+# Author:   Paul Pogonyshev <pogonyshev@gmail.com>
+# Homepage: https://github.com/doublep/emake
+
+set -e
+
+if [ -z "$EMAKE_EMACS" ]; then
+    if [ -z "$EMACS" ]; then
+        EMAKE_EMACS=emacs
+    else
+        EMAKE_EMACS=$EMACS
+    fi
+fi
+
+EMAKE_CMD=$0
+
+# For determining whether to enable coloring in automatic mode; Elisp has no `isatty' and
+# it doesn't look like we could use `terminal-parameters' etc. in batch mode.  Also could
+# try determining background color with "\e]11;?\a", but that doesn't work in a subshell
+# and cutting it out of our own output in compatible manner is a nightmare.
+EMAKE_TTY=
+if test -t 1; then
+    EMAKE_TTY=t
+fi
+
+export EMAKE_EMACS
+export EMAKE_CMD
+export EMAKE_TTY
+
+$EMAKE_EMACS --batch --no-site-file --no-site-lisp                                                     \
+             --execute @[(emake-quote-sh-string (emake-file-contents "bin/bootstrap.el.part" 0 1))]@   \
+             --execute "(kill-emacs (emake-cli (append (cdr (member \"--\" command-line-args)) nil)))" \
+             -- "$@"

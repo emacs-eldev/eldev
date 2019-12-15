@@ -1,0 +1,16 @@
+\input texinfo
+@settitle Emake test `project-b' manual
+
+@dircategory Emacs
+@direntry
+* project-b: (project-b.el). Emake's test `project-b'.
+@end direntry
+
+@ifnottex
+@node Top
+@top project-b
+
+This is a ``manual'' for `project-b'.
+@end ifnottex
+
+@bye
