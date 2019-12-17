@@ -1,6 +1,10 @@
 (require 'test/common)
 
 
+;; To silence byte-compilation warnings on Emacs 24.
+(defvar package-archive-priorities)
+
+
 (ert-deftest emake-test-archives-1 ()
   (emake--test-run "trivial-project" ("archives")
     (should (string-prefix-p "None specified" stdout))

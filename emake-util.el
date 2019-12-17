@@ -25,9 +25,8 @@
 
 ;; Compatibility.
 
-;; To silence compilation warnings on Emacs 24.
+;; To silence byte-compilation warnings on Emacs 24-25.
 (defvar inhibit-message)
-(defvar package-archive-priorities)
 (defvar byte-compile-log-warning-function)
 
 

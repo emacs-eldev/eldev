@@ -33,6 +33,12 @@
 (require 'emake-util)
 
 
+;; To silence byte-compilation warnings on Emacs 24-25.
+(defvar inhibit-message)
+(defvar package-archive-priorities)
+(defvar byte-compile-log-warning-function)
+
+
 (defvar emake-shell-command (or (emake-getenv "EMAKE_CMD") "emake"))
 (defvar emake-emacs-executable (or (emake-getenv "EMAKE_EMACS") (emake-getenv "EMACS") "emacs"))
 

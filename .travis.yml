@@ -20,3 +20,5 @@ env:
 
 script:
   - EMAKE_LOCAL=. ./bin/emake --packaged --debug --trace --time test --omit-backtraces --expect 200
+  # Also require that byte-compilation produces no warnings.
+  - EMAKE_LOCAL=. ./bin/emake --packaged --debug --trace --time compile --warnings-as-errors
