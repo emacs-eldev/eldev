@@ -1023,11 +1023,7 @@ NO-ERROR-IF-MISSING."
                                         `((,emake--internal-pseudoarchive . ,(file-name-as-directory (emake--internal-pseudoarchive-dir)))))
                                     ,@package-archives))
          (package-pinned-packages `(,@(unless self (mapcar (lambda (entry) `(,(car entry) . ,emake--internal-pseudoarchive)) emake--local-dependencies)) ,@package-pinned-packages))
-         (plan                    (list nil))
-         (non-local-plan-size     0)
-         (dependency-index        0)
-         unknown-packages
-         missing-dependency)
+         (plan                    (list nil)))
     (unless self
       (emake--create-internal-pseudoarchive-descriptor))
     (emake--fetch-archive-contents to-be-upgraded)
@@ -1060,108 +1056,113 @@ NO-ERROR-IF-MISSING."
                           (package-read-all-archive-contents)
                           (setf plan (list nil))
                           (emake--plan-install-or-upgrade self nil all-packages plan)))))
-    (when (and to-be-upgraded (not (eq to-be-upgraded t)))
-      (dolist (package-to-be-upgraded to-be-upgraded)
-        (unless (emake-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) (car plan))
-          (push package-to-be-upgraded unknown-packages)))
-      (when unknown-packages
-        (signal 'emake-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(emake-shell-command t)))
-                                     "Cannot upgrade %s: `%s' has no such dependencies" ,(emake-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
-    (dolist (dependency (car plan))
-      (unless (emake--loading-mode (car dependency))
-        (setf non-local-plan-size (1+ non-local-plan-size))))
-    (when (and dry-run (> non-local-plan-size 0))
-      (emake-verbose "In dry-run mode Emake only pretends it is upgrading, installing or deleting dependencies"))
-    (dolist (dependency (car plan))
-      (let ((previous-version (cdr dependency))
-            (dependency       (car dependency)))
-        (if (emake--loading-mode dependency)
-            (emake--load-local-dependency dependency)
-          (setf dependency-index (1+ dependency-index))
-          (if previous-version
-              (emake-print :stderr "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'..."
+    (let ((planned-packages    (nreverse (car plan)))
+          (non-local-plan-size 0)
+          (dependency-index    0)
+          unknown-packages
+          missing-dependency)
+      (when (and to-be-upgraded (not (eq to-be-upgraded t)))
+        (dolist (package-to-be-upgraded to-be-upgraded)
+          (unless (emake-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
+            (push package-to-be-upgraded unknown-packages)))
+        (when unknown-packages
+          (signal 'emake-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(emake-shell-command t)))
+                                       "Cannot upgrade %s: `%s' has no such dependencies" ,(emake-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
+      (dolist (dependency planned-packages)
+        (unless (emake--loading-mode (car dependency))
+          (setf non-local-plan-size (1+ non-local-plan-size))))
+      (when (and dry-run (> non-local-plan-size 0))
+        (emake-verbose "In dry-run mode Emake only pretends it is upgrading, installing or deleting dependencies"))
+      (dolist (dependency planned-packages)
+        (let ((previous-version (cdr dependency))
+              (dependency       (car dependency)))
+          (if (emake--loading-mode dependency)
+              (emake--load-local-dependency dependency)
+            (setf dependency-index (1+ dependency-index))
+            (if previous-version
+                (emake-print :stderr "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'..."
+                             dependency-index non-local-plan-size
+                             (emake-colorize (package-desc-name dependency) 'name) (emake-message-version previous-version t) (emake-message-version dependency t)
+                             (package-desc-archive dependency))
+              (emake-print :stderr "[%d/%d] Installing package `%s' (%s) from `%s'..."
                            dependency-index non-local-plan-size
-                           (emake-colorize (package-desc-name dependency) 'name) (emake-message-version previous-version t) (emake-message-version dependency t)
-                           (package-desc-archive dependency))
-            (emake-print :stderr "[%d/%d] Installing package `%s' (%s) from `%s'..."
-                         dependency-index non-local-plan-size
-                         (emake-colorize (package-desc-name dependency) 'name) (emake-message-version dependency t) (package-desc-archive dependency)))
-          (unless dry-run
-            (let ((inhibit-message t))
-              (package-install-from-archive dependency))))))
-    (when (= non-local-plan-size 0)
-      (if additional-sets
-          (emake-verbose "All project dependencies (including those for %s) have been installed already or are local"
-                         (emake-message-enumerate "set" additional-sets))
-        (emake-verbose "All project dependencies have been installed already or are local")))
-    (when main-command-effect
-      (unless dry-run
-        (let ((inhibit-message t)
-              (num-deleted     0))
-          (dolist (dependency (car plan))
-            (unless (or (null (cdr dependency)) (emake--loading-mode (car dependency)))
-              (package-delete (cdr dependency))
-              (setf num-deleted (1+ num-deleted))))
-          (when (> num-deleted 0)
-            (emake-verbose "Deleted %s" (emake-message-plural num-deleted (if self "obsolete package version" "obsolete dependency version"))))))
-      (if (> non-local-plan-size 0)
-          (emake-print "Upgraded or installed %s" (emake-message-plural non-local-plan-size (if self "package" "dependency package")))
-        (emake-print (if self "Emake is up-to-date" "All dependencies are up-to-date"))))
-    (when activate
-      (let (recursing-for)
-        (emake-advised (#'package-activate-1
-                        :around (lambda (original dependency &rest rest)
-                                  (let ((inhibit-message nil))
-                                    (catch 'exit
-                                      (let* ((dependency-name (package-desc-name dependency))
-                                             (recursing       (memq dependency-name recursing-for)))
-                                        (emake-pcase-exhaustive (unless recursing (emake--loading-mode dependency))
-                                          (`nil
-                                           (emake-trace (if recursing "Activating local dependency package `%s'..." "Activating dependency package `%s'...")
-                                                        dependency-name)
-                                           (or (let ((inhibit-message t))
-                                                 (apply original dependency rest))
-                                               (progn (setf missing-dependency dependency-name)
-                                                      nil)))
-                                          ;; In all these modes dependency is activated in exactly the same
-                                          ;; way, the difference is in `emake--load-local-dependency'.
-                                          ((or `as-is `source `byte-compiled `built `built-and-compiled `built-source)
-                                           (dolist (requirement (package-desc-reqs dependency))
-                                             (unless (package-activate (car requirement))
-                                               (throw 'exit nil)))
-                                           (push (if (eq dependency-name package-name)
-                                                     emake-project-dir
-                                                   ;; 2 and 3 stand for directory name and its absolute path.
-                                                   (emake-trace "Activating local dependency `%s' in directory `%s'"
-                                                                dependency-name (nth 2 (assq dependency-name emake--local-dependencies)))
-                                                   (nth 3 (assq dependency-name emake--local-dependencies)))
-                                                 load-path)
-                                           (push dependency-name package-activated-list)
-                                           t)
-                                          (`packaged
-                                           (let ((generated-package (assq dependency-name emake--local-dependency-packages)))
-                                             (unless generated-package
-                                               (error "Package for local dependency `%s' must have been generated by this point" dependency-name))
-                                             (push dependency-name recursing-for)
-                                             (let* ((package-user-dir (expand-file-name "local/packages" (emake-cache-dir t)))
-                                                    (up-to-date-desc  (when (nth 2 generated-package)
-                                                                        ;; Package is up-to-date, no need to reinstall it.  At
-                                                                        ;; least if we can find the installed copy.
-                                                                        (ignore-errors (package-load-descriptor (expand-file-name (package-desc-full-name dependency) package-user-dir))))))
-                                               (if up-to-date-desc
-                                                   (progn (emake-trace "Local dependency package `%s' hasn't changed since last installation, no need to reinstall" dependency-name)
-                                                          (emake--assq-set dependency-name `(,up-to-date-desc) package-alist)
-                                                          (package-activate dependency-name))
-                                                 (emake-trace "(Re)installing local dependency package `%s'..." dependency-name)
-                                                 (emake-install-package-file (nth 1 generated-package))))
-                                             (pop recursing-for)))))))))
-          (dolist (package all-packages)
-            (unless (package-activate (car package))
-              ;; We don't report the required version, but if you look at
-              ;; `package-activate-1' (as of 2019-11-24), it also has problems with versions
-              (if no-error-if-missing
-                  (emake-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
-                (signal 'emake-error `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency))))))))))
+                           (emake-colorize (package-desc-name dependency) 'name) (emake-message-version dependency t) (package-desc-archive dependency)))
+            (unless dry-run
+              (let ((inhibit-message t))
+                (package-install-from-archive dependency))))))
+      (when (= non-local-plan-size 0)
+        (if additional-sets
+            (emake-verbose "All project dependencies (including those for %s) have been installed already or are local"
+                           (emake-message-enumerate "set" additional-sets))
+          (emake-verbose "All project dependencies have been installed already or are local")))
+      (when main-command-effect
+        (unless dry-run
+          (let ((inhibit-message t)
+                (num-deleted     0))
+            (dolist (dependency planned-packages)
+              (unless (or (null (cdr dependency)) (emake--loading-mode (car dependency)))
+                (package-delete (cdr dependency))
+                (setf num-deleted (1+ num-deleted))))
+            (when (> num-deleted 0)
+              (emake-verbose "Deleted %s" (emake-message-plural num-deleted (if self "obsolete package version" "obsolete dependency version"))))))
+        (if (> non-local-plan-size 0)
+            (emake-print "Upgraded or installed %s" (emake-message-plural non-local-plan-size (if self "package" "dependency package")))
+          (emake-print (if self "Emake is up-to-date" "All dependencies are up-to-date"))))
+      (when activate
+        (let (recursing-for)
+          (emake-advised (#'package-activate-1
+                          :around (lambda (original dependency &rest rest)
+                                    (let ((inhibit-message nil))
+                                      (catch 'exit
+                                        (let* ((dependency-name (package-desc-name dependency))
+                                               (recursing       (memq dependency-name recursing-for)))
+                                          (emake-pcase-exhaustive (unless recursing (emake--loading-mode dependency))
+                                            (`nil
+                                             (emake-trace (if recursing "Activating local dependency package `%s'..." "Activating dependency package `%s'...")
+                                                          dependency-name)
+                                             (or (let ((inhibit-message t))
+                                                   (apply original dependency rest))
+                                                 (progn (setf missing-dependency dependency-name)
+                                                        nil)))
+                                            ;; In all these modes dependency is activated in exactly the same
+                                            ;; way, the difference is in `emake--load-local-dependency'.
+                                            ((or `as-is `source `byte-compiled `built `built-and-compiled `built-source)
+                                             (dolist (requirement (package-desc-reqs dependency))
+                                               (unless (package-activate (car requirement))
+                                                 (throw 'exit nil)))
+                                             (push (if (eq dependency-name package-name)
+                                                       emake-project-dir
+                                                     ;; 2 and 3 stand for directory name and its absolute path.
+                                                     (emake-trace "Activating local dependency `%s' in directory `%s'"
+                                                                  dependency-name (nth 2 (assq dependency-name emake--local-dependencies)))
+                                                     (nth 3 (assq dependency-name emake--local-dependencies)))
+                                                   load-path)
+                                             (push dependency-name package-activated-list)
+                                             t)
+                                            (`packaged
+                                             (let ((generated-package (assq dependency-name emake--local-dependency-packages)))
+                                               (unless generated-package
+                                                 (error "Package for local dependency `%s' must have been generated by this point" dependency-name))
+                                               (push dependency-name recursing-for)
+                                               (let* ((package-user-dir (expand-file-name "local/packages" (emake-cache-dir t)))
+                                                      (up-to-date-desc  (when (nth 2 generated-package)
+                                                                          ;; Package is up-to-date, no need to reinstall it.  At
+                                                                          ;; least if we can find the installed copy.
+                                                                          (ignore-errors (package-load-descriptor (expand-file-name (package-desc-full-name dependency) package-user-dir))))))
+                                                 (if up-to-date-desc
+                                                     (progn (emake-trace "Local dependency package `%s' hasn't changed since last installation, no need to reinstall" dependency-name)
+                                                            (emake--assq-set dependency-name `(,up-to-date-desc) package-alist)
+                                                            (package-activate dependency-name))
+                                                   (emake-trace "(Re)installing local dependency package `%s'..." dependency-name)
+                                                   (emake-install-package-file (nth 1 generated-package))))
+                                               (pop recursing-for)))))))))
+            (dolist (package all-packages)
+              (unless (package-activate (car package))
+                ;; We don't report the required version, but if you look at
+                ;; `package-activate-1' (as of 2019-11-24), it also has problems with versions
+                (if no-error-if-missing
+                    (emake-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
+                  (signal 'emake-error `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency)))))))))))
 
 (defun emake--plan-install-or-upgrade (self to-be-upgraded all-packages plan)
   (let ((visited (make-hash-table :test #'eq)))
