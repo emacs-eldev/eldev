@@ -581,12 +581,16 @@ BODY can contain the following keywords:
   (emake-output "Usage: %s [OPTION...] COMMAND [...]" (emake-shell-command t)))
 
 (defun emake-shell-command (&optional for-display)
-  (or (when (and for-display (file-name-absolute-p emake-shell-command))
-        (if (emake-directory-in-exec-path (file-name-directory emake-shell-command))
-            (file-name-nondirectory emake-shell-command)
-          (let ((command (file-relative-name emake-shell-command emake-project-dir)))
-            (unless (emake-external-or-absolute-filename command)
-              command))))
+  (or (cond ((and for-display (file-name-absolute-p emake-shell-command))
+             (if (emake-directory-in-exec-path (file-name-directory emake-shell-command))
+                 (file-name-nondirectory emake-shell-command)
+               (let ((command (file-relative-name emake-shell-command emake-project-dir)))
+                 (unless (emake-external-or-absolute-filename command)
+                   command))))
+            ((and (not for-display) (file-name-directory emake-shell-command))
+             ;; Can only use absolute filenames: anything else means looking up in
+             ;; `exec-path', which is not how shell works.
+             (expand-file-name emake-shell-command emake-project-dir)))
       emake-shell-command))
 
 (defun emake-parse-options (command-line &optional command stop-on-non-option allow-unknown)
