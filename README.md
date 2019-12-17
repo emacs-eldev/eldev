@@ -1,3 +1,6 @@
+[![Build Status](https://secure.travis-ci.org/doublep/emake.png)](http://travis-ci.org/doublep/emake)
+
+
 # Emake
 
 Emake is an Emacs-based build system, targeted solely at Elisp
@@ -37,8 +40,8 @@ Drawbacks:
 
 ## Requirements
 
-Emake runs on Emacs 24 and up.  On earlier Emacs versions it will be
-overly verbose, but this is rather an Emacs problem.
+Emake runs on Emacs 24.4 and up [*].  On earlier Emacs versions it
+will be overly verbose, but this is rather an Emacs problem.
 
 Linux or other POSIX-like system is currently required.  However,
 since there is only a small shell script that is really OS-dependent,
@@ -47,6 +50,9 @@ porting to other systems should not be difficult (volunteers welcome).
 Emake intentionally has no dependencies, at least currently: otherwise
 your project would also see them, which could in theory lead to some
 problems.
+
+[*] Emake could reasonably be backported to work on Emacs 24.1 and up
+    if anyone interested has access to such old versions.
 
 
 ## Installation
