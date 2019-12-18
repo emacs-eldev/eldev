@@ -59,11 +59,35 @@ problems.
 
 There are several ways to install Emake.
 
-1. Bootstrapping from Melpa.
+1. Bootstrapping from Melpa: if you have a catch-all directory for
+   executables, e.g. `~/bin`.
 
-   FIXME: Not available from Melpa yet.
+   * From this directory execute:
 
-2. Installing from sources.
+         $ curl -fsSL https://raw.github.com/doublep/emake/master/bin/emake > emake && chmod a+x emake
+
+   You can even do this from `/usr/local/bin` provided you have the
+   necessary permissions.
+
+   No further steps necessary — Emake will bootstrap itself as needed
+   on first invocation.
+
+2. Bootstrapping from Melpa: general case.
+
+   * Execute:
+
+         $ curl -fsSL https://raw.github.com/doublep/emake/master/webinstall/emake | sh
+
+     This will install `emake` script to `~/.emake/bin`.
+
+   * Add the directory to your `$PATH`; e.g. in `~/.profile` add this:
+
+         export PATH="$HOME/.emake/bin:$PATH"
+
+   Afterwards emake will bootstrap itself as needed on first
+   invocation.
+
+3. Installing from sources.
 
    * Clone the source tree from GitHub.
 
@@ -78,12 +102,12 @@ There are several ways to install Emake.
      would be a good value for `DIRECTORY`.  You could even install in
      e.g. `/usr/local/bin` — but make sure you have permissions first.
 
-3. Mostly for developing Emake itself.
+4. Mostly for developing Emake itself.
 
    * Clone the source tree from GitHub.
 
-   * Set variable `EMAKE_LOCAL` to the full path of the working
-     directory.
+   * Set environment variable `$EMAKE_LOCAL` to the full path of the
+     working directory.
 
    * Make sure executable `emake` is available.  Either follow any of
      the first way to install Emake, or symlink/copy file `bin/emake`
@@ -608,7 +632,7 @@ Emacs, it will not use dependencies or previous test results, but
 rather install or recompute them from scratch.
 
 Normally, Emake uses command `emacs` that is supposed to be resolvable
-through `PATH` environment variable.  However, you can always tell it
+through `$PATH` environment variable.  However, you can always tell it
 to use a different Emacs version by setting either `EMAKE_EMACS` or
 just `EMACS` in the environment, e.g.:
 

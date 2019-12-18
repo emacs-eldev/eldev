@@ -1,0 +1,17 @@
+#! /bin/sh
+
+# This script downloads Emake startup script as `~/.emake/bin/emake'.
+
+set -e
+
+
+DIR=~/.emake/bin
+
+mkdir -p $DIR
+curl -fsSL https://raw.githubusercontent.com/doublep/emake/master/bin/emake > $DIR/emake
+chmod a+x $DIR/emake
+
+echo "Emake startup script has been installed."
+echo "Don't forget to add \`$DIR' to PATH environment variable:"
+echo
+echo "    export PATH=\"$DIR:\$PATH\""

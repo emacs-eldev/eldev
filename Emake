@@ -2,8 +2,8 @@
 
 (setf emake-files-to-package (append emake-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
 
-;; To avoid including files in test "projects".
-(setf emake-standard-excludes (append emake-standard-excludes '("./test/*/")))
+;; Avoid including files in test "projects".
+(setf emake-standard-excludes (append emake-standard-excludes '("./test/*/" "./webinstall")))
 
 ;; Only to simplify `eval' usage, Emake itself doesn't depend on Dash.
 (emake-use-package-archive 'melpa-stable)
