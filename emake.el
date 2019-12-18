@@ -5,9 +5,9 @@
 ;; Author:     Paul Pogonyshev <pogonyshev@gmail.com>
 ;; Maintainer: Paul Pogonyshev <pogonyshev@gmail.com>
 ;; Version:    0.1-beta1
-;; Keywords:   elisp
+;; Keywords:   maint, tools
 ;; Homepage:   https://github.com/doublep/emake
-;; Package-Requires: ((emacs "24.1"))
+;; Package-Requires: ((emacs "24.4"))
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
