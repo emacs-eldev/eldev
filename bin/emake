@@ -70,7 +70,7 @@ $EMAKE_EMACS --batch --no-site-file --no-site-lisp                              
               requirements
             (not (package-activate '\''emake)))
       (let ((inhibit-message nil))
-        (message "Bootstrapping Emake from %s...\n" archive-name)
+        (message "Bootstrapping Emake for Emacs %s from %s...\n" emake--emacs-version archive-name)
         (when emake-pkg
           (message "Emake package itself will be used from `%s'\''\n" emake-local)))
       (package-refresh-contents)
