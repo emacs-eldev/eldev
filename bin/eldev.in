@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# Eldev --- Elisp Development Tool.
+#
+# Copyright (C) 2019 Paul Pogonyshev
+#
+# Author:   Paul Pogonyshev <pogonyshev@gmail.com>
+# Homepage: https://github.com/doublep/eldev
+
+set -e
+
+if [ -z "$ELDEV_EMACS" ]; then
+    if [ -z "$EMACS" ]; then
+        ELDEV_EMACS=emacs
+    else
+        ELDEV_EMACS=$EMACS
+    fi
+fi
+
+ELDEV_CMD=$0
+
+# For determining whether to enable coloring in automatic mode; Elisp has no `isatty' and
+# it doesn't look like we could use `terminal-parameters' etc. in batch mode.  Also could
+# try determining background color with "\e]11;?\a", but that doesn't work in a subshell
+# and cutting it out of our own output in compatible manner is a nightmare.
+ELDEV_TTY=
+if test -t 1; then
+    ELDEV_TTY=t
+fi
+
+export ELDEV_EMACS
+export ELDEV_CMD
+export ELDEV_TTY
+
+$ELDEV_EMACS --batch --no-site-file --no-site-lisp                                                     \
+             --execute @[(eldev-quote-sh-string (eldev-file-contents "bin/bootstrap.el.part" 0 1))]@   \
+             --execute "(kill-emacs (eldev-cli (append (cdr (member \"--\" command-line-args)) nil)))" \
+             -- "$@"

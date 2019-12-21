@@ -1,0 +1,23 @@
+#! /bin/sh
+
+# This script downloads Eldev startup script as `~/.eldev/bin/eldev'
+# and EVM (Emacs Version Manager) for Travis CI.
+#
+# In your `.travis.yml' add this:
+#
+# - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-ert > x.sh && source ./x.sh
+
+set -e
+
+
+ELDEV_DIR=~/.eldev/bin
+EVM_DIR=~/.evm
+
+export PATH="$ELDEV_DIR:$EVM_DIR:$PATH"
+
+mkdir -p $ELDEV_DIR
+curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_DIR/eldev
+chmod a+x $ELDEV_DIR/eldev
+
+git clone --depth 1 https://github.com/rejeep/evm.git $EVM_DIR
+evm config path /tmp

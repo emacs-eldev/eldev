@@ -1,20 +1,54 @@
-; -*- mode: emacs-lisp; no-byte-compile: t -*-
-(let ((eldev--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
+#! /bin/sh
+
+# Eldev --- Elisp Development Tool.
+#
+# Copyright (C) 2019 Paul Pogonyshev
+#
+# Author:   Paul Pogonyshev <pogonyshev@gmail.com>
+# Homepage: https://github.com/doublep/eldev
+
+set -e
+
+if [ -z "$ELDEV_EMACS" ]; then
+    if [ -z "$EMACS" ]; then
+        ELDEV_EMACS=emacs
+    else
+        ELDEV_EMACS=$EMACS
+    fi
+fi
+
+ELDEV_CMD=$0
+
+# For determining whether to enable coloring in automatic mode; Elisp has no `isatty' and
+# it doesn't look like we could use `terminal-parameters' etc. in batch mode.  Also could
+# try determining background color with "\e]11;?\a", but that doesn't work in a subshell
+# and cutting it out of our own output in compatible manner is a nightmare.
+ELDEV_TTY=
+if test -t 1; then
+    ELDEV_TTY=t
+fi
+
+export ELDEV_EMACS
+export ELDEV_CMD
+export ELDEV_TTY
+
+$ELDEV_EMACS --batch --no-site-file --no-site-lisp                                                     \
+             --execute '(let ((eldev--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
       (eldev--dir           (getenv "ELDEV_DIR"))
       ;; This is intentional.  First, this is in case ELDEV_LOCAL is
       ;; defined, second, this is just Eldev default for packages.
       (load-prefer-newer    t))
-  ;; Setting `debug-on-error' would be useful, but it can break many
-  ;; `package-*' functions, since those use `with-demoted-errors' and
-  ;; so `condition-case-unless-debug'.
-  (unless (and (fboundp 'version<=) (version<= "24.1" eldev--emacs-version))
+  ;; Setting `debug-on-error'\'' would be useful, but it can break many
+  ;; `package-*'\'' functions, since those use `with-demoted-errors'\'' and
+  ;; so `condition-case-unless-debug'\''.
+  (unless (and (fboundp '\''version<=) (version<= "24.1" eldev--emacs-version))
     (error "Eldev requires Emacs 24.1 or newer"))
   (setf package-user-dir       (expand-file-name "bootstrap" (expand-file-name eldev--emacs-version (if (= (length eldev--dir) 0) "~/.eldev" eldev--dir)))
         package-directory-list nil
         package-archives       nil)
-  (require 'package)
+  (require '\''package)
   (package-initialize t)
-  (let ((package-archives '(("melpa-stable" . "http://stable.melpa.org/packages/")))
+  (let ((package-archives '\''(("melpa-stable" . "http://stable.melpa.org/packages/")))
         (archive-name      "Melpa stable")
         (inhibit-message  t)
         (eldev-local      (getenv "ELDEV_LOCAL"))
@@ -28,29 +62,31 @@
           (insert-file-contents-literally (expand-file-name "eldev.el" eldev-local))
           (setf eldev-pkg                    (package-buffer-info)
                 (package-desc-dir eldev-pkg) (expand-file-name eldev-local))
-          ;; Currently Eldev has no external dependencies, but let's be generic.
+          ;; Currently Eldev has no external dependencies, but let'\''s be generic.
           (dolist (requirement (package-desc-reqs eldev-pkg))
             (unless (package-activate (car requirement))
               (push requirement requirements))))))
     (when (if eldev-pkg
               requirements
-            (not (package-activate 'eldev)))
+            (not (package-activate '\''eldev)))
       (let ((inhibit-message nil))
         (message "Bootstrapping Eldev for Emacs %s from %s...\n" eldev--emacs-version archive-name)
         (when eldev-pkg
-          (message "Eldev package itself will be used from `%s'\n" eldev-local)))
+          (message "Eldev package itself will be used from `%s'\''\n" eldev-local)))
       (package-refresh-contents)
       (if eldev-pkg
           (package-download-transaction (package-compute-transaction nil requirements))
-        (package-install 'eldev)))
+        (package-install '\''eldev)))
     (when eldev-pkg
       (push `(eldev . (,eldev-pkg)) package-alist)
-      ;; `package--autoloads-file-name' is package-private.
+      ;; `package--autoloads-file-name'\'' is package-private.
       (let* ((autoloads-file     (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
                                                    (package-desc-dir eldev-pkg)))
              (autoloads-disabler (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args)))))
-        (advice-add #'load :around autoloads-disabler)
+        (advice-add #'\''load :around autoloads-disabler)
         (package-activate-1 eldev-pkg)
-        (advice-remove #'load autoloads-disabler))))
-  (require 'eldev)
-  (eldev-start-up))
+        (advice-remove #'\''load autoloads-disabler))))
+  (require '\''eldev)
+  (eldev-start-up))'   \
+             --execute "(kill-emacs (eldev-cli (append (cdr (member \"--\" command-line-args)) nil)))" \
+             -- "$@"

@@ -19,6 +19,6 @@ env:
   - EVM_EMACS=emacs-26.3-travis
 
 script:
-  - EMAKE_LOCAL=. ./bin/emake --packaged --debug --trace --time test --omit-backtraces --expect 200
+  - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time test --omit-backtraces --expect 200
   # Also require that byte-compilation produces no warnings.
-  - EMAKE_LOCAL=. ./bin/emake --packaged --debug --trace --time compile --warnings-as-errors
+  - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time compile --warnings-as-errors

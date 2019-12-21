@@ -7,7 +7,7 @@ common.el
 
 *.el
 
-    Actual ERT tests.  Most files are named after Emake commands they
+    Actual ERT tests.  Most files are named after Eldev commands they
     test.
 
 files/
@@ -32,7 +32,7 @@ missing-dependency-*/
 
     Projects that don't provide a way to look up at least one
     dependency.  Can only be repaired using local dependencies.  Used
-    to test that certain Emake commands work anyway.
+    to test that certain Eldev commands work anyway.
 
 */
 

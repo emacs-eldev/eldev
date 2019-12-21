@@ -1,31 +1,31 @@
 (require 'test/common)
 
 
-(ert-deftest emake-test-just-run-1 ()
-  (emake--test-run "empty-project" ()
-    (should (string-prefix-p (emake--test-in-project-environment (emake--test-capture-output (emake-usage))) stdout))
+(ert-deftest eldev-test-just-run-1 ()
+  (eldev--test-run "empty-project" ()
+    (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-capture-output (eldev-usage))) stdout))
     (should (= exit-code 0))))
 
 ;; This should work even in broken projects.
-(ert-deftest emake-test-just-run-missing-dependency-1 ()
+(ert-deftest eldev-test-just-run-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.
-  (let ((emake--test-project "missing-dependency-a"))
-    (emake--test-delete-cache)
-    (emake--test-run nil ()
-      (should (string-prefix-p (emake--test-in-project-environment (emake--test-capture-output (emake-usage))) stdout))
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ()
+      (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-capture-output (eldev-usage))) stdout))
       (should (= exit-code 0)))))
 
-(ert-deftest emake-test-bootstrapping-1 ()
-  (emake--test-create-emake-archive "emake-archive-1")
-  (let ((emake--test-project     "trivial-project")
-        (emake--test-emake-local (concat ":pa:" (emake--test-tmp-subdir "emake-archive-1")))
-        (emake--test-emake-dir   (emake--test-tmp-subdir "bootstrap-root")))
-    (ignore-errors (delete-directory emake--test-emake-dir t))
-    (emake--test-run nil ("version")
-      (should (string= stdout (format "emake %s\n" (emake-message-version (emake-find-package-descriptor 'emake)))))
+(ert-deftest eldev-test-bootstrapping-1 ()
+  (eldev--test-create-eldev-archive "eldev-archive-1")
+  (let ((eldev--test-project     "trivial-project")
+        (eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
+        (eldev--test-eldev-dir   (eldev--test-tmp-subdir "bootstrap-root")))
+    (ignore-errors (delete-directory eldev--test-eldev-dir t))
+    (eldev--test-run nil ("version")
+      (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))
-    (emake--test-run nil ("eval" "(byte-code-function-p (symbol-function 'emake-cli))")
+    (eldev--test-run nil ("eval" "(byte-code-function-p (symbol-function 'eldev-cli))")
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
 

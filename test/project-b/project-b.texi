@@ -1,9 +1,9 @@
 \input texinfo
-@settitle Emake test `project-b' manual
+@settitle Eldev test `project-b' manual
 
 @dircategory Emacs
 @direntry
-* project-b: (project-b.el). Emake's test `project-b'.
+* project-b: (project-b.el). Eldev's test `project-b'.
 @end direntry
 
 @ifnottex

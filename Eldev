@@ -1,0 +1,89 @@
+; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+
+(setf eldev-files-to-package (append eldev-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+
+;; Avoid including files in test "projects".
+(setf eldev-standard-excludes (append eldev-standard-excludes '("./test/*/" "./webinstall")))
+
+;; Only to simplify `eval' usage, Eldev itself doesn't depend on Dash.
+(eldev-use-package-archive 'melpa-stable)
+(eldev-add-extra-dependencies '(eval exec emacs) 'dash)
+(setq eldev-default-required-features '(:project-name dash))
+
+
+(add-hook 'eldev-test-hook (lambda () (eldev-print "Eldev tests are fairly slow, since they spawn lots of child processes")))
+
+
+(eldev-defbuilder eldev-builder-preprocess-.in (source target)
+  :short-name     "SUBST"
+  :message        source-and-target
+  :source-files   "*.in"
+  :targets        (".in" -> "")
+  :collect        ":default"
+  :define-cleaner (eldev-cleaner-preprocessed
+                   "Delete results of preprocessing `.in' files.  This is specific
+to Eldev itself."
+                   :aliases prep)
+  (let ((modes (file-modes target)))
+    (eldev-substitute source target)
+    (when (or modes (string-prefix-p "bin/" target))
+      (set-file-modes target (or modes #o755)))))
+
+
+(eldev-defcleaner eldev-cleaner-test-caches ()
+  "Delete `.eldev' directories in test projects.  This is specific
+to Eldev itself."
+  (let (directories)
+    (dolist (project (directory-files "test"))
+      (when (and (not (member project '("." ".." ".testroot"))) (file-directory-p (expand-file-name project "test")))
+        (push (expand-file-name eldev-cache-dir (expand-file-name project "test")) directories)))
+    directories))
+
+
+(defmacro eldev--install-self-error (error directory format-string &rest arguments)
+  `(signal 'eldev-error (append (unless (file-writable-p directory) '(:hint "You probably need to log in as root"))
+                                (list ,format-string ,@arguments (error-message-string ,error)))))
+
+(eldev-defcommand eldev-install-self (&rest parameters)
+  "Install Eldev.  You only need this command if you want to
+install from sources (clone of Git repository).  Should probably
+be executed via `install.sh'."
+  :parameters     "DIRECTORY"
+  (unless parameters
+    (eldev-error "Missing target directory")
+    (when (boundp 'eldev--install-sh)
+      (eldev-error "Run as `./install.sh DIRECTORY'"))
+    (eldev-print "Suggested directories:")
+    (dolist (directory '("~/bin" "~/.bin" "~/local/bin" "~/.local/bin" "/usr/local/bin" "/usr/bin"))
+      (when (eldev-directory-in-exec-path directory)
+        (eldev-print "  %s" directory)))
+    (eldev-print "\nIf you use a different directory, make sure to add it to `PATH'\nenvironment variable.")
+    (signal 'eldev-quit 1))
+  (let ((directory (car parameters)))
+    (if (file-exists-p directory)
+        (unless (file-directory-p directory)
+          (signal 'eldev-error `("File `%s' exists, but is not a directory" ,directory)))
+      (if (eldev-y-or-n-p (eldev-format-message "Directory `%s' doesn't exist; attempt to create it? " directory))
+          (condition-case error
+              (make-directory directory t)
+            (error (eldev--install-self-error error (file-name-directory directory) "When creating directory `%s': %s" directory)))
+        (signal 'eldev-error `("Installation aborted"))))
+    (when (file-exists-p (expand-file-name "eldev" directory))
+      (signal 'eldev-error `("File `eldev' already exists in directory `%s'" ,directory)))
+    ;; Unless verbosity level is set explicitly, make it `quiet' for
+    ;; building process.
+    (let ((eldev-verbosity-level (or eldev-verbosity-level 'quiet)))
+      (eldev-build ":package"))
+    (condition-case error
+        (copy-file "bin/eldev" (file-name-as-directory directory))
+      (error (eldev--install-self-error error (file-name-as-directory directory) "When copying file `eldev' to directory `%s': %s" directory)))
+    ;; Several duplicates with bootstrapping code, but I think it's
+    ;; one of those rare cases where this is fine.
+    (let* ((eldev--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
+           (eldev--dir           (eldev-getenv "ELDEV_DIR" "~/.eldev"))
+           (package-user-dir     (expand-file-name "bootstrap" (expand-file-name eldev--emacs-version eldev--dir))))
+      (eldev-install-package-file (expand-file-name (format "dist/eldev-%s.tar" (eldev-message-version (eldev-package-descriptor))))))
+    (eldev-print "Installation complete%s"
+                 (if (eldev-directory-in-exec-path directory)
+                     "; you can execute `eldev' now"
+                   (format "\nDon't forget to add `%s' to `PATH' environment variable" directory)))))

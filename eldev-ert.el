@@ -1,4 +1,4 @@
-;;; emake.el --- Emacs `make'  -*- lexical-binding: t -*-
+;;; eldev.el --- Elisp Development Tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2019 Paul Pogonyshev
 
@@ -17,7 +17,7 @@
 
 ;;; Code:
 
-(require 'emake)
+(require 'eldev)
 (require 'ert)
 
 
@@ -26,26 +26,26 @@
 (defvar ert-batch-backtrace-right-margin)
 
 
-;; Functions for binding Emake with ERT testing framework.  Broken out
-;; into a separate file so that `emake.el' doesn't have to require
+;; Functions for binding Eldev with ERT testing framework.  Broken out
+;; into a separate file so that `eldev.el' doesn't have to require
 ;; `ert' feature.
 
-(defvar emake--test-ert-short-backtraces nil)
-(defvar emake--test-ert-results nil)
+(defvar eldev--test-ert-short-backtraces nil)
+(defvar eldev--test-ert-results nil)
 
-(defun emake-test-ert-preprocess-selectors (selectors)
-  (emake-test-selectors-to-elisp-values selectors t))
+(defun eldev-test-ert-preprocess-selectors (selectors)
+  (eldev-test-selectors-to-elisp-values selectors t))
 
-(defun emake-test-ert-load-results ()
-  (emake-test-do-load-results "ert" "previous ERT test results" 1
+(defun eldev-test-ert-load-results ()
+  (eldev-test-do-load-results "ert" "previous ERT test results" 1
     (let ((results (cdr (assq 'results contents))))
       (dolist (result results)
         (when (ert-test-boundp (car result))
           (setf (ert-test-most-recent-result (ert-get-test (car result))) (cdr result))))
-      (setf emake--test-ert-results results))))
+      (setf eldev--test-ert-results results))))
 
-(defun emake-test-ert-save-results ()
-  (emake-test-do-save-results "ert" "ERT test results" 1
+(defun eldev-test-ert-save-results ()
+  (eldev-test-do-save-results "ert" "ERT test results" 1
     (let (results)
       (mapatoms (lambda (symbol)
                   (when (ert-test-boundp symbol)
@@ -59,22 +59,22 @@
                                 (ert-test-result-with-condition-backtrace result) '(...)
                                 (ert-test-result-with-condition-infos     result) '(...))))
                       (push `(,symbol . ,result) results)))))
-      ;; Use `emake--test-ert-results' to not forget results of tests that were not loaded
+      ;; Use `eldev--test-ert-results' to not forget results of tests that were not loaded
       ;; this time.
-      (dolist (result emake--test-ert-results)
+      (dolist (result eldev--test-ert-results)
         (unless (assq (car result) results)
           (push result results)))
       `((results . ,results)))))
 
-(defun emake-run-ert-tests (selectors &optional environment)
+(defun eldev-run-ert-tests (selectors &optional environment)
   "Run ERT tests according to given SELECTORS.
 This is a wrapper around `ert-run-tests-batch' that handles
-`emake-test-stop-on-unexpected'.  Test runners should generally
+`eldev-test-stop-on-unexpected'.  Test runners should generally
 use this for ERT framework, unless they can do better."
   ;; Since ERT doesn't support features we want out-of-the-box, we have to hack.
-  (emake-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin emake--test-ert-short-backtraces)
+  (eldev-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin eldev--test-ert-short-backtraces)
     (let (completed-tests)
-      (emake-advised (#'ert-run-tests
+      (eldev-advised (#'ert-run-tests
                       ;; There is a difference in number arguments in Emacs 24, so just hide
                       ;; the extra arguments with `&rest'.
                       :around (lambda (original selector listener &rest rest)
@@ -83,22 +83,22 @@ use this for ERT framework, unless they can do better."
                                          ;; Older ERT versions have `ert--print-backtrace',
                                          ;; newer use `backtrace-to-string'.  Not using
                                          ;; function-quoting to avoid warnings.
-                                         (prog1 (emake-advised ('backtrace-to-string
+                                         (prog1 (eldev-advised ('backtrace-to-string
                                                                 :around (lambda (original &optional frames)
-                                                                          (if emake-test-print-backtraces
-                                                                              (funcall original (emake--ert-maybe-shorten-backtrace frames))
+                                                                          (if eldev-test-print-backtraces
+                                                                              (funcall original (eldev--ert-maybe-shorten-backtrace frames))
                                                                             "    [omitted]")))
-                                                  (emake-advised ('ert--print-backtrace
+                                                  (eldev-advised ('ert--print-backtrace
                                                                   :around (lambda (original &optional frames)
-                                                                            (if emake-test-print-backtraces
-                                                                                (funcall original (emake--ert-maybe-shorten-backtrace frames))
+                                                                            (if eldev-test-print-backtraces
+                                                                                (funcall original (eldev--ert-maybe-shorten-backtrace frames))
                                                                               (insert "    [omitted]\n"))))
                                                     (apply listener event-type arguments)))
                                            (pcase event-type
                                              (`run-started
-                                              (emake-test-validate-amount (ert-stats-total (nth 0 arguments))))
+                                              (eldev-test-validate-amount (ert-stats-total (nth 0 arguments))))
                                              (`test-ended
-                                              (when emake-test-stop-on-unexpected
+                                              (when eldev-test-stop-on-unexpected
                                                 (let ((stats             (nth 0 arguments))
                                                       (test              (nth 1 arguments))
                                                       (result            (nth 2 arguments))
@@ -111,25 +111,25 @@ use this for ERT framework, unless they can do better."
                                                       (setf num-tests-ignored        (- (length (ert--stats-tests stats)) (length completed-tests))
                                                             (ert--stats-tests stats) (vconcat (nreverse completed-tests))))
                                                     (when (> num-tests-ignored 0)
-                                                      (emake-warn "\nStopping before %s" (emake-message-plural num-tests-ignored "more test")))
-                                                    (signal 'emake-quit 1))))))))
+                                                      (eldev-warn "\nStopping before %s" (eldev-message-plural num-tests-ignored "more test")))
+                                                    (signal 'eldev-quit 1))))))))
                                        rest)))
-        (let* ((statistics     (ert-run-tests-batch (emake-build-ert-selector selectors)))
+        (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
                (num-unexpected (ert-stats-completed-unexpected statistics)))
           (unless (= num-unexpected 0)
-            (signal 'emake-error `("%s produced an unexpected result" ,(emake-message-plural num-unexpected "test")))))))))
+            (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "test")))))))))
 
-(defun emake--ert-maybe-shorten-backtrace (frames)
-  (when emake--test-ert-short-backtraces
-    ;; Drop the frames that are inside ERT and Emake.
+(defun eldev--ert-maybe-shorten-backtrace (frames)
+  (when eldev--test-ert-short-backtraces
+    ;; Drop the frames that are inside ERT and Eldev.
     (let ((scan (reverse frames)))
       (while scan
         (let ((frame (pop scan)))
-          (when (eq (emake--ert-frame-function frame) 'ert--run-test-internal)
+          (when (eq (eldev--ert-frame-function frame) 'ert--run-test-internal)
             ;; Heuristic: older Emacs versions have two more "uninteresting" frames where
             ;; first is a `funcall' and second is some byte-compiled function.
-            (when (and (eq (emake--ert-frame-function (car scan)) 'funcall)
-                       (byte-code-function-p (emake--ert-frame-function (cadr scan))))
+            (when (and (eq (eldev--ert-frame-function (car scan)) 'funcall)
+                       (byte-code-function-p (eldev--ert-frame-function (cadr scan))))
               (setf scan (cddr scan)))
             (setf frames (nreverse scan)
                   scan   nil))))))
@@ -137,23 +137,23 @@ use this for ERT framework, unless they can do better."
 
 (declare-function backtrace-frame-fun "backtrace" (frame))
 
-(defun emake--ert-frame-function (frame)
+(defun eldev--ert-frame-function (frame)
   (cond ((listp frame)                   (nth 1 frame))  ;; Older Emacs versions.
         ((fboundp #'backtrace-frame-fun) (backtrace-frame-fun frame))
         (t                               (aref 1 frame))))
 
-(defun emake-build-ert-selector (selectors)
+(defun eldev-build-ert-selector (selectors)
   "Convert a list of SELECTORS to a single ERT selector.
 If the list contains several selectors, they are combined with
 `or' operator, as promised by the `test' command documentation.
 
-When `emake-test-dwim' is set, any symbol that is not an exact
+When `eldev-test-dwim' is set, any symbol that is not an exact
 test name is instead treated as a regular expression that is
 supposed to match test names."
   (let ((ert-selectors (mapcar (lambda (selector)
                                  (let ((as-elisp  (car selector))
                                        (as-string (cdr selector)))
-                                   (if (and emake-test-dwim
+                                   (if (and eldev-test-dwim
                                             (or (and (symbolp as-elisp) (not (memq as-elisp '(nil t))) (not (keywordp as-elisp)) (not (ert-test-boundp as-elisp)))
                                                 (numberp as-elisp)))
                                        as-string
@@ -164,6 +164,6 @@ supposed to match test names."
       (car ert-selectors))))
 
 
-(provide 'emake-ert)
+(provide 'eldev-ert)
 
-;;; emake-ert.el ends here
+;;; eldev-ert.el ends here
