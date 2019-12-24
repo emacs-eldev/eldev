@@ -39,7 +39,7 @@
 
 
 (if (fboundp 'xor)
-    (defalias 'eldev-xor #'xor
+    (defalias 'eldev-xor 'xor
       "Same as `xor', needed for compatibility.")
   (defsubst eldev-xor (a b)
     "Same as `xor', needed for compatibility."
@@ -48,7 +48,7 @@
 
 (eval-and-compile
   (if (macrop 'pcase-exhaustive)
-      (defalias 'eldev-pcase-exhaustive #'pcase-exhaustive
+      (defalias 'eldev-pcase-exhaustive 'pcase-exhaustive
         "Same as `pcase-exhaustive', needed for compatibility.")
     (defmacro eldev-pcase-exhaustive (value &rest cases)
       "Same as `pcase-exhaustive', needed for compatibility."
@@ -57,7 +57,7 @@
          (value  (error "No clause matching `%S'" value)))))
 
   (if (fboundp 'macroexp-quote)
-      (defalias 'eldev-macroexp-quote #'macroexp-quote
+      (defalias 'eldev-macroexp-quote 'macroexp-quote
         "Same as `macroexp-quote', needed for compatibility.")
     (defun eldev-macroexp-quote (v)
       "Same as `macroexp-quote', needed for compatibility."
@@ -280,7 +280,7 @@ including nil, stands for the default verbosity level.")
 (defvar eldev--real-stderr-output nil)
 
 
-(defalias 'eldev-format-message (if (fboundp #'format-message) #'format-message #'format))
+(defalias 'eldev-format-message (if (fboundp 'format-message) 'format-message #'format))
 
 (defun eldev-message-plural (n singular &optional plural)
   (if (= n 1)
