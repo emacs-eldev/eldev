@@ -2824,7 +2824,7 @@ declares"
 
 (defun eldev--need-to-build (target source)
   "Determine if we need to build a non-virtual TARGET because of SOURCE."
-  (unless (eldev-virtual-target-p source) 
+  (unless (eldev-virtual-target-p source)
     (or (eq eldev-build-infinitely-new t)
         (member source eldev-build-infinitely-new)
         (file-newer-than-file-p source target))))
@@ -3145,7 +3145,7 @@ Return value is one of the following symbols:
                  files-to-tar)
             (condition-case nil
                 (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir))
-              (file-error (error "FIXME: Copy...")))
+              (file-error (error "FIXME: Copy")))
             (make-directory (file-name-directory package-target) t)
             (unless (file-exists-p descriptor-file)
               (with-temp-file descriptor-file
@@ -3283,7 +3283,7 @@ will fail if the project already has file named `Eldev'."
                            (insert-file-contents ".gitignore" t)
                          (file-missing))
                        (goto-char (point-max))
-                       (when (not (eolp))
+                       (unless (eolp)
                          (insert "\n"))
                        (when (looking-back (rx nonl "\n") nil)
                          (insert "\n"))
