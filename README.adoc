@@ -4,7 +4,7 @@
 
 = Eldev
 
-image:https://secure.travis-ci.org/doublep/eldev.svg[Build status, link=http://travis-ci.org/doublep/eldev]
+image:https://api.travis-ci.org/doublep/eldev.svg[Build status, link=https://travis-ci.org/doublep/eldev]
 
 Eldev (Elisp Development Tool) is an Emacs-based build system,
 targeted solely at Elisp projects.  It is an alternative to Cask.
@@ -241,7 +241,7 @@ init`).  For example:
 
 Eldev knows about three “standard” archives, which should cover most
 of your needs: `gnu`, `melpa-stable` and `melpa-unstable`.  Note that
-`http://melpa.org` is called `melpa-unstable`.  This is to emphasize
+`https://melpa.org` is called `melpa-unstable`.  This is to emphasize
 that you shouldn’t use it if `melpa-stable` is enough, because you
 wouldn’t want your tests fail only because a dependency in an unstable
 version has a bug.

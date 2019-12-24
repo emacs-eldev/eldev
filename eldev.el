@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see http://www.gnu.org/licenses.
+;; along with this program.  If not, see https://www.gnu.org/licenses.
 
 
 ;;; Commentary:
@@ -681,9 +681,9 @@ exist yet."
 (defvar eldev--local-dependencies nil)
 (defvar eldev--local-dependency-packages nil)
 
-(defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")    300)
-                                        (melpa-stable   ("melpa-stable"   . "http://stable.melpa.org/packages/") 200)
-                                        (melpa-unstable ("melpa-unstable" . "http://melpa.org/packages/")        100)))
+(defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
+                                        (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
+                                        (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)))
 
 
 (defun eldev-require-version (version)
@@ -701,8 +701,8 @@ of (ID . URL), same as you would use in `package-archives'.
 Standard archives:
 
   - gnu            (https://elpa.gnu.org/packages/)
-  - melpa-stable   (http://stable.melpa.org/packages/)
-  - melpa-unstable (http://melpa.org/packages/)
+  - melpa-stable   (https://stable.melpa.org/packages/)
+  - melpa-unstable (https://melpa.org/packages/)
 
 If PRIORITY is non-nil, ARCHIVE is given this priority (see
 `package-archive-priorities').  Standard archives get priorities
