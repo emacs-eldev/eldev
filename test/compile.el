@@ -109,5 +109,18 @@
       (should (string= stdout "Nothing to do\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-test-compile-circular-requires-1 ()
+  (eldev--test-without-files "project-g" ("project-g.elc" "project-g-util.elc")
+    (eldev--test-run nil ("compile")
+      (eldev--test-assert-files project-dir preexisting-files "project-g.elc" "project-g-util.elc")
+      (should (= exit-code 0)))
+    ;; `project-g.el' and `project-g-util.el' require each other
+    ;; (though the first one does that only after calling `provide').
+    ;; Make sure Eldev is not confused by that.
+    (eldev--test-run nil ("compile")
+      (should (string= stdout "Nothing to do\n"))
+      (eldev--test-assert-files project-dir preexisting-files "project-g.elc" "project-g-util.elc")
+      (should (= exit-code 0)))))
+
 
 (provide 'test/compile)

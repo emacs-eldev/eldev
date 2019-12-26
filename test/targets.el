@@ -167,6 +167,26 @@
   '(":default"))
 
 
+(defvar eldev--test-targets-project-g-main
+  '(":default"
+    ":package"
+    "    dist/project-g-1.0.tar  [PACK]"
+    "        project-g-util.el"
+    "        project-g.el"
+    ":compile"
+    "    project-g-util.elc  [ELC]"
+    "        project-g-util.el"
+    ;; Note the unusual dependency; however, this is correct, see project files.
+    "        [inh] project-g.elc"
+    "    project-g.elc  [ELC]"
+    "        project-g.el"
+    ":package-archive-entry"
+    "    dist/project-g-1.0.entry  [repeated, see `dist/project-g-1.0.tar' above]"))
+
+(defvar eldev--test-targets-project-g-test
+  '(":default"))
+
+
 (defmacro eldev--test-project-dependencies (test-project sets &rest targets)
   `(let ((eldev--test-project (or ,test-project eldev--test-project))
          (expected            ,(if (= (length targets) 1) (car targets) `(eldev--test-targets-combine ,@targets))))
@@ -291,6 +311,19 @@
 
 (ert-deftest eldev-test-targets-project-f-4 ()
   (eldev--test-project-dependencies "project-f" ("all") eldev--test-targets-project-f-main eldev--test-targets-project-f-test))
+
+
+(ert-deftest eldev-test-targets-project-g-1 ()
+  (eldev--test-project-dependencies "project-g" () eldev--test-targets-project-g-main))
+
+(ert-deftest eldev-test-targets-project-g-2 ()
+  (eldev--test-project-dependencies "project-g" ("main") eldev--test-targets-project-g-main))
+
+(ert-deftest eldev-test-targets-project-g-3 ()
+  (eldev--test-project-dependencies "project-g" ("test") eldev--test-targets-project-g-test))
+
+(ert-deftest eldev-test-targets-project-g-4 ()
+  (eldev--test-project-dependencies "project-g" ("all") eldev--test-targets-project-g-main eldev--test-targets-project-g-test))
 
 
 (provide 'test/targets)

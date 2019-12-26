@@ -3037,8 +3037,7 @@ Return value is one of the following symbols:
                                           (and (funcall original-load-source-file full-name file no-error no-message)
                                                (or (string= dependency-source source)
                                                    (eq (eldev-build-target-status dependency-target) 'not-planned)
-                                                   (eldev-build-target dependency-target)))))))
-         inherits)
+                                                   (eldev-build-target dependency-target))))))))
     (eldev-verbose (if recursive "Byte-compiling file `%s' early as `require'd from another file..." "Byte-compiling file `%s'...")
                    source)
     (let ((eldev--recursive-byte-compilation t))
@@ -3089,15 +3088,24 @@ Return value is one of the following symbols:
               ;; Normal errors would get caught inside Emacs byte-compilation code.
               (throw 'eldev--byte-compilation-failed failed-source)
             (signal 'eldev-build-failed `("Failed to byte-compile `%s'" ,failed-source))))
-        (dolist (entry (cdr (or (assoc (expand-file-name source eldev-project-dir) load-history) (assoc (expand-file-name target eldev-project-dir) load-history))))
-          (pcase entry
-            (`(require . ,feature)
-             (let ((provided-by (eldev--find-feature-provider feature)))
-               (when (stringp provided-by)
-                 (push `(inherits ,(eldev-replace-suffix provided-by ".el" ".elc")) inherits))))
-            (`(provide . ,feature)
-             (puthash feature source eldev--feature-providers))))
-        (eldev-set-target-dependencies target inherits)))))
+        (let (inherited-targets
+              provided-feature)
+          (dolist (entry (cdr (or (assoc (expand-file-name source eldev-project-dir) load-history) (assoc (expand-file-name target eldev-project-dir) load-history))))
+            (pcase entry
+              (`(require . ,feature)
+               (unless provided-feature
+                 (let ((provided-by (eldev--find-feature-provider feature)))
+                   (when (stringp provided-by)
+                     (push `(,feature . ,provided-by) inherited-targets)))))
+              (`(provide . ,feature)
+               ;; See e.g. `eldev-test-compile-circular-requires-1': after `provide' form
+               ;; ignore all remaining `require's for dependency purposes.  Also remove
+               ;; self-dependency entry if it has been added.
+               (puthash feature source eldev--feature-providers)
+               (setf inherited-targets (delete `(,feature . ,source) inherited-targets)
+                     provided-feature  t))))
+          (eldev-set-target-dependencies target (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
+                                                        inherited-targets)))))))
 
 (defun eldev--find-feature-provider (feature)
   (or (gethash feature eldev--feature-providers)
