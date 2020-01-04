@@ -34,9 +34,11 @@
 (defvar eldev--test-ert-results nil)
 
 (defun eldev-test-ert-preprocess-selectors (selectors)
+  "Convert SELECTORS to ERT format."
   (eldev-test-selectors-to-elisp-values selectors t))
 
 (defun eldev-test-ert-load-results ()
+  "Load previous ERT test results if they are present."
   (eldev-test-do-load-results "ert" "previous ERT test results" 1
     (let ((results (cdr (assq 'results contents))))
       (dolist (result results)
@@ -45,6 +47,7 @@
       (setf eldev--test-ert-results results))))
 
 (defun eldev-test-ert-save-results ()
+  "Save ERT test results for future use."
   (eldev-test-do-save-results "ert" "ERT test results" 1
     (let (results)
       (mapatoms (lambda (symbol)

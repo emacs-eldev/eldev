@@ -78,14 +78,29 @@
 (defvar byte-compile-log-warning-function)
 
 
-(defvar eldev-shell-command (or (eldev-getenv "ELDEV_CMD") "eldev"))
-(defvar eldev-emacs-executable (or (eldev-getenv "ELDEV_EMACS") (eldev-getenv "EMACS") "emacs"))
+(defvar eldev-shell-command (or (eldev-getenv "ELDEV_CMD") "eldev")
+  "Command used to launch Eldev, in raw form.
+You should use function `eldev-shell-command' in most cases
+instead.")
 
-(defconst eldev-dir (or (eldev-getenv "ELDEV_DIR") "~/.eldev"))
-(defconst eldev-user-config-file (expand-file-name "config" eldev-dir))
-(defconst eldev-file "Eldev")
-(defconst eldev-local-file "Eldev-local")
-(defconst eldev-cache-dir ".eldev")
+(defvar eldev-emacs-executable (or (eldev-getenv "ELDEV_EMACS") (eldev-getenv "EMACS") "emacs")
+  "Emacs executable used for Eldev.")
+
+(defconst eldev-dir (or (eldev-getenv "ELDEV_DIR") "~/.eldev")
+  "Global user's Eldev directory, usually `~/.eldev'.")
+
+(defconst eldev-user-config-file (expand-file-name "config" eldev-dir)
+  "Global user's Eldev configuration file, usually `~/.eldev/config'.")
+
+(defconst eldev-file "Eldev"
+  "Project's Eldev configuration file, `Eldev'.")
+
+(defconst eldev-local-file "Eldev-local"
+  "Working directory Eldev configuration file, `Eldev-local'.")
+
+(defconst eldev-cache-dir ".eldev"
+  "Name of Eldev cache subdirectory, `.eldev'.
+See also function `eldev-cache-dir'.")
 
 (defconst eldev--internal-pseudoarchive "--eldev--")
 
@@ -149,14 +164,21 @@ Additionally, whenever any of these filesets is resolved,
 `eldev-standard-excludes' is always “subtracted” from the
 result.")
 
-(defvar eldev-files-to-package '("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir"))
-(defvar eldev-makeinfo-sources '("./*.texi" "./*.texinfo" "./doc/*.texi" "./doc/*.texinfo"))
-(defvar eldev-info-sources '("./*.info" "./*.info"))
+(defvar eldev-files-to-package '("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir")
+  "Files that are copied to built packages.")
+
+(defvar eldev-makeinfo-sources '("./*.texi" "./*.texinfo" "./doc/*.texi" "./doc/*.texinfo")
+  "Files used as `makeinfo' sources.")
+
+(defvar eldev-info-sources '("./*.info" "./*.info")
+  "Files used as `install-info' sources to generate target `dir'.")
 
 (defvar eldev-dist-dir "dist"
   "Directory where to generate package tarballs.
 This directory can even be located outside the project directory,
-which is useful in certain special cases.")
+which is useful in certain special cases.
+
+See also function `eldev-dist-dir'.")
 
 (defvar eldev-clean-external-dist nil
   "Whether to allow `eldev clean dist' to delete `dist' directory
@@ -164,9 +186,12 @@ even if it is outside of the project.  Normally it doesn't do
 that as a precaution.")
 
 
-(defvar eldev-project-loading-mode nil)
+(defvar eldev-project-loading-mode nil
+  "Project loading mode, `as-is' if not specified.")
 
-(defvar eldev-setup-forms nil)
+(defvar eldev-setup-forms nil
+  "Forms executed as the last step of Eldev setup.
+Should normally be specified only via command line.")
 
 
 (defvar eldev-force-override nil
@@ -203,6 +228,7 @@ that as a precaution.")
     (eldev--assq-set command function eldev--commands)))
 
 (defun eldev-register-command-aliases (command aliases)
+  "Register additional ALIASES for given COMMAND."
   (dolist (alias (eldev-listify aliases))
     (eldev--assq-set alias command eldev--command-aliases)))
 
@@ -343,6 +369,8 @@ BODY can contain the following keywords:
             (eldev--register-option ',name ',options ',for-command ',(nreverse keywords)))))
 
 (defmacro eldev-defbooloptions (t-name nil-name variable t-body nil-body &rest common-body)
+  "Define a yes/no (boolean) option.
+This is only a wrapper over `eldev-defoption'."
   (declare (indent 3))
   `(progn (eldev-defoption ,t-name ()
             ,@(append t-body   common-body `(:if-default ,variable       (setf ,variable t))))
@@ -465,9 +493,29 @@ BODY can contain the following keywords:
 ;; Filesets.
 
 (defun eldev-standard-fileset (name &optional no-excludes)
+  "Return a computed fileset for target set with given NAME.
+Unless NO-EXCLUDES is specified, all targets from
+`eldev-standard-excludes' are ignored."
   (eldev-standard-filesets (if no-excludes :no-excludes :std-excludes) name))
 
 (defun eldev-standard-filesets (&rest arguments)
+  "Build a fileset from standard pieces.
+ARGUMENTS should be either names of standard filesets
+(i.e. usually `main' or `test', but see `eldev-filesets') or any
+of the following keywords:
+
+    :and or :or
+
+        How to combine filesets; `:or' is the default.
+
+    :these or :except
+
+        Whether to use given filesets (default) or every standard
+        fileset except them.
+
+    :std-excludes or :no-excludes
+
+        Whether to use `eldev-standard-filesets' (default) or not."
   (let ((combination-mode :or)
         except
         no-excludes
@@ -506,6 +554,8 @@ BODY can contain the following keywords:
     result))
 
 (defun eldev-validate-standard-fileset (name)
+  "Validate that NAME specifies a standard fileset.
+See `eldev-filesets'."
   (when (stringp name)
     (setf name (intern name)))
   (unless (or (eq name 'all) (assq name eldev-filesets))
@@ -521,6 +571,8 @@ BODY can contain the following keywords:
 
 
 (defun eldev-start-up ()
+  "Prepare Eldev.
+Used by Eldev startup script."
   (setf package-user-dir (expand-file-name "packages" (eldev-cache-dir t))
         package-archives nil))
 
@@ -623,9 +675,11 @@ BODY can contain the following keywords:
     (eval form t)))
 
 (defun eldev-usage ()
+  "Print Eldev usage message."
   (eldev-output "Usage: %s [OPTION...] COMMAND [...]" (eldev-shell-command t)))
 
 (defun eldev-shell-command (&optional for-display)
+  "Return shell command used to start Eldev."
   (or (cond ((and for-display (file-name-absolute-p eldev-shell-command))
              (if (eldev-directory-in-exec-path (file-name-directory eldev-shell-command))
                  (file-name-nondirectory eldev-shell-command)
@@ -639,6 +693,8 @@ BODY can contain the following keywords:
       eldev-shell-command))
 
 (defun eldev-parse-options (command-line &optional command stop-on-non-option allow-unknown)
+  "Parse global or command-specific options.
+Returns COMMAND-LINE with options removed."
   (save-match-data
     (let (without-options)
       (while command-line
@@ -707,10 +763,62 @@ exist yet."
     cache-dir))
 
 (defun eldev-dist-dir (&optional ensure-exists)
+  "Get the directory where to generate package tarballs."
   (let ((dist-dir (file-name-as-directory (expand-file-name (or eldev-dist-dir "") eldev-project-dir))))
     (when ensure-exists
       (make-directory dist-dir t))
     dist-dir))
+
+(defmacro eldev-do-load-cache-file (file description expected-version &rest body)
+  "Load data from a cache FILE.
+Such data is considered non-critical, therefore this function
+will never signal an error.  DESCRIPTION is used in
+human-readable information.
+
+Data in FILE is supposed to be a single alist (see macro
+`eldev-do-save-cache-file').  Its version must not be newer than
+EXPECTED-VERSION, else it is discarded.
+
+If loading succeeds, BODY is executed with loaded Elisp object
+bound as `contents'.  Version of stored data is bound as
+`version'."
+  (declare (indent 3) (debug (stringp stringp numberp body)))
+  `(condition-case error
+       (if (file-exists-p ,file)
+           (progn
+             (eldev-trace "Reading %s from file `%s'..." ,description (file-relative-name ,file eldev-project-dir))
+             (with-temp-buffer
+               (insert-file-contents ,file)
+               (let* ((contents (read (current-buffer)))
+                      (version  (cdr (assq 'version contents))))
+                 (if (> version ,expected-version)
+                     (eldev-verbose "Ignoring %s in file `%s': version %d must be from the future (expected at most %d)" ,description ,file version ,expected-version)
+                   ,@body))))
+         (eldev-trace "No file `%s', not reading %s" (file-relative-name ,file eldev-project-dir) ,description))
+     ;; Since this is not overly important, just print a verbose-level message.
+     (error (eldev-verbose "Failed to load %s: %s" ,description (error-message-string error)))))
+
+(defmacro eldev-do-save-cache-file (file description version &rest body)
+  "Save data generated by BODY to a cache FILE.
+Such data is considered non-critical, therefore this function
+will never signal an error.  DESCRIPTION is used in
+human-readable information.
+
+BODY is supposed to generate an alist.  A single entry `(version
+. VERSION)' is prepended to it.  It will be used by macro
+`eldev-do-load-cache-file' and its body to determine how to parse
+the data."
+  (declare (indent 3) (debug (stringp stringp numberp body)))
+  `(condition-case error
+       (with-temp-file ,file
+         (eldev-trace "Saving %s to file `%s'..." ,description (file-relative-name ,file eldev-project-dir))
+         (let ((data                       (progn ,@body))
+               (print-circle               nil)
+               (print-continuous-numbering nil))
+           (prin1 (cons (cons 'version ,version) data) (current-buffer))
+           (insert "\n")))
+     ;; Since this is not overly important, just print a verbose-level message.
+     (error (eldev-verbose "Failed to save %s: %s" ,description (error-message-string error)))))
 
 
 
@@ -726,7 +834,9 @@ exist yet."
 
 
 (defun eldev-require-version (version)
-  "Fail if Eldev is too old."
+  "Fail if Eldev is too old.
+VERSION can be either a string or a list (see
+`version-to-list')."
   (unless (eldev-find-package-descriptor 'eldev version)
     (signal 'eldev-too-old `(:hint ("Run `%s upgrade-self' to install the newest available Eldev version" ,(eldev-shell-command t))
                                    "Project `%s' requires Eldev version %s or newer (this is version %s)" ,(package-desc-name (eldev-package-descriptor))
@@ -762,6 +872,8 @@ specify something explicitly."
     (push (cons (car archive) priority) package-archive-priorities)))
 
 (defun eldev-use-local-dependency (dir &optional loading-mode)
+  "Use local dependency found in DIR.
+See the manual for more information about local dependencies."
   (if loading-mode
       (unless (assq loading-mode eldev--loading-modes)
         (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
@@ -778,6 +890,9 @@ specify something explicitly."
     (eldev-trace "Will use directory `%s' as local dependency `%s' with loading mode `%s'" dir name loading-mode)))
 
 (defun eldev-add-extra-dependencies (sets &rest dependencies)
+  "Additionally use DEPENDENCIES for given SETS.
+Sets are typically named after Eldev commands.  See the manual
+for details."
   (dolist (set (eldev-listify sets))
     (let ((set-dependencies (or (assq set eldev--extra-dependencies) (car (push `(,set . nil) eldev--extra-dependencies)))))
       (dolist (dependency dependencies)
@@ -912,6 +1027,8 @@ Influential environment variables: `ELDEV_EMACS' (also just `EMACS'),
   :for-command    help)
 
 (defun eldev-options-help (&optional command title)
+  "List options for given COMMAND.
+If COMMAND is nil, list global options instead."
   (let (by-handler)
     (dolist (option (cdr (assq command eldev--options)))
       (push (car option) (cdr (or (assq (cdr option) by-handler) (car (push (cons (cdr option) nil) by-handler))))))
@@ -931,6 +1048,7 @@ Influential environment variables: `ELDEV_EMACS' (also just `EMACS'),
           (eldev-command-or-option-help all-strings (car group)))))))
 
 (defun eldev-command-or-option-help (command-or-option handler)
+  "Print help on given command or option."
   (let ((documentation  (eldev-briefdoc handler))
         (default        (eldev-get handler :if-default))
         (default-value  (eldev-get handler :default-value))
@@ -967,8 +1085,12 @@ Influential environment variables: `ELDEV_EMACS' (also just `EMACS'),
 
 ;; Loading dependencies; eldev prepare, eldev upgrade, eldev upgrade-self
 
-(defvar eldev-upgrade-dry-run-mode nil)
-(defvar eldev-upgrade-self-from-stable t)
+(defvar eldev-upgrade-dry-run-mode nil
+  "Don't upgrade if non-nil, just pretend to do so.")
+
+(defvar eldev-upgrade-self-from-stable t
+  "Use Melpa Stable when upgrading Eldev.")
+
 (defvar eldev--upgrade-self-from-forced-pa nil
   "Should remain unset; used for testing.")
 
@@ -1361,11 +1483,15 @@ descriptor."
 
 ;; eldev clean
 
-(defvar eldev-clean-dry-run-mode nil)
+(defvar eldev-clean-dry-run-mode nil
+  "Don't delete anything if non-nil, just pretend to do so.")
+
 (defvar eldev--cleaners nil)
 (defvar eldev--cleaner-aliases nil)
 
-(defvar eldev-clean-sets nil)
+(defvar eldev-clean-sets nil
+  "Target sets to clean.
+See `eldev-filesets'.  Default (nil) means to clean everything.")
 
 
 ;; Internal helper for `eldev-defcleaner'.
@@ -1522,6 +1648,7 @@ be used on the command line."
       (eldev-print "Nothing to delete"))))
 
 (defun eldev-clean-fileset ()
+  "Return effective fileset to clean."
   (apply #'eldev-standard-filesets :or (or eldev-clean-sets '(all))))
 
 ;; Similar to `eldev-build-set', but the default value is different.
@@ -1801,15 +1928,30 @@ mode output is restricted to just the version."
 
 These heuristics are aimed at further simplifying test execution.")
 
-(defvar eldev-test-stop-on-unexpected nil)
-(defvar eldev-test-print-backtraces t)
-(defvar eldev-test-expect-at-least nil)
+(defvar eldev-test-stop-on-unexpected nil
+  "If non-nil, stop as soon as a test produces an unexpected result.")
 
-(defvar eldev-test-framework nil)
-(defvar eldev-test-runner nil)
+(defvar eldev-test-print-backtraces t
+  "If non-nil (default), print assertion backtraces.")
+
+(defvar eldev-test-expect-at-least nil
+  "Fail if there are fewer than this many tests.
+This is mostly meant for automated tests to prevent accidental
+situations where success is claimed only because no/few tests
+were executed.")
+
+(defvar eldev-test-framework nil
+  "Test framework to use.
+If left nil (default value), Eldev will try to autodetect.")
+
+(defvar eldev-test-runner nil
+  "Test runner to use.")
+
 (defvar eldev--test-runners nil)
 
-(defvar eldev-test-file-patterns nil)
+(defvar eldev-test-file-patterns nil
+  "Load only those test files that match one of these patterns.
+Should normally be specified only from command line.")
 
 (defvar eldev-test-known-frameworks '((ERT . ((detect               . (lambda () (featurep 'ert)))
                                               (preprocess-selectors . (lambda (selectors)
@@ -1900,10 +2042,14 @@ unexpected result."
       (eldev-print "No test files to load"))))
 
 (defun eldev-test-get-framework-data (framework)
+  "Get handlers for given FRAMEWORK."
   (or (cdr (assq framework eldev-test-known-frameworks))
       (error "Unknown test framework `%s'" framework)))
 
 (defun eldev-test-framework ()
+  "Get used test framework.
+If variable `eldev-test-framework' has nil value, framework is
+autodetected if possible."
   (or eldev-test-framework
       (let ((scan eldev-test-known-frameworks)
             detected)
@@ -1916,70 +2062,54 @@ unexpected result."
         detected)))
 
 (defun eldev-test-preprocess-selectors (framework selectors)
+  "Convert specified SELECTORS for use by given FRAMEWORK."
   (let ((preprocess-selectors (cdr (assq 'preprocess-selectors (eldev-test-get-framework-data framework)))))
     (if preprocess-selectors
         (funcall preprocess-selectors selectors)
       selectors)))
 
 (defun eldev-test-selectors-to-elisp-values (selectors &optional cons-with-string)
+  "Read SELECTORS as Elisp expressions.
+This function is meant for use in framework support
+implementations."
   (mapcar (lambda (selector)
             (let ((as-elisp (eldev-read-wholly selector "selector `%s'")))
               (if cons-with-string `(,as-elisp . ,selector) as-elisp)))
           selectors))
 
 (defun eldev-test-prepare-framework (framework selectors)
+  "Prepare given test FRAMEWORK."
   (let ((prepare (cdr (assq 'prepare (eldev-test-get-framework-data framework)))))
     (when prepare
       (funcall prepare selectors))))
 
 (defun eldev-test-finalize-framework (framework selectors)
+  "Finalize given test FRAMEWORK after executing tests."
   (condition-case error
       (let ((finalize (cdr (assq 'finalize (eldev-test-get-framework-data framework)))))
         (when finalize
           (funcall finalize selectors)))
     (error (eldev-warn "When finalizing test framework `%s': %s" framework (error-message-string error)))))
 
-(defmacro eldev-do-load-cache-file (file description expected-version &rest body)
-  (declare (indent 3) (debug (stringp stringp numberp body)))
-  `(condition-case error
-       (if (file-exists-p ,file)
-           (progn
-             (eldev-trace "Reading %s from file `%s'..." ,description (file-relative-name ,file eldev-project-dir))
-             (with-temp-buffer
-               (insert-file-contents ,file)
-               (let* ((contents (read (current-buffer)))
-                      (version  (cdr (assq 'version contents))))
-                 (if (> version ,expected-version)
-                     (eldev-verbose "Ignoring %s in file `%s': version %d must be from the future (expected at most %d)" ,description ,file version ,expected-version)
-                   ,@body))))
-         (eldev-trace "No file `%s', not reading %s" (file-relative-name ,file eldev-project-dir) ,description))
-     ;; Since this is not overly important, just print a verbose-level message.
-     (error (eldev-verbose "Failed to load %s: %s" ,description (error-message-string error)))))
-
 (defmacro eldev-test-do-load-results (file-extension description expected-version &rest body)
+  "Load previous test results.
+This macro is meant for use in framework support
+implementations."
   (declare (indent 3) (debug (stringp stringp numberp body)))
   (let ((file (expand-file-name (format "test-results.%s" file-extension) (eldev-cache-dir t))))
     `(eldev-do-load-cache-file ,file ,description ,expected-version ,@body)))
 
-(defmacro eldev-do-save-cache-file (file description version &rest body)
-  (declare (indent 3) (debug (stringp stringp numberp body)))
-  `(condition-case error
-       (with-temp-file ,file
-         (eldev-trace "Saving %s to file `%s'..." ,description (file-relative-name ,file eldev-project-dir))
-         (let ((data                       (progn ,@body))
-               (print-circle               nil)
-               (print-continuous-numbering nil))
-           (prin1 (cons (cons 'version ,version) data) (current-buffer))
-           (insert "\n")))
-     ;; Since this is not overly important, just print a verbose-level message.
-     (error (eldev-verbose "Failed to save %s: %s" ,description (error-message-string error)))))
-
 (defmacro eldev-test-do-save-results (file-extension description version &rest body)
+  "Save test results.
+This macro is meant for use in framework support
+implementations."
   (declare (indent 3) (debug (stringp stringp numberp body)))
   (let ((file (expand-file-name (format "test-results.%s" file-extension) (eldev-cache-dir t t))))
     `(eldev-do-save-cache-file ,file ,description ,version ,@body)))
 
 (defun eldev-test-validate-amount (num-tests)
+  "Fail if NUM-TESTS are not enough.
+See `eldev-test-expect-at-least'."
   (when (and eldev-test-expect-at-least (< num-tests eldev-test-expect-at-least))
     (signal 'eldev-error `("Too few tests match the selectors (%d, expected at least %d)" ,num-tests ,eldev-test-expect-at-least))))
 
@@ -2116,8 +2246,12 @@ that the project provides that feature.  Otherwise should be a
 single symbol or a list of symbols (empty list---nil---of course
 means not to require anything).")
 
-(defvar eldev-eval-lexical t)
-(defvar eldev-eval-require-main-feature t)
+(defvar eldev-eval-lexical t
+  "Whether to evaluate expressions in lexical or dynamic scope.")
+
+(defvar eldev-eval-require-main-feature t
+  "Whether to autorequire main project features.")
+
 (defvar eldev-eval-printer-function #'eldev-prin1
   "Default printer function for `eval' command.
 Standard value is `eldev-prin1', but can be customized.")
@@ -2218,6 +2352,7 @@ obligations."
     (pp object stream)))
 
 (defun eldev-required-features (feature-names)
+  "Return a list of features to autorequire."
   (mapcar (lambda (feature)
             (if (eq feature :project-name) (package-desc-name (eldev-package-descriptor)) feature))
           (eldev-flatten-tree (mapcar (lambda (feature)
@@ -2228,7 +2363,8 @@ obligations."
 
 ;; eldev emacs
 
-(defvar eldev-emacs-default-command-line '("--no-init-file" "--no-site-file" "--no-site-lisp" "--no-splash"))
+(defvar eldev-emacs-default-command-line '("--no-init-file" "--no-site-file" "--no-site-lisp" "--no-splash")
+  "Options added to Emacs command line by default.")
 
 (defvar eldev-emacs-required-features :default
   "Features that spawned Emacs processes require automatically.
@@ -2284,10 +2420,18 @@ Emacs, else it will most likely fail."
 (defvar eldev--build-targets (make-hash-table :test #'equal))
 (defvar eldev--targets-prepared-for nil)
 
-(defvar eldev-build-sets nil)
-(defvar eldev-build-keep-going nil)
-(defvar eldev-build-treat-warnings-as-errors nil)
-(defvar eldev-build-suppress-warnings nil)
+(defvar eldev-build-sets nil
+  "Target sets to build.
+If left nil, only set `main' is built.")
+
+(defvar eldev-build-keep-going nil
+  "Whether to continue even if building a target fails.")
+
+(defvar eldev-build-treat-warnings-as-errors nil
+  "Whether to treat all building warnings as errors.")
+
+(defvar eldev-build-suppress-warnings nil
+  "Whether to ignore all building warnings (but not errors).")
 
 (defvar eldev-build-force-rebuilding nil
   "Targets that are to be rebuilt even if they appear up-to-date.
@@ -2301,19 +2445,31 @@ Can be either a list of filenames or symbol t, meaning “all of
 them”.  Targets that are built from these sources or depend on
 them will never be found up-to-date.")
 
-(defvar eldev-build-dry-run-mode nil)
+(defvar eldev-build-dry-run-mode nil
+  "If non-nil, don't build anything, just pretend to do so.")
 
-(defvar eldev-build-current-targets nil)
+(defvar eldev-build-current-targets nil
+  "When building, bound to list of targets being built now.")
 
-(defvar eldev-package-generate-entry-file nil)
-(defvar eldev-package-forced-version nil)
-(defvar eldev-package-output-dir nil)
-(defvar eldev-package-print-filename nil)
+(defvar eldev-package-generate-entry-file nil
+  "If non-nil, generate an entry file for package archives.")
+
+(defvar eldev-package-forced-version nil
+  "Use given version instead of project's self-reported version.")
+
+(defvar eldev-package-output-dir nil
+  "Put generated packages to given directory.
+If left unspecified, value of function `eldev-dist-dir' is used.")
+
+(defvar eldev-package-print-filename nil
+  "Print resulting filename after generating a package.
+This is mostly for interfacing with other tools.")
 
 (defvar eldev--build-plan nil)
 (defvar eldev--build-results nil)
 
-(defvar eldev-targets-list-dependencies nil)
+(defvar eldev-targets-list-dependencies nil
+  "Whether to print known target dependencies.")
 
 (defvar eldev--target-dependencies nil)
 (defvar eldev--target-dependencies-need-saving nil)
@@ -2522,6 +2678,7 @@ This function may only be called while inside the body of a
       (setf eldev--target-dependencies-need-saving t))))
 
 (defmacro eldev-with-target-dependencies (&rest body)
+  "Execute BODY with target dependency mechanism set up."
   (declare (indent 0) (debug (body)))
   `(progn (eldev--load-target-dependencies)
           (unwind-protect
@@ -2562,6 +2719,7 @@ This function may only be called while inside the body of a
 
 
 (defmacro eldev-defbuilder (name arguments &rest body)
+  "Define a target builder."
   (declare (doc-string 3) (indent 2))
   (let ((parsed-body  (eldev-macroexp-parse-body body))
         (builder-name (intern (replace-regexp-in-string (rx bol (1+ (not (any "-"))) (1+ "-") (? "builder-")) "" (symbol-name name))))
@@ -2932,6 +3090,9 @@ Return value is one of the following symbols:
       (if (memq (gethash target eldev--build-plan) '(nil side-effect)) 'not-planned 'planned)))
 
 (defun eldev-build-target (target)
+  "Build given TARGET.
+The TARGET must be previously planned for building: it is not
+possible to build arbitrary targets this way."
   (eldev-pcase-exhaustive (eldev-build-target-status target)
     (`building    (error "Trying to build `%s' recursively" target))
     (`built       (eldev-trace "Not trying to build `%s' again" target))

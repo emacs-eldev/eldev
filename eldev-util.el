@@ -83,6 +83,8 @@
 
 ;; Replacements for a small parts of `dash'.
 (defmacro eldev-any-p (form list)
+  "Same as `--any' in Dash.
+Used to avoid depending on the library."
   (let ((values (make-symbol "$values"))
         (result (make-symbol "$result")))
     `(let ((,values ,list)
@@ -93,6 +95,8 @@
        ,result)))
 
 (defmacro eldev-all-p (form list)
+  "Same as `--all' in Dash.
+Used to avoid depending on the library."
   (let ((values (make-symbol "$values"))
         (result (make-symbol "$result")))
     `(let ((,values ,list)
@@ -103,6 +107,8 @@
        ,result)))
 
 (defmacro eldev-filter (form list)
+  "Same as `--filter' in Dash.
+Used to avoid depending on the library."
   (let ((values (make-symbol "$values"))
         (result (make-symbol "$result")))
     `(let ((,values ,list)
@@ -144,6 +150,7 @@ unmodified, else it is wrapped as a single-item list."
   (if (listp x) x `(,x)))
 
 (defun eldev-string-list-p (x)
+  "Determine if X is a list of strings."
   (let ((result t))
     (while x
       (if (and (consp x) (stringp (car x)))
@@ -153,7 +160,8 @@ unmodified, else it is wrapped as a single-item list."
     result))
 
 (defun eldev-flatten-tree (tree)
-  "Like `flatten-tree' in newer Emacs versions."
+  "Like `flatten-tree' in newer Emacs versions.
+Needed for compatibility."
   (let (elems)
     (while (consp tree)
       (let ((elem (pop tree)))
@@ -178,11 +186,12 @@ unmodified, else it is wrapped as a single-item list."
          value))))
 
 
-;; We use these to avoid accidental name clashes with something else.
 (defsubst eldev-get (symbol property)
+  "Similar to built-in `get', used to avoid accidental name clashes."
   (plist-get (get symbol 'eldev--properties) property))
 
 (defsubst eldev-put (symbol property value)
+  "Similar to built-in `put', used to avoid accidental name clashes."
   (put symbol 'eldev--properties (plist-put (get symbol 'eldev--properties) property value)))
 
 
@@ -196,6 +205,12 @@ parameter, but it's not needed in noninteractive use."
 
 
 (defun eldev-quote-sh-string (string &optional always-quote)
+  "Quote given STRING for use in a shell command.
+Unlike standard `shell-quote-argument', this function uses single
+quotes to improve readability in most cases.
+
+If ALWAYS-QUOTE is not specified and STRING doesn't contain any
+special characters, it is returned unmodified."
   (if (and (not always-quote) (string-match-p "\\`[-a-zA-Z0-9,._+:@%/]+\\'" string))
       ;; No quoting necessary.
       string
@@ -210,14 +225,21 @@ parameter, but it's not needed in noninteractive use."
 
 
 (defun eldev-replace-suffix (string old-suffix new-suffix)
+  "Replace suffix of given STRING (usually a filename).
+If STRING doesn't even end in OLD-SUFFIX, it is returned
+unmodified."
   (if (string-suffix-p old-suffix string)
       (concat (substring string 0 (- (length old-suffix))) new-suffix)
     string))
 
 (defsubst eldev-external-filename (filename)
+  "Determine if FILENAME specifies a path outside current directory.
+This function doesn't handle absolute paths specially."
   (or (string= filename "..") (string-prefix-p "../" filename)))
 
 (defsubst eldev-external-or-absolute-filename (filename)
+  "Determine if FILENAME specifies a path outside current directory.
+Absolute paths are also considered to point outside."
   (or (eldev-external-filename filename) (file-name-absolute-p filename)))
 
 
@@ -236,6 +258,10 @@ library version."
         (symbol-value variable)))))
 
 (defmacro eldev-bind-from-environment (environment variables &rest body)
+  "Execute BODY with certain VARIABLES set from ENVIRONMENT.
+ENVIRONMENT should be an alist (see `eldev-environment-value').
+If no value for a variable is specified, current value is not
+altered."
   (declare (indent 2))
   `(let (,@(mapcar (lambda (variable) `(,variable (eldev-environment-value ',variable ,environment))) variables))
      ,@body))
@@ -249,7 +275,11 @@ library version."
 Can be a symbol `quiet', `verbose' or `trace'.  Any other value,
 including nil, stands for the default verbosity level.")
 
-(defvar eldev-coloring-mode 'auto)
+(defvar eldev-coloring-mode 'auto
+  "Whether to use coloring on output.
+Special symbol \\='auto means that coloring should be used when
+printing to a real terminal, but not when printing to a file.")
+
 (defvar eldev--tty (equal (eldev-getenv "ELDEV_TTY") "t"))
 
 (defvar eldev-colorizing-schemes (eval-when-compile (let (schemes)
@@ -267,22 +297,40 @@ including nil, stands for the default verbosity level.")
                                                           (puthash (car type) (format "%s" (cadr entry))
                                                                    (or (cdr (assq (car entry) schemes))
                                                                        (eldev--assq-set (car entry) (make-hash-table :test #'eq) schemes)))))
-                                                      schemes)))
+                                                      schemes))
+  "Alist of colorizing schemes.
+Specifies how to convert colorizing types to actual ASCII
+terminal colors.")
 
-(defvar eldev-used-colorizing-scheme nil)
+(defvar eldev-used-colorizing-scheme nil
+  "Used colorizing scheme.
+If not specified, Eldev will try to pick the best-suited one.")
 
-(defvar eldev-output-time-diffs nil)
+(defvar eldev-output-time-diffs nil
+  "Whether to prepend all output lines with elapsed time.")
+
 (defvar eldev--time-diff-base (float-time))
 
-(defvar eldev-disable-message-rerouting nil)
-(defvar eldev-message-rerouting-destination :stderr)
+(defvar eldev-disable-message-rerouting nil
+  "Temporarily disable message rerouting.
+See `eldev-output-reroute-messages'.")
+
+(defvar eldev-message-rerouting-destination :stderr
+  "Rerouted message destination.
+Should be either `:stderr' or `:stdout'.")
+
 (defvar eldev--output-rerouted nil)
 (defvar eldev--real-stderr-output nil)
 
 
-(defalias 'eldev-format-message (if (fboundp 'format-message) 'format-message #'format))
+(defalias 'eldev-format-message (if (fboundp 'format-message) 'format-message #'format)
+  "Like `format-message' if that is defined.
+Fall back to `format' on older Emacs versions.")
 
 (defun eldev-message-plural (n singular &optional plural)
+  "Return SINGULAR or PLURAL as suitable for the value of N.
+If PLURAL is not specified, it is built from SINGULAR by adding a
+single ‘s’ (suitable for most, but not all words)."
   (if (= n 1)
       (eldev-format-message "%d %s" n singular)
     (if plural
@@ -290,9 +338,21 @@ including nil, stands for the default verbosity level.")
       (eldev-format-message "%d %ss" n singular))))
 
 (defun eldev-message-enumerate (string values &optional converter dont-quote no-and)
+  "Enumerate VALUES for use in human-readable messages.
+STRING is the common term.  Can be either a simple string, a
+two-item list in form (SINGULAR PLURAL) or nil.
+
+If CONVERTER is specified, it should be a function that converts
+a value to a string; otherwise VALUES must be a list of strings.
+
+Values are put in single quotes, unless DONT-QUOTE is specified.
+
+Values are separated by commas, but the last two, for better
+readability, are separated with word “and”.  However, if NO-AND
+is t, a comma is used also between the last two values.  If
+NO-AND is a string, it is used in place of “and”."
   (let (enumerated)
-    (unless (listp values)
-      (setf values (list values)))
+    (setf values (eldev-listify values))
     (when string
       (push (if (cdr values)
                 (if (consp string) (cadr string) (format "%ss" string))
@@ -307,11 +367,16 @@ including nil, stands for the default verbosity level.")
     (apply #'concat (nreverse enumerated))))
 
 (defun eldev-message-enumerate-files (string files)
+  "Enumerate FILES for use in human-readable messages.
+See function `eldev-message-enumerate' for details."
   (eldev-format-message string (if (and files (null (cdr files))) "" "s")
                         (if files (mapconcat (lambda (file) (eldev-format-message "`%s'" file)) files ", ") "none")
                         (length files)))
 
 (defun eldev-message-version (version &optional colorized)
+  "Format VERSION for use in human-readable messages.
+VERSION can be a string, a list (see `version-to-list') or a
+package descriptor."
   (let ((string (cond ((stringp version)                        version)
                       ((and version (not (equal version '(0)))) (package-version-join (if (listp version) version (package-desc-version version))))
                       (t                                        "(any)"))))
@@ -320,14 +385,18 @@ including nil, stands for the default verbosity level.")
     string))
 
 (defun eldev-message-command-line (executable command-line)
+  "Format given command line for human-readable messages"
   (concat executable " " (mapconcat #'eldev-quote-sh-string command-line " ")))
 
-;; Mainly in case we want to write something better later.
 (defun eldev-y-or-n-p (prompt)
+  "Similar to `y-or-n-p'.
+Currently works exactly like that built-in, but may be changed
+later (preserving semantics)."
   (y-or-n-p prompt))
 
 
 (defun eldev-colorize (string &rest types)
+  "Apply given Eldev colorizing to STRING."
   (setf string (copy-sequence (if (symbolp string) (symbol-name string) string string)))
   (when types
     (add-face-text-property 0 (length string) types nil string))
@@ -435,6 +504,9 @@ including nil, stands for the default verbosity level.")
 
 
 (defun eldev-read-wholly (string &optional description)
+  "Read STRING as Elisp expression.
+This is basically a wrapper over `read-from-string', but issues
+human-readable errors if there are any problems."
   (setf description (eldev-format-message (or description "Lisp object from `%s'") string))
   (let* ((result (condition-case error
                      (read-from-string string)
@@ -446,6 +518,11 @@ including nil, stands for the default verbosity level.")
 
 
 (defmacro eldev-output-reroute-messages (&rest body)
+  "Execute BODY while rerouting standard Emacs messages.
+Messages are reformatted through `eldev-output' and sent either
+to `eldev-message-rerouting-destination'.  Can be termporarily
+disabled by setting `eldev-disable-message-rerouting' inside
+BODY."
   (declare (indent 0) (debug (body)))
   `(eldev-advised (#'message :around (unless (or eldev-disable-message-rerouting eldev--output-rerouted)
                                        (lambda (original &rest args)
@@ -457,12 +534,15 @@ including nil, stands for the default verbosity level.")
 
 
 (defun eldev-documentation (function)
-  ;; Basically like `help--doc-without-fn', but that is package-private.
+  "Return Elisp documentation of given FUNCTION.
+Strip calling convention from byte-compiled functions, since that
+is not meant for humans."
   (let ((documentation (documentation function)))
     (when documentation
       (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" documentation))))
 
 (defun eldev-briefdoc (function)
+  "Return first sentence of Elisp documentation of given FUNCTION."
   (or (eldev-get function :briefdoc)
       (when (documentation function)
         (with-temp-buffer
@@ -494,26 +574,31 @@ including nil, stands for the default verbosity level.")
      ,var))
 
 (defun eldev-tar-executable (&optional not-required)
+  "Find `tar' executable."
   (eldev--find-executable eldev--tar-executable not-required
     (or (executable-find "gtar") (executable-find "tar"))
     "Cannot find `tar' program"))
 
 (defun eldev-makeinfo-executable (&optional not-required)
+  "Find `makeinfo' executable."
   (eldev--find-executable eldev--makeinfo-executable not-required
     (executable-find "makeinfo")
     "Cannot find `makeinfo' program"))
 
 (defun eldev-install-info-executable (&optional not-required)
+  "Find `install-info' executable."
   (eldev--find-executable eldev--install-info-executable not-required
     (executable-find "install-info")
     "Cannot find `install-info' program"))
 
 (defun eldev-git-executable (&optional not-required)
+  "Find `git' executable."
   (eldev--find-executable eldev--git-executable not-required
     (executable-find "git")
     "Git is not installed (cannot find `git' executable)"))
 
 (defun eldev-directory-in-exec-path (directory)
+  "Determine if DIRECTORY is in $PATH environment variable."
   (setf directory (expand-file-name directory))
   (or (member (directory-file-name directory) exec-path) (member (file-name-as-directory directory) exec-path)))
 
@@ -629,7 +714,8 @@ is non-nil when this function is called."
 
 ;; Fileset basics.
 
-(defvar eldev-fileset-max-iterations 10)
+(defvar eldev-fileset-max-iterations 10
+  "Fail if computed fileset elements cannot be resolved in this many iterations.")
 
 (defun eldev-find-files (fileset &optional absolute root)
   "Find files matching given FILESET.
@@ -660,11 +746,14 @@ For example, result list could be something like this:
         (nreverse (car files))))))
 
 (defun eldev-find-and-trace-files (fileset description &optional absolute root)
+  "Find files and trace a standard message about them.
+See `eldev-find-files' for details."
   (let ((files (eldev-find-files fileset absolute root)))
     (eldev-trace "%s" (eldev-message-enumerate-files (eldev-format-message "Found %s: %%s (%%d)" description) files))
     files))
 
 (defun eldev-filter-files (files fileset &optional absolute root)
+  "Return only those FILES that are matched by FILESET."
   (setf root (file-name-as-directory (if root (expand-file-name root eldev-project-dir) eldev-project-dir)))
   (save-match-data
     (let ((case-fold-search     nil)
