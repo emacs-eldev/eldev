@@ -32,12 +32,21 @@
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-test-compile-everything-6 ()
-  ;; This test is particularly important, as it highlights that
-  ;; certain files must be loaded before compilation.
+  ;; `project-e' contains files that must be loaded before
+  ;; compilation.
   (eldev--test-without-files "project-e" ("project-e.elc" "project-e-misc.elc" "project-e-util.elc")
-    (eldev--test-run nil ("compile")
+    (eldev--test-run nil ("compile" "--load-before-compiling")
       (eldev--test-assert-files project-dir preexisting-files "project-e.elc" "project-e-misc.elc" "project-e-util.elc")
       (should (= exit-code 0)))))
+
+
+(ert-deftest eldev-test-compile-doesnt-load-when-not-asked-1 ()
+  ;; `project-e-misc.el' is somewhat broken in that it cannot be
+  ;; compiled before being loaded.  Make sure that Eldev doesn't load
+  ;; `.el' files by default: only when asked.
+  (eldev--test-without-files "project-e" ("project-e.elc" "project-e-misc.elc" "project-e-util.elc")
+    (eldev--test-run nil ("compile")
+      (should (= exit-code 1)))))
 
 
 (ert-deftest eldev-test-compile-erroneous-project-1 ()

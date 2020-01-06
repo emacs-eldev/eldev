@@ -2424,6 +2424,20 @@ Emacs, else it will most likely fail."
   "Target sets to build.
 If left nil, only set `main' is built.")
 
+(defvar eldev-build-load-before-byte-compiling nil
+  "Whether to load `.el' files before byte-compiling them.
+
+Ideally, files should be byte-compilable without loading them
+first.  This might require some careful application of
+`eval-and-compile' and similar forms, especially when complicated
+macros are involved, but is achievable.  Such compilation without
+loading first is also somewhat faster.
+
+However, since Emacs packaging system always loads before
+byte-compiling, many projects are not prepared for this.  You can
+set this to non-nil to avoid warnings and errors you will not
+typically see anyway.")
+
 (defvar eldev-build-keep-going nil
   "Whether to continue even if building a target fails.")
 
@@ -2941,6 +2955,13 @@ used"
   :default-value  (eldev-message-enumerate nil (or eldev-build-sets '(main)) nil t)
   (setf eldev-build-sets (append eldev-build-sets (list (eldev-validate-standard-fileset name)))))
 
+(eldev-defbooloptions eldev-build-load-before-byte-compiling eldev-build-byte-compile-straight-away eldev-build-load-before-byte-compiling
+  ("Load `.el' files before byte-compiling them; this is how Emacs packaging system behaves"
+   :options       (-l --load-before-compiling))
+  ("Byte-compile `.el' without loading them first; this might require adding some `eval-and-compile' forms in your code"
+   :options       (-L --dont-load-before-compiling --byte-compile-straight-away))
+  :for-command    (build compile package))
+
 (eldev-defbooloptions eldev-build-keep-going eldev-build-stop-on-failure eldev-build-keep-going
   ("Keep building even if a target failed"
    :options       (-k --keep-going))
@@ -3220,7 +3241,8 @@ possible to build arbitrary targets this way."
                                ;; Don't even load `no-byte-compile' files unless called
                                ;; recursively.  Otherwise we might e.g. attempt loading
                                ;; `define-package' and fail.
-                               (unless (and (or recursive skip-byte-compilation (load source nil t t))
+                               (unless (and (or recursive skip-byte-compilation (not eldev-build-load-before-byte-compiling)
+                                                (load source nil t t))
                                             (let* ((byte-compile-error-on-warn        eldev-build-treat-warnings-as-errors)
                                                    (have-warning-function             (boundp 'byte-compile-log-warning-function))
                                                    (byte-compile-log-warning-function (if eldev-build-suppress-warnings
