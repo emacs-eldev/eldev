@@ -2474,6 +2474,10 @@ This is mostly for interfacing with other tools.")
 (defvar eldev--target-dependencies nil)
 (defvar eldev--target-dependencies-need-saving nil)
 
+;; FIXME: Maybe find a better way?
+(defvar eldev--package-target-file nil)
+(defvar eldev--package-target-generated nil)
+
 
 (defsubst eldev-virtual-target-p (target)
   (string-prefix-p ":" target))
@@ -3318,10 +3322,6 @@ possible to build arbitrary targets this way."
     (unless (= exit-code 0)
       (signal 'eldev-error `("`install-info' process exited with error code %d" ,exit-code)))))
 
-
-;; FIXME: Maybe find a better way?
-(defvar eldev--package-target-file nil)
-(defvar eldev--package-target-generated nil)
 
 (eldev-defbuilder eldev-builder-package (sources targets)
   :type           many-to-many

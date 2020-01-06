@@ -20,5 +20,15 @@ env:
 
 script:
   - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time test --omit-backtraces --expect 200
-  # Also require that byte-compilation produces no warnings.
-  - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time compile --warnings-as-errors
+  # Also require that byte-compilation produces no warnings.  We'd use
+  # Eldev itself to byte-compile, but that could hide some problems
+  # (for Eldev itself, other packages should be fine) by indirectly
+  # loading `.el' first.
+  - emacs --batch --eval "(progn
+                            (require 'bytecomp)
+                            (let ((byte-compile-error-on-warn t))
+                              (push default-directory load-path)
+                              (unless (and (byte-compile-file \"eldev-util.el\")
+                                           (byte-compile-file \"eldev.el\")
+                                           (byte-compile-file \"eldev-ert.el\"))
+                                (kill-emacs 1))))"

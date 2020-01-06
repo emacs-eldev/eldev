@@ -38,15 +38,14 @@
     (put name 'error-message    message)))
 
 
-(if (fboundp 'xor)
-    (defalias 'eldev-xor 'xor
-      "Same as `xor', needed for compatibility.")
-  (defsubst eldev-xor (a b)
-    "Same as `xor', needed for compatibility."
-    (if a (not b) b)))
-
-
 (eval-and-compile
+  (if (fboundp 'xor)
+      (defalias 'eldev-xor 'xor
+        "Same as `xor', needed for compatibility.")
+    (defsubst eldev-xor (a b)
+      "Same as `xor', needed for compatibility."
+      (if a (not b) b)))
+
   (if (macrop 'pcase-exhaustive)
       (defalias 'eldev-pcase-exhaustive 'pcase-exhaustive
         "Same as `pcase-exhaustive', needed for compatibility.")
@@ -460,12 +459,13 @@ later (preserving semantics)."
     (setf eldev-used-colorizing-scheme 'light-bg))
   (cdr (assq eldev-used-colorizing-scheme eldev-colorizing-schemes)))
 
-(defun eldev--output-wrapper (extra-keywords colorize-as format-string arguments)
-  (let (keywords)
-    (while (keywordp format-string)
-      (push format-string keywords)
-      (setf format-string (pop arguments)))
-    `(eldev-output ,@extra-keywords ,@(nreverse keywords) (eldev-colorize ,format-string ',colorize-as) ,@arguments)))
+(eval-and-compile
+  (defun eldev--output-wrapper (extra-keywords colorize-as format-string arguments)
+    (let (keywords)
+      (while (keywordp format-string)
+        (push format-string keywords)
+        (setf format-string (pop arguments)))
+      `(eldev-output ,@extra-keywords ,@(nreverse keywords) (eldev-colorize ,format-string ',colorize-as) ,@arguments))))
 
 (defmacro eldev-error (format-string &rest arguments)
   "Format and print given error message."
