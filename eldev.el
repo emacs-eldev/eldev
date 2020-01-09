@@ -3211,110 +3211,144 @@ possible to build arbitrary targets this way."
   ;; idea is to byte-compile `require'd files first so that the outer file uses already
   ;; byte-compiled and thus faster definitions.
   (require 'bytecomp)
-  (let* ((load-prefer-newer         t)
-         (recursive                 eldev--recursive-byte-compilation)
-         (original-load-source-file load-source-file-function)
-         (load-source-file-function (if recursive
-                                        original-load-source-file
-                                      (lambda (full-name file no-error no-message)
-                                        (let* ((dependency-source (file-relative-name full-name eldev-project-dir))
-                                               ;; See above: not using `byte-compile-dest-file'.
-                                               (dependency-target (concat dependency-source "c")))
-                                          (eldev-trace "Loading file `%s'" dependency-source)
-                                          ;; We have to load the file before byte-compiling it,
-                                          ;; otherwise e.g. certain macros can fail.
-                                          (and (funcall original-load-source-file full-name file no-error no-message)
-                                               (or (string= dependency-source source)
-                                                   (eq (eldev-build-target-status dependency-target) 'not-planned)
-                                                   (eldev-build-target dependency-target))))))))
-    (eldev-verbose (if recursive "Byte-compiling file `%s' early as `require'd from another file..." "Byte-compiling file `%s'...")
-                   source)
-    (let ((eldev--recursive-byte-compilation t))
-      (let ((failed-source (catch 'eldev--byte-compilation-failed
-                             ;; When called recursively, let `byte-compile-file' determine this.
-                             (let ((skip-byte-compilation (unless recursive
-                                                            (with-temp-buffer
-                                                              (insert-file-contents source)
-                                                              ;; Older versions don't understand `no-mode'.
-                                                              (hack-local-variables (when (>= emacs-major-version 26) 'no-mode))
-                                                              no-byte-compile))))
-                               ;; Don't even load `no-byte-compile' files unless called
-                               ;; recursively.  Otherwise we might e.g. attempt loading
-                               ;; `define-package' and fail.
-                               (unless (and (or recursive skip-byte-compilation (not eldev-build-load-before-byte-compiling)
-                                                (load source nil t t))
-                                            (let* ((byte-compile-error-on-warn        eldev-build-treat-warnings-as-errors)
-                                                   (have-warning-function             (boundp 'byte-compile-log-warning-function))
-                                                   (byte-compile-log-warning-function (if eldev-build-suppress-warnings
-                                                                                          #'ignore
-                                                                                        (when have-warning-function
-                                                                                          byte-compile-log-warning-function)))
-                                                   (result (if skip-byte-compilation
-                                                               'no-byte-compile
-                                                             (eldev-advised (#'byte-compile-log-warning :around
-                                                                                                        (unless have-warning-function
-                                                                                                          (lambda (original &rest arguments)
-                                                                                                            (unless eldev-build-suppress-warnings
-                                                                                                              (apply original arguments)))))
-                                                               ;; Hack: make Emacs 24.x shut up.  We don't do it in various
-                                                               ;; other cases, but this one is important for our tests.
-                                                               (eldev-advised (#'message :around
-                                                                                         (when (< emacs-major-version 25)
-                                                                                           (lambda (original &rest arguments)
-                                                                                             (unless (equal arguments `("Wrote %s" ,(expand-file-name target)))
-                                                                                               (apply original arguments)))))
-                                                                 (byte-compile-file source))))))
-                                              (cond ((eq result 'no-byte-compile)
-                                                     (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable"
-                                                                    source)
-                                                     t)
-                                                    (result
-                                                     ;; Load ourselves, since `byte-compile-file' calls
-                                                     ;; `load' without `nomessage' parameter.
-                                                     (load target nil t)))))
-                                 source)))))
-        (when failed-source
-          (if recursive
-              ;; Normal errors would get caught inside Emacs byte-compilation code.
-              (throw 'eldev--byte-compilation-failed failed-source)
-            (signal 'eldev-build-failed `("Failed to byte-compile `%s'" ,failed-source))))
-        (let (inherited-targets
-              provided-feature)
-          (dolist (entry (cdr (or (assoc (expand-file-name source eldev-project-dir) load-history) (assoc (expand-file-name target eldev-project-dir) load-history))))
-            (pcase entry
-              (`(require . ,feature)
-               (unless provided-feature
-                 (let ((provided-by (eldev--find-feature-provider feature)))
-                   (when (stringp provided-by)
-                     (push `(,feature . ,provided-by) inherited-targets)))))
-              (`(provide . ,feature)
-               ;; See e.g. `eldev-test-compile-circular-requires-1': after `provide' form
-               ;; ignore all remaining `require's for dependency purposes.  Also remove
-               ;; self-dependency entry if it has been added.
-               (puthash feature source eldev--feature-providers)
-               (setf inherited-targets (delete `(,feature . ,source) inherited-targets)
-                     provided-feature  t))))
-          (eldev-set-target-dependencies target (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
-                                                        inherited-targets)))))))
+  (let* ((recursive                         eldev--recursive-byte-compilation)
+         (eldev--recursive-byte-compilation t)
+         (load-prefer-newer                 t)
+         ;; When called recursively, let `byte-compile-file' determine this.
+         (skip-byte-compilation             (unless recursive
+                                              (with-temp-buffer
+                                                (insert-file-contents source)
+                                                ;; Older versions don't understand `no-mode'.
+                                                (hack-local-variables (when (>= emacs-major-version 26) 'no-mode))))))
+    ;; Don't do anything with `no-byte-compile' files (not even load) unless called
+    ;; recursively.  Otherwise we might e.g. attempt loading `define-package' and fail.
+    (unless skip-byte-compilation
+      (eldev-verbose (if recursive "Byte-compiling file `%s' early as `require'd from another file..." "Byte-compiling file `%s'...")
+                     source)
+      (eldev-advised ('load :before
+                            (unless recursive
+                              (lambda (file &rest _ignored)
+                                (eldev--trigger-early-byte-compilation file))))
+        ;; The advice for `load' is, unfortunately, not enough since `require' calls
+        ;; C-level function directly, bypassing advice machinery.
+        (eldev-advised ('require :before
+                                 (unless recursive
+                                   (lambda (feature &optional filename &rest _ignored)
+                                     (eldev--trigger-early-byte-compilation (or filename (eldev--find-feature-provider feature))))))
+          (let* (result
+                 (failed-source
+                  (catch 'eldev--byte-compilation-failed
+                    ;; Must be within the `catch', because it can trigger byte-compilation
+                    ;; of other targets.
+                    (when eldev-build-load-before-byte-compiling
+                      (eldev-trace "Loading file `%s' before byte-compiling it..." source)
+                      (load source nil t t))
+                    (setf result (if skip-byte-compilation
+                                     'no-byte-compile
+                                   (let* ((byte-compile-error-on-warn        eldev-build-treat-warnings-as-errors)
+                                          (have-warning-function             (boundp 'byte-compile-log-warning-function))
+                                          (byte-compile-log-warning-function (if eldev-build-suppress-warnings
+                                                                                 #'ignore
+                                                                               (when have-warning-function
+                                                                                 byte-compile-log-warning-function))))
+                                     (eldev-advised (#'byte-compile-log-warning :around
+                                                                                (unless have-warning-function
+                                                                                  (lambda (original &rest arguments)
+                                                                                    (unless eldev-build-suppress-warnings
+                                                                                      (apply original arguments)))))
+                                       ;; Hack: make Emacs 24.x shut up.  We don't do it in various
+                                       ;; other places, but this one is important for our tests.
+                                       (eldev-advised (#'message :around
+                                                                 (when (< emacs-major-version 25)
+                                                                   (lambda (original &rest arguments)
+                                                                     (unless (equal arguments `("Wrote %s" ,(expand-file-name target)))
+                                                                       (apply original arguments)))))
+                                         (byte-compile-file source))))))
+                    (cond ((eq result 'no-byte-compile)
+                           (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
+                           nil)
+                          (result
+                           (when eldev-build-load-before-byte-compiling
+                             ;; Load ourselves, since `byte-compile-file' calls `load'
+                             ;; without `nomessage' parameter.  Byte-compiled file should
+                             ;; be loaded to replace its slower source we loaded above.
+                             (eldev-trace "Loading the byte-compiled file `%s'..." target)
+                             (load target nil t t))
+                           nil)
+                          (t
+                           source)))))
+            (when failed-source
+              (if recursive
+                  ;; Normal errors would get caught inside Emacs byte-compilation code, so
+                  ;; we use tag throwing/catching instead.
+                  (throw 'eldev--byte-compilation-failed failed-source)
+                (signal 'eldev-build-failed `("Failed to byte-compile `%s'" ,failed-source))))
+            (unless (eq result 'no-byte-compile)
+              (let ((history-entry (or (assoc (expand-file-name target eldev-project-dir) load-history)
+                                       (assoc (expand-file-name source eldev-project-dir) load-history)))
+                    inherited-targets
+                    provided-feature)
+                (unless history-entry
+                  ;; This would not be needed if we could determine dependencies in any
+                  ;; other way.  At least we load already byte-compiled file.
+                  (eldev-trace "Loading file `%s' in order to find dependencies..." target)
+                  (load (expand-file-name target eldev-project-dir) nil t t)
+                  (setf history-entry (assoc (expand-file-name target eldev-project-dir) load-history)))
+                (dolist (entry (cdr history-entry))
+                  (pcase entry
+                    (`(require . ,feature)
+                     (unless provided-feature
+                       (let ((provided-by (eldev--find-feature-provider feature)))
+                         (when (stringp provided-by)
+                           (push `(,feature . ,provided-by) inherited-targets)))))
+                    (`(provide . ,feature)
+                     ;; See e.g. `eldev-test-compile-circular-requires-1': after `provide' form
+                     ;; ignore all remaining `require's for dependency purposes.  Also remove
+                     ;; self-dependency entry if it has been added.
+                     (puthash feature source eldev--feature-providers)
+                     (setf inherited-targets (delete `(,feature . ,source) inherited-targets)
+                           provided-feature  t))))
+                (eldev-set-target-dependencies target (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
+                                                              inherited-targets))))))))))
+
+(defun eldev--trigger-early-byte-compilation (file)
+  (when (stringp file)
+    ;; Reset `default-directory', because it can have been changed e.g. when called from
+    ;; inside byte-compilation.
+    (let ((default-directory eldev-project-dir))
+      (setf file (file-relative-name file eldev-project-dir))
+      (unless (or (eldev-external-or-absolute-filename file)
+                  (not (eldev-external-or-absolute-filename (file-relative-name file eldev-cache-dir))))
+        (setf file (eldev-replace-suffix file ".el" ".elc"))
+        (let ((status (eldev-build-target-status file)))
+          (when (eq status 'planned)
+            (eldev-build-target file)))))))
 
 (defun eldev--find-feature-provider (feature)
   (or (gethash feature eldev--feature-providers)
-      (let ((scan     load-history)
-            (look-for `(provide . ,feature))
-            provider)
-        (while scan
-          (let ((entry (pop scan)))
-            (when (member look-for (cdr entry))
-              (setf provider (let ((filename (file-relative-name (car entry) eldev-project-dir)))
-                               (if (or (eldev-external-or-absolute-filename filename)
-                                       (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
-                                   'external
-                                 (setf filename (eldev-replace-suffix filename ".elc" ".el"))
-                                 (if (file-exists-p (expand-file-name filename eldev-project-dir))
-                                     filename
-                                   'unknown)))
-                    scan     nil))))
-        (puthash feature (or provider 'built-in) eldev--feature-providers))))
+      (puthash feature
+               (if (featurep feature)
+                   (let ((scan     load-history)
+                         (look-for `(provide . ,feature))
+                         (provider 'built-in))
+                     (while scan
+                       (let ((entry (pop scan)))
+                         (when (member look-for (cdr entry))
+                           (setf provider (eldev--validate-el-feature-source (car entry))
+                                 scan     nil))))
+                     provider)
+                 (eldev--validate-el-feature-source (locate-file (symbol-name feature) load-path '(".el" ".elc"))))
+               eldev--feature-providers)))
+
+(defun eldev--validate-el-feature-source (filename)
+  (setf filename (file-relative-name filename eldev-project-dir))
+  (if (or (eldev-external-or-absolute-filename filename)
+          (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
+      'external
+    (setf filename (eldev-replace-suffix filename ".elc" ".el"))
+    (if (file-exists-p (expand-file-name filename eldev-project-dir))
+        filename
+      'unknown)))
 
 
 (eldev-defbuilder eldev-builder-makeinfo (source target)

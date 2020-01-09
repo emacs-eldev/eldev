@@ -45,7 +45,7 @@
   ;; compiled before being loaded.  Make sure that Eldev doesn't load
   ;; `.el' files by default: only when asked.
   (eldev--test-without-files "project-e" ("project-e.elc" "project-e-misc.elc" "project-e-util.elc")
-    (eldev--test-run nil ("compile")
+    (eldev--test-run nil ("compile" "project-e-misc.el")
       (should (= exit-code 1)))))
 
 
