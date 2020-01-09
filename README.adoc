@@ -1,6 +1,6 @@
 :toc: macro
 :toc-title: Table of contents
-:icons: font
+ifndef::env-github[:icons: font]
 
 = Eldev
 
@@ -357,6 +357,7 @@ anything:
     $ eldev upgrade --dry-run
 
 
+[#loading-modes]
 == Loading modes
 
 In Eldev the project’s package and its local dependencies have
@@ -454,7 +455,112 @@ FIXME
 
 === Byte-compiling
 
-FIXME
+You can use Eldev to byte-compile your project.  Indirectly, this can
+be done by <<loading-modes,selecting appropriate loading mode>> for
+the project or its local dependencies.  However, sometimes you might
+want to do this explicitly.  For this, use command `compile`:
+
+    $ eldev compile
+
+You can also byte-compile specific files:
+
+    $ eldev compile foo-util.el foo-misc.el
+
+Eldev will not recompile `.el` that have up-to-date `.elc` versions.
+So, if you issue command `compile` twice in a row, it will say:
+“Nothing to do” the second time.  But suppose file `foo-misc.el` has
+form `(require 'foo-util)`.  If you edit `foo-util.el`, byte-compiled
+file `foo-misc.elc` might no longer be correct, because it has been
+compiled against old definitions from `foo-util.el`.  Luckily, Eldev
+knows how to detect when a file ``require``s another.  You can see
+this in the target tree:
+
+    $ eldev targets --dependencies
+    [...]
+    :compile
+        foo-misc.elc  [ELC]
+            foo-misc.el
+            [inh] foo-util.elc
+    [...]
+
+As a result, if you now edit `foo-util.el` and issue `compile` again,
+both `foo-util.elc` and `foo-misc.elc` will be rebuilt.
+
+Eldev treats warnings from Emacs’ byte-compiler just as that —
+warnings, i.e. they will not prevent compilation from generally
+succeeding.  However, during automated testing you might want to check
+that there are no warnings.  The easiest way to do it is to use
+`--warnings-as-errors` option (`-w`):
+
+    $ eldev compile --warnings-as-errors
+
+Command `compile` is actually just a wrapper over the generic building
+system.  You can rewrite all the examples above using command `build`.
+If you don’t specify files to compile, virtual target `:compile` is
+built.  This target depends on all `.elc` files in the project.
+
+However, there is a subtle difference: for `compile` you specify
+_source_ files, while `build` expects _targets_.  Therefore, example
+
+    $ eldev compile foo-util.el foo-misc.el
+
+above is equivalent to this command:
+
+    $ eldev build foo-util.elc foo-misc.elc
+
+with `.el` in filenames substituted with `.elc`.
+
+==== Byte-compiling complicated macros ====
+
+Certain files macros in Elisp cannot be byte-compiled without
+evaluating them first _or_ carefully applying `eval-and-compile` to
+functions used in macroexpansions.  Because Emacs packaging system
+always loads (evaluates) package files before byte-compiling them
+during installation, this is often overlooked.
+
+Unlike the packaging system, Eldev by default expects that `.el` files
+can be compiled _without_ loading them first, i.e. it expects that
+`eval-and-compile` is applied where needed.  This is the default
+because it is much faster on certain files.
+
+However, if your project cannot be byte-compiled without loading first
+and you don’t want to “fix” this, you can ask Eldev to behave like the
+packaging system using `--load-before-compiling` (`-l`) option:
+
+    $ eldev compile -l
+
+It is a good idea to specify this as the default in file `Eldev` for
+projects that need this setting:
+
+    (setf eldev-build-load-before-byte-compiling t)
+
+You can find more information in section “Evaluation During
+Compilation” of Elisp manual.
+
+==== Speed of byte-compilation ====
+
+While not particularly important in most cases, speed of
+byte-compilation can become an issue in large projects, especially if
+they use lots of macros.  Eldev tries to speed up byte-compilation by
+compiling the files in “correct” order.
+
+This means that if, as above, `foo-misc.el` ``require``s feature
+`foo-util`, then `foo-util.el` will always be byte-compiled first, so
+that compilation of `foo-misc.el` can use faster, byte-compiled
+versions of definitions from that file.  This works even if Eldev
+doesn’t yet know which files `require` which.
+
+When Eldev has to change the planned order of byte-compilation because
+of a `require` form, it writes an appropriate message (you need to run
+with option `-v` or `-t` to see it):
+
+    $ eldev -v compile
+    [...]
+    ELC      foo-misc.el
+    Byte-compiling file ‘foo-misc.el’...
+    ELC      foo-util.el
+    Byte-compiling file ‘foo-util.el’ early as ‘require’d from another file...
+    Done building “sources” for virtual target ‘:compile’
 
 
 == Testing
