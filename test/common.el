@@ -108,6 +108,8 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
            (progn ,@body)
          (eldev--test-delete-quietly nil ',files-to-delete)))))
 
+(declare-function directory-files-recursively "subr" t)
+
 (defun eldev--test-find-files (directory)
   ;; Not using `eldev-find-files' if easily possible (Emacs 25 and
   ;; up) to avoid tests depending on its correctness.
