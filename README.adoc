@@ -1,6 +1,13 @@
 :toc: macro
 :toc-title: Table of contents
 ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:warning-caption: :warning:
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+endif::[]
 
 = Eldev
 
@@ -286,6 +293,12 @@ should really remain your own private setting and go to `Eldev-local`.
 Local dependencies have _loading modes_, just as the project’s package
 itself.  Those will be discussed later.
 
+Eldev correctly handles situations with changing definitions of local
+dependencies.  I.e. by simply commenting out or uncommenting
+`eldev-use-local-dependency` call, you can quickly test your project
+both with a Melpa-provided package and with a local dependency — Eldev
+will adapt without any additional work from you.
+
 [#additional-dependencies]
 === Additional dependencies
 
@@ -425,33 +438,143 @@ it only knows how to build packages, byte-compile `.el` files and make
 can do anything you want.  For example, generate resource files that
 should be included in the final package.
 
+The main command is predictably called `build`.  There are also
+several related commands which will be discussed in the next sections.
+
 === Targets
 
 Build system is based on _targets_.  Targets come in two kinds: _real_
 and _virtual_.  First type of targets corresponds to files — not
-necessarily existing, but they will be generated when such targets are
-built.  Targets of the second type always have names that begin with
-“:” (like keywords in Elisp).  Most import virtual target is called
-`:default` — this is what Eldev will build if you don’t request
-anything explicitly.
+necessarily already existing.  When needed, such targets get rebuilt
+and the files are (re)generated in process.  Targets of the second
+type always have names that begin with “:” (like keywords in Elisp).
+Most import virtual target is called `:default` — this is what Eldev
+will build if you don’t request anything explicitly.
+
+To find all targets in a project (more precisely, its `main`
+<<target-sets,target set>>):
+
+    $ eldev targets
+
+Project’s targets form a tree.  Before a higher-level target can be
+built, all its children must be up-to-date, i.e. built first if
+necessary.  In the tree you can also see _sources_ for some targets.
+Those can be distinguished by lack of builder name in brackets.
+Additionally, if output is colored, targets have special color, while
+sources use default text color.
+
+Here is how target tree looks for Eldev project itself (version may be
+different and more targets may be added in future):
+
+    :default
+        bin/eldev  [SUBST]
+            bin/eldev.in
+    :package
+        dist/eldev-0.1.tar  [PACK]
+            bin/eldev  [repeated, see above]
+            eldev-ert.el
+            eldev-util.el
+            eldev.el
+    :compile
+        eldev-ert.elc  [ELC]
+            eldev-ert.el
+        eldev-util.elc  [ELC]
+            eldev-util.el
+        eldev.elc  [ELC]
+            eldev.el
+    :package-archive-entry
+        dist/eldev-0.1.entry  [repeated, see ‘dist/eldev-0.1.tar’ above]
+
+And a short explanation of various elements:
+
+`:default`, `:package`, `:compile` etc.::
+
+    Virtual targets.  The ones you see above are typical, but there
+    could be more.
+
+`bin/eldev`, `dist/eldev-0.1.tar`, `eldev-ert.elc` etc.::
+
+    Real targets.
+
+`SUBST`, `PACK`, `ELC`::
+
+    Builders used to generate target.  Note that virtual targets never
+    have builders.  `SUBST` is not a standard builder, it is defined
+    in file `Eldev` of the project.
+
+`bin/eldev.in`, `eldev-ert.el` etc.::
+
+    Sources for generating targets.  Certain targets have more than
+    one source file.  Also note how targets can have other targets as
+    their sources (`bin/eldev` is both a target on its own and a
+    source for `dist/eldev-0.1.tar`).
+
+`[repeated \...]`::
+
+    To avoid exponential increase in tree size, Eldev doesn’t repeat
+    target subtrees.  Instead, only root target of a subtree is
+    printed.
+
+==== Target cross-dependencies
 
 FIXME
 
+[#target-sets]
 ==== Target sets
 
 Eldev groups all targets into _sets_.  Normally, there are only two
 sets called `main` and `test`, but you can define more if you need
-(see variable `eldev-filesets').
+(see variable `eldev-filesets').  For example, if your project
+includes a development tool that certainly shouldn’t be included in
+project’s package, it makes sense to break it out into a separate
+target set.
 
-FIXME
+Target sets should be seen only as ways of grouping targets together
+for the purpose of quickly enumerating them.  Two targets in the same
+set can be completely independent from each other.  Similarly, targets
+from different sets can depend on each other (provided this doesn’t
+create a circular dependency, of course).  For example, targets in set
+`test` will often depend on those in set `main`, because test `.el`
+files usually `require` some features from `main`.
 
-=== Cleaning
+By default, command `build` operates only on `main` target set.  You
+can use option `--set` (`-s`) to process a different target set.  If
+you want to build several sets at once, repeat the option as many
+times as needed.  Finally, you can use special name `all` to order
+Eldev to operate on all defined sets at once.
 
-FIXME
+Command `targets` instead of the option expects set names as its
+arguments.  For example:
+
+    $ eldev targets test
 
 === Building packages
 
-FIXME
+To build a Elisp package out of your project, use command `package`:
+
+    $ eldev package
+
+This command is basically a wrapper over the build system, it tells
+the system to generate virtual target `:package`.  However, there are
+a few options that can only be passed to this special command, not to
+underlying `build`.
+
+Normally, packages are generated in subdirectory `dist` (more
+precisely, in directory specified by `eldev-dist-dir` variable).  If
+needed, you can override this using `--output-dir` option.
+
+By default, Eldev will use package’s self-reported version, i.e. value
+of “Version” header in its main `.el` file.  If you need to give the
+package a different version, use option `--force-version`.  E.g. Melpa
+would do this if it used Eldev.
+
+Finally, if you are invoking Eldev from a different tool, you might be
+interested in option `--print-filename`.  When it is specified, Eldev
+will print absolute filename of the generated package and word
+“generated” or “up-to-date” as the two last lines of its (stdout)
+output.  Otherwise it is a bit tricky to find the package, especially
+if you don’t use `--force-version` option.  As an optimisation, you
+can also reuse previous package file if Eldev says “up-to-date”.
 
 === Byte-compiling
 
@@ -468,9 +591,12 @@ You can also byte-compile specific files:
 
 Eldev will not recompile `.el` that have up-to-date `.elc` versions.
 So, if you issue command `compile` twice in a row, it will say:
-“Nothing to do” the second time.  But suppose file `foo-misc.el` has
-form `(require 'foo-util)`.  If you edit `foo-util.el`, byte-compiled
-file `foo-misc.elc` might no longer be correct, because it has been
+“Nothing to do” the second time.
+
+However, simple comparison of modification time of `.el` and its
+`.elc` file is not always enough.  Suppose file `foo-misc.el` has form
+`(require 'foo-util)`.  If you edit `foo-util.el`, byte-compiled file
+`foo-misc.elc` might no longer be correct, because it has been
 compiled against old definitions from `foo-util.el`.  Luckily, Eldev
 knows how to detect when a file ``require``s another.  You can see
 this in the target tree:
@@ -487,14 +613,14 @@ As a result, if you now edit `foo-util.el` and issue `compile` again,
 both `foo-util.elc` and `foo-misc.elc` will be rebuilt.
 
 Eldev treats warnings from Emacs’ byte-compiler just as that —
-warnings, i.e. they will not prevent compilation from generally
-succeeding.  However, during automated testing you might want to check
-that there are no warnings.  The easiest way to do it is to use
-`--warnings-as-errors` option (`-w`):
+warnings, i.e. they will be shown, but will not prevent compilation
+from generally succeeding.  However, during automated testing you
+might want to check that there are no warnings.  The easiest way to do
+it is to use `--warnings-as-errors` option (`-w`):
 
     $ eldev compile --warnings-as-errors
 
-Command `compile` is actually just a wrapper over the generic building
+Command `compile` is actually only a wrapper over the generic building
 system.  You can rewrite all the examples above using command `build`.
 If you don’t specify files to compile, virtual target `:compile` is
 built.  This target depends on all `.elc` files in the project.
@@ -561,6 +687,10 @@ with option `-v` or `-t` to see it):
     ELC      foo-util.el
     Byte-compiling file ‘foo-util.el’ early as ‘require’d from another file...
     Done building “sources” for virtual target ‘:compile’
+
+=== Cleaning
+
+FIXME
 
 
 == Testing
@@ -847,12 +977,12 @@ Eldev also supports composite filesets.  They are built using common
 set/logic operations and can be nested, i.e. one composite fileset can
 include another.  There are currently three types:
 
-`(:and ELEMENT...)`::
+`(:and ELEMENT\...)`::
 
   A file matches an `:and` fileset if and only if it matches _every_
   of its `ELEMENT` filesets.
 
-`(:or ELEMENT...)`::
+`(:or ELEMENT\...)`::
 
   A file matches an `:or` fileset if and only if it matches _at least
   one_ of its `ELEMENT` filesets.
@@ -888,16 +1018,61 @@ evaluated in turn — and so on, until everything is resolved.
 
 == Extending Eldev
 
-FIXME
+Eldev is written to be not just configurable, but also extensible.  It
+makes perfect sense to have additional code in file `Eldev` — if your
+project has uncommon building steps.  And also in `~/.eldev/config` —
+if you want a special command for your own needs, for example.  Or
+maybe in `Eldev-local` — if you need something extra only for one
+specific project.
 
 === Hooks
 
+Eldev defines a few hooks (more might be added later).
+
+`eldev-executing-command-hook`::
+
+    Run before executing any command.  Command name (as a symbol) is
+    passed to the hook’s functions as the only argument.  This is
+    always the “canonical” command name, even if it is run using an
+    alias.
+
+`eldev-COMMAND-hook`::
+
+    Run before executing specific command, functions have no
+    arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
+    print a disclaimer about its fairly slow tests.
+
+=== Writing builders
+
 FIXME
 
-=== Adding commands
+=== Adding commands and options
 
 FIXME
 
-=== Adding command and global options
+=== Custom test runners
 
 FIXME
+
+
+== Influential environment variables
+
+A few environment variables can affect Eldev’s behavior.
+
+`EMACS` or `ELDEV_EMACS`::
+
+    Use given Emacs executable (also for any child processes).  If not
+    specified, this defaults to just `emacs`, which is expected
+    somewhere in `$PATH`.
+
+`ELDEV_LOCAL`::
+
+    Load Eldev Elisp code from given directory (usually a Git clone of
+    source tree) instead of the normal bootstrapping from Melpa.
+    Should not be needed normally, only when developing Eldev itself.
+
+`ELDEV_DIR`::
+
+    Directory where user’s configuration file, Eldev’s bootstrapping
+    files etc. are located, defaults to `~/.eldev`.  Used by Eldev’s
+    own regression tests, should be of no interest for typical use.
