@@ -318,6 +318,11 @@ See `eldev-output-reroute-messages'.")
   "Rerouted message destination.
 Should be either `:stderr' or `:stdout'.")
 
+(defvar eldev-message-rerouting-wrapper nil
+  "When set, send rerouted message through this function/macro.
+Typical values would be `eldev-warn', `eldev-trace' etc.  Note
+that this overrides `eldev-message-rerouting-destination'.")
+
 (defvar eldev--output-rerouted nil)
 (defvar eldev--real-stderr-output nil)
 
@@ -524,12 +529,19 @@ to `eldev-message-rerouting-destination'.  Can be termporarily
 disabled by setting `eldev-disable-message-rerouting' inside
 BODY."
   (declare (indent 0) (debug (body)))
-  `(eldev-advised (#'message :around (unless (or eldev-disable-message-rerouting eldev--output-rerouted)
-                                       (lambda (original &rest args)
-                                         (unless (and (boundp 'inhibit-message) inhibit-message)
-                                           (if eldev--real-stderr-output
-                                               (apply original args)
-                                             (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args))))))
+  `(eldev-advised (#'message :around
+                             (unless (or eldev-disable-message-rerouting eldev--output-rerouted)
+                               (lambda (original &rest args)
+                                 (unless (and (boundp 'inhibit-message) inhibit-message)
+                                   (cond (eldev--real-stderr-output
+                                          (apply original args))
+                                         (eldev-message-rerouting-wrapper
+                                          (if (functionp eldev-message-rerouting-wrapper)
+                                              (apply eldev-message-rerouting-wrapper args)
+                                            ;; Assume a macro (`eldev-warn' or something like that).
+                                            (eval `(,eldev-message-rerouting-wrapper ,@args) t)))
+                                         (t
+                                          (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args)))))))
      ,@body))
 
 

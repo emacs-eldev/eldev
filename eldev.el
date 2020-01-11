@@ -585,58 +585,64 @@ Used by Eldev startup script."
         (condition-case-unless-debug error
             (condition-case error
                 (eldev-output-reroute-messages
-                  (let ((eldev-project-dir (or eldev-project-dir (expand-file-name default-directory)))
-                        ;; Eldev uses a different default.
-                        (load-prefer-newer t))
-                    ;; If `inhibit-message' is t when a signal is raised, Emacs won't
-                    ;; print error stacktraces even if `debug-on-error' is t.  Add a
-                    ;; workaround.
-                    (eldev-advised (#'debug :around (lambda (original &rest arguments)
-                                                      (let ((inhibit-message nil))
-                                                        (apply original arguments))))
-                      (eldev-parse-options command-line nil t t)
-                      ;; Since this is printed before `~/.eldev/config' is loaded it can
-                      ;; ignore some settings from that file, e.g. colorizing mode.
-                      (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
-                      (eldev-trace "Running on %s" (emacs-version))
-                      (eldev-trace "Project directory: `%s'" eldev-project-dir)
-                      (condition-case error
-                          (eldev--set-up)
-                        (eldev-too-old (setf eldev-too-old (cdr error))))
-                      (setf command-line (eldev-parse-options command-line nil t))
-                      (if command-line
-                          (progn
-                            (setf command (intern (car command-line)))
-                            (let* ((real-command (or (cdr (assq command eldev--command-aliases)) command))
-                                   (handler      (or (cdr (assq real-command eldev--commands)))))
-                              (if handler
-                                  (let ((hook (eldev-get handler :command-hook)))
-                                    (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
-                                      (signal 'eldev-too-old eldev-too-old))
-                                    (setf command-line (if (eldev-get handler :custom-parsing)
-                                                           (cdr command-line)
-                                                         (eldev-parse-options (cdr command-line) real-command)))
-                                    (if (eq real-command command)
-                                        (eldev-verbose "Executing command `%s'..." command)
-                                      (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
-                                    (when eldev-executing-command-hook
-                                      (eldev-trace "Executing `eldev-executing-command-hook'...")
-                                      (run-hook-with-args 'eldev-executing-command-hook real-command))
-                                    (when (symbol-value hook)
-                                      (eldev-trace "Executing `%s'..." hook)
-                                      (run-hooks hook))
-                                    ;; We want `message' output on stdout universally, but
-                                    ;; older Emacses are very verbose and having additional
-                                    ;; unexpected messages in our stdout would screw up
-                                    ;; tests.  So we set the target to stdout only now.
-                                    (let ((eldev-message-rerouting-destination :stdout))
-                                      (apply handler command-line))
-                                    (setf exit-code 0))
-                                (eldev-error "Unknown command `%s'" command)
-                                (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
-                        (eldev-usage)
-                        (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
-                        (setf exit-code 0)))))
+                  (eldev-advised (#'display-warning :around (lambda (original type message &optional level &rest args)
+                                                              (let ((eldev-message-rerouting-wrapper (pcase level
+                                                                                                       (:error #'eldev-error)
+                                                                                                       (:debug #'eldev-verbose)
+                                                                                                       (_      #'eldev-warn))))
+                                                                (apply original type message level args))))
+                    (let ((eldev-project-dir (or eldev-project-dir (expand-file-name default-directory)))
+                          ;; Eldev uses a different default.
+                          (load-prefer-newer t))
+                      ;; If `inhibit-message' is t when a signal is raised, Emacs won't
+                      ;; print error stacktraces even if `debug-on-error' is t.  Add a
+                      ;; workaround.
+                      (eldev-advised (#'debug :around (lambda (original &rest arguments)
+                                                        (let ((inhibit-message nil))
+                                                          (apply original arguments))))
+                        (eldev-parse-options command-line nil t t)
+                        ;; Since this is printed before `~/.eldev/config' is loaded it can
+                        ;; ignore some settings from that file, e.g. colorizing mode.
+                        (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
+                        (eldev-trace "Running on %s" (emacs-version))
+                        (eldev-trace "Project directory: `%s'" eldev-project-dir)
+                        (condition-case error
+                            (eldev--set-up)
+                          (eldev-too-old (setf eldev-too-old (cdr error))))
+                        (setf command-line (eldev-parse-options command-line nil t))
+                        (if command-line
+                            (progn
+                              (setf command (intern (car command-line)))
+                              (let* ((real-command (or (cdr (assq command eldev--command-aliases)) command))
+                                     (handler      (or (cdr (assq real-command eldev--commands)))))
+                                (if handler
+                                    (let ((hook (eldev-get handler :command-hook)))
+                                      (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
+                                        (signal 'eldev-too-old eldev-too-old))
+                                      (setf command-line (if (eldev-get handler :custom-parsing)
+                                                             (cdr command-line)
+                                                           (eldev-parse-options (cdr command-line) real-command)))
+                                      (if (eq real-command command)
+                                          (eldev-verbose "Executing command `%s'..." command)
+                                        (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
+                                      (when eldev-executing-command-hook
+                                        (eldev-trace "Executing `eldev-executing-command-hook'...")
+                                        (run-hook-with-args 'eldev-executing-command-hook real-command))
+                                      (when (symbol-value hook)
+                                        (eldev-trace "Executing `%s'..." hook)
+                                        (run-hooks hook))
+                                      ;; We want `message' output on stdout universally, but
+                                      ;; older Emacses are very verbose and having additional
+                                      ;; unexpected messages in our stdout would screw up
+                                      ;; tests.  So we set the target to stdout only now.
+                                      (let ((eldev-message-rerouting-destination :stdout))
+                                        (apply handler command-line))
+                                      (setf exit-code 0))
+                                  (eldev-error "Unknown command `%s'" command)
+                                  (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
+                          (eldev-usage)
+                          (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
+                          (setf exit-code 0))))))
               (eldev-error (let* ((arguments (cdr error))
                                   hint
                                   hint-about-command)
