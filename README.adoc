@@ -11,6 +11,8 @@ endif::[]
 
 = Eldev
 
+image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
+image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
 image:https://api.travis-ci.org/doublep/eldev.svg[Build status, link=https://travis-ci.org/doublep/eldev]
 
 Eldev (Elisp Development Tool) is an Emacs-based build system,
