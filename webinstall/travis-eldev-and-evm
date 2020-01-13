@@ -10,14 +10,14 @@
 set -e
 
 
-ELDEV_DIR=~/.eldev/bin
-EVM_DIR=~/.evm/bin
+ELDEV_BIN_DIR=~/.eldev
+EVM_DIR=~/.evm
 
-export PATH="$ELDEV_DIR:$EVM_DIR:$PATH"
+export PATH="$ELDEV_DIR:$EVM_DIR/bin:$PATH"
 
-mkdir -p $ELDEV_DIR
-curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_DIR/eldev
-chmod a+x $ELDEV_DIR/eldev
+mkdir -p $ELDEV_BIN_DIR
+curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
+chmod a+x $ELDEV_BIN_DIR/eldev
 
 git clone --depth 1 https://github.com/rejeep/evm.git $EVM_DIR
 evm config path /tmp
