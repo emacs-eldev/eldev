@@ -11,7 +11,7 @@ set -e
 
 
 ELDEV_DIR=~/.eldev/bin
-EVM_DIR=~/.evm
+EVM_DIR=~/.evm/bin
 
 export PATH="$ELDEV_DIR:$EVM_DIR:$PATH"
 
