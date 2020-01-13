@@ -10,10 +10,10 @@
 set -e
 
 
-ELDEV_BIN_DIR=~/.eldev
+ELDEV_BIN_DIR=~/.eldev/bin
 EVM_DIR=~/.evm
 
-export PATH="$ELDEV_DIR:$EVM_DIR/bin:$PATH"
+export PATH="$ELDEV_BIN_DIR:$EVM_DIR/bin:$PATH"
 
 mkdir -p $ELDEV_BIN_DIR
 curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
