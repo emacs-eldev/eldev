@@ -8,6 +8,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-evm: https://github.com/rejeep/evm
 
 = Eldev
 
@@ -15,13 +16,13 @@ image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=
 image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
 image:https://api.travis-ci.org/doublep/eldev.svg[Build status, link=https://travis-ci.org/doublep/eldev]
 
-Eldev (Elisp Development Tool) is an Emacs-based build system,
-targeted solely at Elisp projects.  It is an alternative to Cask.
-Unlike Cask, Eldev itself is fully written in Elisp and its
-configuration files are also Elisp programs.  If you are familiar with
-Java world, Cask can be seen as a parallel to Maven — it uses project
-_description_, while Eldev is sort of a parallel to Gradle — its
-configuration is a _program_ on its own.
+Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
+solely at Elisp projects.  It is an alternative to Cask.  Unlike Cask,
+Eldev itself is fully written in Elisp and its configuration files are
+also Elisp programs.  If you are familiar with Java world, Cask can be
+seen as a parallel to Maven — it uses project _description_, while
+Eldev is sort of a parallel to Gradle — its configuration is a
+_program_ on its own.
 
 toc::[]
 
@@ -105,6 +106,10 @@ This will install `eldev` script to `~/.eldev/bin`.
 
 Afterwards Eldev will bootstrap itself as needed on first invocation.
 
+TIP: `eldev` doesn’t _really_ need to be findable through `$PATH` — it
+will work regardless.  This is rather for your convenience, so that
+you don’t need to type the full path again and again.
+
 
 [discrete]
 ==== Installing from sources
@@ -136,7 +141,7 @@ but make sure you have permissions first.
   first way to install Eldev, or symlink/copy file `bin/eldev` from
   the cloned directory to somewhere on your `$PATH`.
 
-Now each time Eldev is executed, it will use the source at
+Now each time Eldev is executed, it will use the sources at
 `$ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
 immediately.
 
@@ -552,7 +557,7 @@ arguments.  For example:
 
 === Building packages
 
-To build a Elisp package out of your project, use command `package`:
+To build an Elisp package out of your project, use command `package`:
 
     $ eldev package
 
@@ -640,7 +645,7 @@ with `.el` in filenames substituted with `.elc`.
 
 ==== Byte-compiling complicated macros ====
 
-Certain files macros in Elisp cannot be byte-compiled without
+Certain files with macros in Elisp cannot be byte-compiled without
 evaluating them first _or_ carefully applying `eval-and-compile` to
 functions used in macroexpansions.  Because Emacs packaging system
 always loads (evaluates) package files before byte-compiling them
@@ -657,8 +662,8 @@ packaging system using `--load-before-compiling` (`-l`) option:
 
     $ eldev compile -l
 
-It is a good idea to specify this as the default in file `Eldev` for
-projects that need this setting:
+Projects that can only be compiled with this setting should specify it
+as the default in their file `Eldev`:
 
     (setf eldev-build-load-before-byte-compiling t)
 
@@ -690,6 +695,7 @@ with option `-v` or `-t` to see it):
     Byte-compiling file ‘foo-util.el’ early as ‘require’d from another file...
     Done building “sources” for virtual target ‘:compile’
 
+[#cleaning]
 === Cleaning
 
 FIXME
@@ -881,7 +887,7 @@ packages.  To illustrate:
 
 == Executing on different Emacs versions
 
-Since Eldev itself is a Elisp program, version of Emacs you use can
+Since Eldev itself is an Elisp program, version of Emacs you use can
 affect any aspect of execution — even before it gets to running
 something out of your project.  Therefore, inside its “cache”
 directory called `.eldev`, the utility creates a subdirectory named
@@ -912,13 +918,63 @@ Therefore, if you use byte-compilation and switch Emacs versions,
 don’t forget to clean the directory.
 
 
+== Continuous integration
+
+Because of Eldev’s trivial installation and built-in support for
+testing, it is a suitable tool for use on continuous integration
+servers.  But of course this only applies if the test framework your
+project uses is already supported (currently only ERT).
+
+=== Travis CI
+
+The largest problem on Travis CI is to install Emacs binary of the
+desired version.  Luckily, there is a tool that can be used for this
+called {uri-evm}[EVM].  For convenience, Eldev provides a simple
+script specifically for use on Travis CI that installs Eldev and EVM
+in one go.
+
+Here is a simple project-agnostic `.travis.yml` file that you can use
+as a basis:
+
+....
+language: emacs-lisp
+dist: trusty
+
+install:
+  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
+  - evm install $EVM_EMACS --use
+
+env:
+  # Add more lines like these if you want to test on different Emacs versions.
+  - EVM_EMACS=emacs-26.3-travis
+
+script:
+  - eldev -p -dtT test
+....
+
+If you want to additionally test that your project byte-compiles
+cleanly, add another line to `script` section:
+
+....
+  - eldev -dtT compile --warnings-as-errors
+....
+
+Or maybe even this, if you want to make sure that test `.el' files
+also can be byte-compiled without warnings (this can sometimes catch
+more problems):
+
+....
+  - eldev -dtT compile --set all --warnings-as-errors
+....
+
+
 [#filesets]
 == Filesets
 
 Filesets are lists of rules that determine a collection of files
 inside given root directory, usually the project directory.  Similar
-concepts are present in most build systems, version control systems
-and some other programs.  Filesets in Eldev are inspired by Git.
+concepts are present in most build tools, version control systems and
+some other programs.  Filesets in Eldev are inspired by Git.
 
 Important examples of filesets are variables `eldev-main-fileset`,
 `eldev-test-fileset` and `eldev-standard-excludes`.  Default values of
@@ -1046,7 +1102,200 @@ Eldev defines a few hooks (more might be added later).
 
 === Writing builders
 
-FIXME
+Eldev build system provides standard builders that cover all basic
+needs of Elisp packages.  However, some projects have uncommon build
+steps.  Instead of writing custom shell scripts, you can integrate
+them into the overall build process — which also simplifies further
+development.
+
+An example of a project with additional build steps is Eldev itself.
+Its executable(s) are combined from executable template that is
+OS-specific and a common Elisp bootstrapping script.  For example,
+`bin/eldev` is generated from files `bin/eldev.in` and
+`bin/bootstrap.el.part`.  However, only the first file counts as the
+source; see how function `eldev-substitute` works.
+
+There is a simple builder for this in file `Eldev` of the project:
+
+    (eldev-defbuilder eldev-builder-preprocess-.in (source target)
+      :short-name     "SUBST"
+      :message        source-and-target
+      :source-files   "*.in"
+      :targets        (".in" -> "")
+      :collect        ":default"
+      :define-cleaner (eldev-cleaner-preprocessed
+                       "Delete results of preprocessing `.in' files.  This is specific
+    to Eldev itself."
+                       :aliases prep)
+      (let ((modes (file-modes target)))
+        (eldev-substitute source target)
+        (when (or modes (string-prefix-p "bin/" target))
+          (set-file-modes target (or modes #o755)))))
+
+Here `eldev-defbuilder` is a macro much like `defun`.  It defines an
+Elisp function named `eldev-builder-preprocess-.in` and registers it
+with parameters (the keyword lines before the body) as an Eldev
+builder.  Predictably, list `(source target)` specifies function
+arguments.
+
+Let’s skip the keywords for a bit and have a look at the body.  It
+works exactly like in a normal Elisp function.  Its job is to generate
+`target` from `source` using builder-specific means.  This particular
+builder calls function `eldev-substite` that does the actual work
+(this function is available also to your project, should you need it).
+But your builders could do whatever you want, including launching
+external processes (C/C++ compiler, a Python script, etc.) and using
+anything from Elisp repertoire.  Note that return value of the body is
+ignored.  If building the target fails, builder should signal an
+error.
+
+Now back to the keyword parameters.  As you can see, they all have a
+name and exactly one value after it.  First comes parameter
+`:short-name`.  It specifies what you see in the target tree of the
+project, i.e. builder’s name for the user.  It is not required;
+without it Eldev would have used `preprocess-.in` as user-visible
+name.
+
+Next parameter is `:message`.  It determines what Eldev prints when
+the builder is actually invoked.  For example, when byte-compiling,
+you’d see messages like this:
+
+    ELC      some-file.el
+
+That’s because byte-compiling builder has its `:message` set to
+`source` (the default).  Other valid values are `target` and
+`source-and-target` (as in the example).  Both `source` and `target`
+can be pluralized (i.e. `sources-and-target` is also a valid value),
+but singular/plural is not important in this case as both work
+identically.  Finally, value of `:message` can be a function, in which
+case it is called with the same arguments as the builder itself and
+should return a string.
+
+Value of `:source-files` parameter must be a <<filesets,fileset>>.  In
+the above example, fileset consists of only one simple rule — which is
+actually enough in most cases, — but it could also be much more
+complicated.  All files that match the fileset and do not match
+`eldev-standard-excludes` will be processed using this builder.
+
+Parameter `:targets` defines the rule used to construct target names
+out of sources matched by `:source-files`.  There are several ways to
+define this rule, we’ll consider them in <<target-rules,their own
+subsection>>.
+
+Keyword `:collect` determines how targets generated by this builder
+are “collected” into virtual targets.  In the example all such targets
+are simply added to the virtual target `:default`.  However, here too
+we have several other possibilities, which will be described
+<<collecting-virtual-targets,later>>.
+
+Finally, keyword `:define-cleaner` provides a simple way of linking
+builders with the <<cleaning,cleaning system>>.
+
+Another important keyword is `:type`.  It is not used here only
+because the example builder is of the default and most common type
+that generates one target for each source file.  All possible types
+are: `one-to-one` (the default), `one-to-many` (several targets from
+one source file), `many-to-one` and `many-to-many`.  If you write a
+builder of a non-default type, be aware that it will be called with a
+list of strings instead of a single string as one or both of its
+arguments, as appropriate.  You should probably also name them in
+plural in the definition in this case, to avoid confusion.
+
+[#target-rules]
+==== Target rules
+
+Target rules define which target(s) will be built from given
+source(s).  There are several ways to define a target rule.  Yet more
+can be added in the future as real-world needs accumulate.
+
+`TARGET`::
+
+    All the sources will be passed together as a list to the builder
+    to generate one `TARGET`.  This is suitable for `many-to-one`
+    builders.
+
+`(TARGET-1 [TARGET-2 [\...]])`::
+
+    Build several `TARGETS` out of all the sources.  This is for
+    `many-to-many` and `one-to-many` builders.
+
+`(SOURCE-SUFFIX \-> TARGET-SUFFIX)`::
+
+    Build target name from source name by replacing filename suffixes.
+    `SOURCE-SUFFIX` can also be a list of strings, in which case any
+    suffix from the list will be replaced.  This is the type of target
+    rule you can see in the example and is suitable for `one-to-one`
+    builders.  Another use of this rule type could be seen in
+    byte-compiling builder:
++
+        :targets        (".el" -> ".elc")
+
+And the most powerful of all target rules: a function (can be a lambda
+form or a function name).  It is called with a list of sources (even
+if the builder is of `one-to-one` or `one-to-many` type) and must
+return one of the types enumerated above.
+
+[#collecting-virtual-targets]
+==== Collecting into virtual targets
+
+Real targets generated by the builders can optionally be combined into
+virtual targets.  The latter are used to easily build all real targets
+of the same type; some (`:default`, `:compile` etc.)  also have
+special meaning to certain commands.
+
+Like with the target rules, there are several ways to collect the
+targets.
+
+`VIRTUAL-TARGET`::
+
+    All real targets generated by the builder are combined into given
+    `VIRTUAL-TARGET`.  This is what you can see in the example.
+
+`(VIRTUAL-TARGET-1 [VIRTUAL-TARGET-2 [\... VIRTUAL-TARGET-N]])`::
+
+    Combine the real targets into `VIRTUAL-TARGET-N`, then put it to
+    the preceding virtual target and so on.  This format is currently
+    unused in standard Eldev builders.  It can generate target trees
+    of this form:
++
+--
+    :gen-files
+        :gen-sources
+            :gen-el
+                foo.el.in
+                bar.el.in
+
+It is expected (even if not required) that a different builder adds
+another branch to the tree, actually making it useful.
+--
+
+`(ENTRY...)`, each `ENTRY` being `(REAL-TARGETS VIRTUAL-TARGETS)`::
+
+    Both of `REAL-TARGETS` and `VIRTUAL-TARGETS` must be either a list
+    or a single target string.  For each `ENTRY` this repeats the
+    logic of one of the two formats above, but instead of all targets
+    for the builder uses only those listed in `REAL-TARGETS` for the
+    `ENTRY`.  This is not often needed, but can be useful if builder’s
+    targets come in two or more substantially different kinds.
+
+Like with <<target-rules,target rules>>, you can specify a function
+here.  Such a function gets called with a list of real targets and
+must return a collection rule in one of the formats listed above.
+
+==== Summary
+
+To define a builder you need to write an Elisp function that generates
+target(s) from source(s).  If it processes multiple sources at once or
+generates multiple targets, give it the appropriate `:type`.  Write a
+fileset that matches its `:source-files` and a rule to determine
+target names from those — parameter `:targets`.  If you want the
+targets grouped together into virtual target(s), add `:collect`
+keyword.  You should probably also add a `:define-cleaner` that
+removes generated targets.
+
+Parameters `:name`, `:short-name`, `:message` and `:briefdoc` are all
+fully presentational and thus not very important.  But if you want to
+write a nice and polished builder, investigate them too.
 
 === Adding commands and options
 
