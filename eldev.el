@@ -2422,6 +2422,9 @@ Emacs, else it will most likely fail."
 
 ;; eldev targets, eldev build, eldev compile, eldev package
 
+(defvar eldev-build-system-hook nil
+  "Hook executed whenever build system is used.")
+
 (defvar eldev--builders nil)
 (defvar eldev--build-targets (make-hash-table :test #'equal))
 (defvar eldev--targets-prepared-for nil)
@@ -2871,6 +2874,7 @@ Also see commands `compile' and `package'."
   :parameters     "[TARGET...]"
   ;; When building, project loading mode is ignored.  The reason is that building itself
   ;; can involve compiling or packaging.
+  (run-hooks 'eldev-build-system-hook)
   (let ((eldev-project-loading-mode 'as-is))
     (eldev-load-project-dependencies 'build))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))

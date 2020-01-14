@@ -8,12 +8,17 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-cask: https://github.com/cask/cask
+:uri-emake: https://github.com/vermiculus/emake.el
 :uri-evm: https://github.com/rejeep/evm
+:uri-travis: https://travis-ci.org/
+:since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 
 = Eldev
 
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
 image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
+image:http://stable.melpa.org/packages/eldev-badge.svg[Melpa Stable, link=http://stable.melpa.org/#/eldev]
 image:https://api.travis-ci.org/doublep/eldev.svg[Build status, link=https://travis-ci.org/doublep/eldev]
 
 Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
@@ -159,8 +164,9 @@ description of any of those, type:
 
 In the help you can also see lots of options — both global and
 specific to certain commands.  Many common things are possible just
-out of the box, but later we will discuss how to define additional
-commands and options or change defaults for the existing.
+out of the box, but <<extending-eldev,later we will discuss>> how to
+define additional commands and options or change defaults for the
+existing.
 
 Two most important global options to remember are `--trace` (`-t`) and
 `--debug` (`-d`).  With the first one, Eldev prints lots of additional
@@ -235,7 +241,8 @@ ignore this file, e.g. list it in `.gitignore` for Git.
 Finally, it is possible to specify some (short) setup forms on the
 command line using `--setup` (`-S`) option.  This is not supposed to
 be used often, mostly in cases where you run Eldev on a use-once
-project checkout, e.g. on a continuous integration server.
+project checkout, e.g. on a <<continuous-integration,continuous
+integration>> server.
 
 
 == Project dependencies
@@ -298,7 +305,7 @@ who check out your project probably don‘t even have a local copy of
 should really remain your own private setting and go to `Eldev-local`.
 
 Local dependencies have _loading modes_, just as the project’s package
-itself.  Those will be discussed later.
+itself.  Those will be discussed <<loading-modes,later>>.
 
 Eldev correctly handles situations with changing definitions of local
 dependencies.  I.e. by simply commenting out or uncommenting
@@ -393,13 +400,14 @@ during development.
 
 However, users won’t have your project loaded like that.  To emulate
 the way that most of the people will use it, you can use loading mode
-`packaged`.  In this mode, Eldev will first package your project (or
-local dependency), then install and activate it using Emacs’ packaging
-system.  This is quite a bit slower than `as-is`, because it involves
-several preparation steps.  However, this is (almost) exactly the way
-normal users will use your project after e.g. installing it from
-Melpa.  For this reason, this mode is recommended for continuous
-integration and other forms of automated testing.
+`packaged`.  In this mode, Eldev will first build a package out of
+your project (or local dependency), then install and activate it using
+Emacs’ packaging system.  This is quite a bit slower than `as-is`,
+because it involves several preparation steps.  However, this is
+almost exactly the way normal users will use your project after
+e.g. installing it from Melpa.  For this reason, this mode is
+recommended for <<continuous-integration,continuous integration>> and
+other forms of automated testing.
 
 Other modes include `byte-compiled` and `source`.  In these modes
 loading is performed just as in `as-is` mode, but before that Eldev
@@ -531,7 +539,7 @@ FIXME
 
 Eldev groups all targets into _sets_.  Normally, there are only two
 sets called `main` and `test`, but you can define more if you need
-(see variable `eldev-filesets').  For example, if your project
+(see variable `eldev-filesets`).  For example, if your project
 includes a development tool that certainly shouldn’t be included in
 project’s package, it makes sense to break it out into a separate
 target set.
@@ -621,9 +629,10 @@ both `foo-util.elc` and `foo-misc.elc` will be rebuilt.
 
 Eldev treats warnings from Emacs’ byte-compiler just as that —
 warnings, i.e. they will be shown, but will not prevent compilation
-from generally succeeding.  However, during automated testing you
-might want to check that there are no warnings.  The easiest way to do
-it is to use `--warnings-as-errors` option (`-w`):
+from generally succeeding.  However, during
+<<continuous-integration,automated testing>> you might want to check
+that there are no warnings.  The easiest way to do it is to use
+`--warnings-as-errors` option (`-W`):
 
     $ eldev compile --warnings-as-errors
 
@@ -918,6 +927,7 @@ Therefore, if you use byte-compilation and switch Emacs versions,
 don’t forget to clean the directory.
 
 
+[#continuous-integration]
 == Continuous integration
 
 Because of Eldev’s trivial installation and built-in support for
@@ -925,13 +935,14 @@ testing, it is a suitable tool for use on continuous integration
 servers.  But of course this only applies if the test framework your
 project uses is already supported (currently only ERT).
 
+[#travis-ci]
 === Travis CI
 
-The largest problem on Travis CI is to install Emacs binary of the
-desired version.  Luckily, there is a tool that can be used for this
-called {uri-evm}[EVM].  For convenience, Eldev provides a simple
-script specifically for use on Travis CI that installs Eldev and EVM
-in one go.
+The largest problem on {uri-travis}[Travis CI] is to install Emacs
+binary of the desired version.  Luckily, there is a tool that can be
+used for this called {uri-evm}[EVM].  For convenience, Eldev provides
+a simple script specifically for use on Travis CI that installs Eldev
+and EVM in one go.
 
 Here is a simple project-agnostic `.travis.yml` file that you can use
 as a basis:
@@ -959,7 +970,7 @@ cleanly, add another line to `script` section:
   - eldev -dtT compile --warnings-as-errors
 ....
 
-Or maybe even this, if you want to make sure that test `.el' files
+Or maybe even this, if you want to make sure that test `.el` files
 also can be byte-compiled without warnings (this can sometimes catch
 more problems):
 
@@ -1074,6 +1085,7 @@ As the result contains references to two variables, they will be
 evaluated in turn — and so on, until everything is resolved.
 
 
+[#extending-eldev]
 == Extending Eldev
 
 Eldev is written to be not just configurable, but also extensible.  It
@@ -1081,7 +1093,7 @@ makes perfect sense to have additional code in file `Eldev` — if your
 project has uncommon building steps.  And also in `~/.eldev/config` —
 if you want a special command for your own needs, for example.  Or
 maybe in `Eldev-local` — if you need something extra only for one
-specific project.
+specific project that you maintain.
 
 === Hooks
 
@@ -1099,6 +1111,13 @@ Eldev defines a few hooks (more might be added later).
     Run before executing specific command, functions have no
     arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
     print a disclaimer about its fairly slow tests.
+
+`eldev-build-system-hook`::{since-0-1-1}
+
+    Hook executed whenever build system is used.  This is useful since
+    at least commands `build`, `compile` and `package` invoke the
+    build system: it would be impractical to add the same function to
+    three hooks.
 
 === Writing builders
 
@@ -1327,3 +1346,18 @@ A few environment variables can affect Eldev’s behavior.
     Directory where user’s configuration file, Eldev’s bootstrapping
     files etc. are located, defaults to `~/.eldev`.  Used by Eldev’s
     own regression tests, should be of no interest for typical use.
+
+
+== See also
+
+Some other build tools, projects and services you might want to use
+with or instead of Eldev:
+
+* {uri-cask}[Cask] — the most established Emacs project management
+  tool.
+* {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
+* {uri-evm}[EVM] — Emacs version manager; has special support for
+  Travis CI.
+* {uri-travis}[Travis CI] — continuous integration service, the most
+  used one for Elisp projects; Eldev has <<travis-ci,additional
+  support>> for it.
