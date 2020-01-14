@@ -846,7 +846,7 @@ VERSION can be either a string or a list (see
   (unless (eldev-find-package-descriptor 'eldev version)
     (signal 'eldev-too-old `(:hint ("Run `%s upgrade-self' to install the newest available Eldev version" ,(eldev-shell-command t))
                                    "Project `%s' requires Eldev version %s or newer (this is version %s)" ,(package-desc-name (eldev-package-descriptor))
-                                   ,(eldev-message-version version) ,(eldev-message-version (eldev-package-descriptor))))))
+                                   ,(eldev-message-version version) ,(eldev-message-version (eldev-find-package-descriptor 'eldev))))))
 
 (defun eldev-use-package-archive (archive &optional priority)
   "Use given ARCHIVE to install project dependencies.
