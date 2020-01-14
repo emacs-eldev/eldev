@@ -8,6 +8,11 @@
 (defun project-b-hello ()
   (dependency-b-hello))
 
+;; This function is syntactically correct, but produces a
+;; byte-compilation warning.
+(defun project-b-unused-argument ()
+  (setf project-b-never-declared-this-variable nil))
+
 (provide 'project-b)
 
 ;;; project-b.el ends here

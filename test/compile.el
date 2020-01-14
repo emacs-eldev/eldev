@@ -132,4 +132,19 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-test-compile-warnings-as-errors-1 ()
+  (eldev--test-without-files "project-a" "project-a.elc"
+    (eldev--test-run nil ("compile" "--warnings-as-errors")
+      (eldev--test-assert-files project-dir preexisting-files "project-a.elc")
+      ;; There must be no warnings.
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-test-compile-warnings-as-errors-2 ()
+  (eldev--test-without-files "project-b" "project-b.elc"
+    (eldev--test-run nil ("compile" "--warnings-as-errors")
+      ;; Compilation must produce a warning, which is elevated and
+      ;; causes build to fail.
+      (should (= exit-code 1)))))
+
+
 (provide 'test/compile)
