@@ -942,7 +942,8 @@ The largest problem on {uri-travis}[Travis CI] is to install Emacs
 binary of the desired version.  Luckily, there is a tool that can be
 used for this called {uri-evm}[EVM].  For convenience, Eldev provides
 a simple script specifically for use on Travis CI that installs Eldev
-and EVM in one go.
+and EVM in one go.  Of course, you don’t _have_ to use EVM, but it
+does make life simpler, while not having any apparent disadvantages.
 
 Here is a simple project-agnostic `.travis.yml` file that you can use
 as a basis:
@@ -1112,12 +1113,12 @@ Eldev defines a few hooks (more might be added later).
     arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
     print a disclaimer about its fairly slow tests.
 
-`eldev-build-system-hook`::{since-0-1-1}
+{since-0-1-1} `eldev-build-system-hook`::
 
     Hook executed whenever build system is used.  This is useful since
     at least commands `build`, `compile` and `package` invoke the
     build system: it would be impractical to add the same function to
-    three hooks.
+    all three hooks.
 
 === Writing builders
 
@@ -1356,6 +1357,8 @@ with or instead of Eldev:
 * {uri-cask}[Cask] — the most established Emacs project management
   tool.
 * {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
+* {uri-makel}[makel] — a prebuilt `Makefile` with typical targets
+  useful to Elisp projects.
 * {uri-evm}[EVM] — Emacs version manager; has special support for
   Travis CI.
 * {uri-travis}[Travis CI] — continuous integration service, the most

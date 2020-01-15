@@ -1,3 +1,8 @@
+# NOTE: The following complications are for Eldev itself.  Projects
+# that _use_ Eldev can have it simpler.  Please see the homepage:
+#
+#     https://github.com/doublep/eldev#travis-ci
+
 language: emacs-lisp
 dist: trusty
 

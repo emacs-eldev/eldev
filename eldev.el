@@ -2423,7 +2423,8 @@ Emacs, else it will most likely fail."
 ;; eldev targets, eldev build, eldev compile, eldev package
 
 (defvar eldev-build-system-hook nil
-  "Hook executed whenever build system is used.")
+  "Hook executed whenever build system is used.  Since Eldev
+0.1.1.")
 
 (defvar eldev--builders nil)
 (defvar eldev--build-targets (make-hash-table :test #'equal))
