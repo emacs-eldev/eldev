@@ -102,7 +102,11 @@
     "    dist/project-d-1.0.entry  [repeated, see `dist/project-d-1.0.tar' above]"))
 
 (defvar eldev--test-targets-project-d-test
-  '(":default"))
+  '(":default"
+    ":compile"
+    "    test/project-d.elc  [ELC]"
+    "        test/project-d.el"
+    "        [inh] project-d.elc"))
 
 
 (defvar eldev--test-targets-project-e-main

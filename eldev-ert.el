@@ -92,9 +92,9 @@ use this for ERT framework, unless they can do better."
                                                                               (funcall original (eldev--ert-maybe-shorten-backtrace frames))
                                                                             "    [omitted]")))
                                                   (eldev-advised ('ert--print-backtrace
-                                                                  :around (lambda (original &optional frames)
+                                                                  :around (lambda (original &optional frames &rest arguments)
                                                                             (if eldev-test-print-backtraces
-                                                                                (funcall original (eldev--ert-maybe-shorten-backtrace frames))
+                                                                                (apply original (eldev--ert-maybe-shorten-backtrace frames) arguments)
                                                                               (insert "    [omitted]\n"))))
                                                     (apply listener event-type arguments)))
                                            (pcase event-type

@@ -49,4 +49,13 @@
       (should (= exit-code 1)))))
 
 
+;; Pre-0.1.1 ERT integration code used to fail on Emacs 26.x because
+;; of a faulty advise for `ert--print-backtrace'.
+(ert-deftest eldev-test-test-ert-print-backtrace-advise-1 ()
+  (eldev--test-run "project-d" ("test")
+    ;; If Eldev itself (rather than tests) fails, there will be a
+    ;; different message.
+    (should (string-match-p "\\`\n*[0-9]+ tests? produced an unexpected result\n*\\'" stderr))))
+
+
 (provide 'test/test)
