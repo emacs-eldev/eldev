@@ -1,5 +1,6 @@
 :toc: macro
 :toc-title: Table of contents
+:source-language: lisp
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :warning-caption: :warning:
@@ -12,6 +13,7 @@ endif::[]
 :uri-emake: https://github.com/vermiculus/emake.el
 :uri-evm: https://github.com/rejeep/evm
 :uri-makel: https://gitea.petton.fr/DamienCassou/makel
+:uri-makem-sh: https://github.com/alphapapa/makem.sh
 :uri-travis: https://travis-ci.org/
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 
@@ -259,7 +261,10 @@ to use an archive, call function `eldev-use-package-archive` in
 `Eldev` (you have such forms already in place if you have used `eldev
 init`).  For example:
 
-    (eldev-use-package-archive 'melpa-stable)
+[source]
+----
+(eldev-use-package-archive 'melpa-stable)
+----
 
 Eldev knows about three “standard” archives, which should cover most
 of your needs: `gnu`, `melpa-stable` and `melpa-unstable`.  Note that
@@ -276,7 +281,10 @@ If dependencies for your project are only available from some other
 archive, you can still use the same function.  Just substite the
 symbolic archive name with a cons cell of name and URL as strings:
 
-    (eldev-use-package-archive '("myarchive" . "http://my.archive.com/packages/"))
+[source]
+----
+(eldev-use-package-archive '("myarchive" . "http://my.archive.com/packages/"))
+----
 
 You don’t need to perform any additional steps to have Eldev actually
 install the dependencies: any command that needs them will make sure
@@ -298,7 +306,10 @@ uses the library.  To have Eldev use your local copy of `barlib`
 instead of downloading it e.g. from Melpa, add the following form in
 file `~/foo/Eldev-local`:
 
-    (eldev-use-local-dependency "~/barlib")
+[source]
+----
+(eldev-use-local-dependency "~/barlib")
+----
 
 Note that the form _must not_ be added to `Eldev`: other developers
 who check out your project probably don‘t even have a local copy of
@@ -323,7 +334,10 @@ packages available for testing purposes.  For example, if your project
 doesn’t depend on package `foo` on its own, but your test files do,
 add the following form to `Eldev` file:
 
-    (eldev-add-extra-dependencies 'test 'foo)
+[source]
+----
+(eldev-add-extra-dependencies 'test 'foo)
+----
 
 Additional dependencies are looked up in the same way as normal ones.
 So, you need to make sure that all of them are available from the
@@ -431,12 +445,18 @@ Remember, that as everything in Eldev, this can be customized.
 E.g. if you want to run your project byte-compiled by default, add
 this to your `Eldev-local`:
 
-    (setf eldev-project-loading-mode 'byte-compiled)
+[source]
+----
+(setf eldev-project-loading-mode 'byte-compiled)
+----
 
 For local dependencies the mode can be chosen when calling
 `eldev-use-local-dependency`.  For example:
 
-    (eldev-use-local-dependency "~/barlib" 'packaged)
+[source]
+----
+(eldev-use-local-dependency "~/barlib" 'packaged)
+----
 
 As mentioned above, loading mode defaults to `as-is`.
 
@@ -675,7 +695,10 @@ packaging system using `--load-before-compiling` (`-l`) option:
 Projects that can only be compiled with this setting should specify it
 as the default in their file `Eldev`:
 
-    (setf eldev-build-load-before-byte-compiling t)
+[source]
+----
+(setf eldev-build-load-before-byte-compiling t)
+----
 
 You can find more information in section “Evaluation During
 Compilation” of Elisp manual.
@@ -958,7 +981,7 @@ install:
   - evm install $EVM_EMACS --use
 
 env:
-  # Add more lines like these if you want to test on different Emacs versions.
+  # Add more lines like this if you want to test on different Emacs versions.
   - EVM_EMACS=emacs-26.3-travis
 
 script:
@@ -1080,8 +1103,11 @@ how many times sequential evaluations can yield symbols or forms.
 Example of an evaluated fileset can be seen from return value of
 `eldev-standard-fileset` function.  E.g.:
 
-    (eldev-standard-fileset 'main)
-    => (:and eldev-main-fileset (:not eldev-standard-excludes))
+[source]
+----
+(eldev-standard-fileset 'main)
+=> (:and eldev-main-fileset (:not eldev-standard-excludes))
+----
 
 As the result contains references to two variables, they will be
 evaluated in turn — and so on, until everything is resolved.
@@ -1138,20 +1164,23 @@ source; see how function `eldev-substitute` works.
 
 There is a simple builder for this in file `Eldev` of the project:
 
-    (eldev-defbuilder eldev-builder-preprocess-.in (source target)
-      :short-name     "SUBST"
-      :message        source-and-target
-      :source-files   "*.in"
-      :targets        (".in" -> "")
-      :collect        ":default"
-      :define-cleaner (eldev-cleaner-preprocessed
-                       "Delete results of preprocessing `.in' files.  This is specific
-    to Eldev itself."
-                       :aliases prep)
-      (let ((modes (file-modes target)))
-        (eldev-substitute source target)
-        (when (or modes (string-prefix-p "bin/" target))
-          (set-file-modes target (or modes #o755)))))
+[source]
+----
+(eldev-defbuilder eldev-builder-preprocess-.in (source target)
+  :short-name     "SUBST"
+  :message        source-and-target
+  :source-files   "*.in"
+  :targets        (".in" -> "")
+  :collect        ":default"
+  :define-cleaner (eldev-cleaner-preprocessed
+                   "Delete results of preprocessing `.in' files.  This is specific
+to Eldev itself."
+                   :aliases prep)
+  (let ((modes (file-modes target)))
+    (eldev-substitute source target)
+    (when (or modes (string-prefix-p "bin/" target))
+      (set-file-modes target (or modes #o755)))))
+----
 
 Here `eldev-defbuilder` is a macro much like `defun`.  It defines an
 Elisp function named `eldev-builder-preprocess-.in` and registers it
@@ -1320,7 +1349,128 @@ write a nice and polished builder, investigate them too.
 
 === Adding commands and options
 
-FIXME
+Eldev has lots of standard commands, but sometimes you need to define
+yet more.  Commands should generally be defined for things that cannot
+be reformulated in terms of building targets — for that you should
+rather write an additional builder.
+
+Defining a command is not much more complicated than defining a normal
+Elisp function:
+
+[source]
+----
+(eldev-defcommand mypackage-parrot (&rest parameters)
+  "Repeat parameters from the command line."
+  :parameters     "TEXT-TO-PARROT"
+  :aliases        (copycat ape)
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Nothing to say")))
+  (eldev-output "%s" (mapconcat #'identity parameters " ")))
+----
+
+Macro `eldev-defcommand` works much like `defun`, but additionally it
+adds the new function to the list of Eldev command handlers.  New
+command receives name built from the function name by removing package
+prefix.  If that doesn’t produce the needed result in your case
+(e.g. if package prefix is two words in your project), you can always
+specify name explicitly by using `:command` parameter.  You can also
+give your command any number of aliases, as shown above.
+
+Keyword `:parameter` describes what the command expects to see on the
+command line.  It is used when invoking `eldev help COMMAND` to
+improve documentation.  Note that all commands are automatically
+documented.  The short one-liner for `eldev help` is derived from the
+function’s documentation by taking the first sentence.  If this is not
+good enough in your case, use keyword `:briefdoc` to set it
+explicitly.
+
+When command is invoked from command line, Eldev calls the
+corresponding function, passing all remaining parameters to it as
+strings.  The example command above just parrots the parameters back
+at user, in accordance to its name.
+
+==== Defining options
+
+You have probably noticed that the command function we’ve defined
+doesn’t accept any options.  In fact, this is true for all commands in
+Eldev: options are not _passed_ to them.  Eldev takes a different
+approach: whenever a (recognized) option is encountered on the command
+line, appropriate function is called, which is supposed to alter
+global state.  This way it is easy to share options between multiple
+commands when needed.
+
+So, with that in mind, let’s expand our example command with an
+option:
+
+[source]
+----
+(defvar mypackage-parrot-colorize-as nil)
+
+(eldev-defcommand mypackage-parrot (&rest parameters)
+  "Repeat parameters from the command line.  If you want, I can even
+colorize them!"
+  :parameters     "TEXT-TO-PARROT"
+  :aliases        (copycat ape)
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Nothing to say")))
+  (let ((text (mapconcat #'identity parameters " ")))
+     (when mypackage-parrot-colorize-as
+       (setf text (eldev-colorize text mypackage-parrot-colorize-as)))
+     (eldev-output "%s" text)))
+
+(eldev-defoption mypackage-parrot-colorize (&optional style)
+  "Apply given STYLE to the parroted text (`section' if not specified)"
+  :options        (-c --colorize)
+  :optional-value STYLE
+  :for-command    parrot
+  (setf mypackage-parrot-colorize-as (intern (or style "section"))))
+----
+
+Definition of `mypackage-parrot` is updated, but there is nothing
+Eldev-specific here.  Let’s rather have a look at the option
+definition.
+
+Unlike for command function, name of option function is not important.
+Instead, how the option looks like on the command line is determined
+by `:options` keyword.  It can specify any number of alternatives, but
+they all must be either short-style (single `-` followed by one
+letter) or long-style (`--` followed by a longer name) options.  Some
+options take a value; it is determined by parameter `:optional-value`
+or `:value` (if it is mandatory) and must match arguments in function
+definition.
+
+Options can be either global or command-specific.  In the latter case
+— the one you’ll typically need — you define to which command(s) the
+option applies using `:for-command` parameter.  In our case its value
+is a single command, but it can also be a list of commands.
+
+To test how the new option works, run:
+
+    $ eldev parrot -c Repeat this
+
+It should print text “Repeat this” in bold, unless you’ve disabled
+output colorizing.
+
+Note that it doesn’t repeat “-c”, even though it appears on the
+command line after the command.  That’s because Eldev doesn’t pass the
+options as parameters to commands: only non-option arguments remain.
+
+Documentation (i.e. output of `eldev help parrot`) for the command we
+defined above now automatically lists the accepted option:
+
+....
+Usage: eldev [OPTION...] parrot TEXT-TO-PARROT
+
+Command aliases: copycat, ape
+
+Options:
+  -c, --colorize[=STYLE]
+                        Apply given STYLE to the parroted text (‘section’ if
+                        not specified)
+
+Repeat parameters from the command line.  If you want, I can even
+colorize them!
+....
 
 === Custom test runners
 
@@ -1352,14 +1502,19 @@ A few environment variables can affect Eldev’s behavior.
 
 == See also
 
-Some other build tools, projects and services you might want to use
-with or instead of Eldev:
+Other build tools you might want to use instead of Eldev:
 
 * {uri-cask}[Cask] — the most established Emacs project management
   tool.
 * {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
 * {uri-makel}[makel] — a prebuilt `Makefile` with typical targets
   useful to Elisp projects.
+* {uri-makem-sh}[makem.sh] — a shell script that performs many common
+  Elisp development tasks; must be copied to your project.
+
+Projects and services that can otherwise help you with developing your
+Elisp code:
+
 * {uri-evm}[EVM] — Emacs version manager; has special support for
   Travis CI.
 * {uri-travis}[Travis CI] — continuous integration service, the most
