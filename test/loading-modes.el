@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-loading-modes-1 ()
+(ert-deftest eldev-loading-modes-1 ()
   (let ((eldev--test-project "project-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("clean")

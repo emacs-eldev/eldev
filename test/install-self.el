@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-install-self-1 ()
+(ert-deftest eldev-install-self-1 ()
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (let* ((eldev--test-eldev-dir (eldev--test-tmp-subdir "install-dir"))
          (non-existing-dir      (eldev--test-tmp-subdir "non-existing-dir"))

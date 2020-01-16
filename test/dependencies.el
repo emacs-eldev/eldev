@@ -1,33 +1,33 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-dependencies-1 ()
+(ert-deftest eldev-dependencies-1 ()
   (eldev--test-run "trivial-project" ("dependencies")
     (should (string-match "no dependencies" stdout))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-test-dependencies-2 ()
+(ert-deftest eldev-dependencies-2 ()
   (eldev--test-run "trivial-project" ("--quiet" "dependencies")
     (should (string= stdout ""))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-test-dependencies-3 ()
+(ert-deftest eldev-dependencies-3 ()
   (eldev--test-run "project-a" ("dependencies")
     (should (string= stdout "dependency-a (any)\n"))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-test-dependencies-4 ()
+(ert-deftest eldev-dependencies-4 ()
   (eldev--test-run "project-b" ("dependencies")
     (should (string= stdout "dependency-b (any)\n"))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-test-dependencies-5 ()
+(ert-deftest eldev-dependencies-5 ()
   (eldev--test-run "project-c" ("dependencies")
     (should (string= stdout "dependency-a (any)\n"))
     (should (= exit-code 0))))
 
 ;; It doesn't matter that the dependency is unresolvable.
-(ert-deftest eldev-test-dependencies-missing-dependency-1 ()
+(ert-deftest eldev-dependencies-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.
   (let ((eldev--test-project "missing-dependency-a"))

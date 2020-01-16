@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-upgrade-other-archive-1 ()
+(ert-deftest eldev-upgrade-other-archive-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-a")
@@ -25,7 +25,7 @@
 
 ;; Exactly like the previous test, only we keep archive name to make
 ;; sure that 'upgrade' command knows to refetch its contents.
-(ert-deftest eldev-test-upgrade-same-archive-1 ()
+(ert-deftest eldev-upgrade-same-archive-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-a")
@@ -48,12 +48,12 @@
       (should (= exit-code 0)))))
 
 
-(ert-deftest eldev-test-upgrade-wrong-dependency-1 ()
+(ert-deftest eldev-upgrade-wrong-dependency-1 ()
   (eldev--test-run "trivial-project" ("upgrade" "doesnt-depend-on-this")
     (should (= exit-code 1))))
 
 
-(ert-deftest eldev-test-upgrade-other-archive-2 ()
+(ert-deftest eldev-upgrade-other-archive-2 ()
   (let ((eldev--test-project "missing-dependency-b"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-b")
@@ -73,7 +73,7 @@
       (should (= exit-code 0)))))
 
 ;; Like above, but explicitly list what to upgrade.
-(ert-deftest eldev-test-upgrade-other-archive-3 ()
+(ert-deftest eldev-upgrade-other-archive-3 ()
   (let ((eldev--test-project "missing-dependency-b"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-b")
@@ -93,7 +93,7 @@
       (should (= exit-code 0)))))
 
 ;; Like above, but explicitly upgrade only `dependency-a'.
-(ert-deftest eldev-test-upgrade-other-archive-4 ()
+(ert-deftest eldev-upgrade-other-archive-4 ()
   (let ((eldev--test-project "missing-dependency-b"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-b")
@@ -115,7 +115,7 @@
 ;; Like above, but explicitly upgrade only `dependency-b'; however
 ;; `dependency-a' must get upgraded too, since new `dependency-b'
 ;; version requires it.
-(ert-deftest eldev-test-upgrade-other-archive-5 ()
+(ert-deftest eldev-upgrade-other-archive-5 ()
   (let ((eldev--test-project "missing-dependency-b"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("version" "dependency-b")
@@ -135,7 +135,7 @@
       (should (= exit-code 0)))))
 
 
-(ert-deftest eldev-test-upgrade-dry-run-1 ()
+(ert-deftest eldev-upgrade-dry-run-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("--setup" "(eldev-use-package-archive `(\"archive-a\" . ,(expand-file-name \"../package-archive-a\")))"

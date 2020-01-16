@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-upgrade-self-1 ()
+(ert-deftest eldev-upgrade-self-1 ()
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (eldev--test-create-eldev-archive "eldev-archive-2" "999.9")
   (let ((eldev--test-project     "trivial-project")
@@ -19,7 +19,7 @@
       (should (= exit-code 0)))))
 
 ;; Trying to upgrade from the archive we have bootstrapped.  Nothing to do.
-(ert-deftest eldev-test-upgrade-self-2 ()
+(ert-deftest eldev-upgrade-self-2 ()
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (let ((eldev--test-project     "trivial-project")
         (eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
@@ -36,7 +36,7 @@
       (should (= exit-code 0)))))
 
 
-(ert-deftest eldev-test-upgrade-self-dry-run-1 ()
+(ert-deftest eldev-upgrade-self-dry-run-1 ()
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (eldev--test-create-eldev-archive "eldev-archive-2" "999.9")
   (let ((eldev--test-project     "trivial-project")

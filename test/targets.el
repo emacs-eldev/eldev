@@ -226,107 +226,107 @@
     targets))
 
 
-(ert-deftest eldev-test-targets-trivial-project-1 ()
+(ert-deftest eldev-targets-trivial-project-1 ()
   (eldev--test-project-dependencies "trivial-project" () eldev--test-targets-trivial-project-main))
 
-(ert-deftest eldev-test-targets-trivial-project-2 ()
+(ert-deftest eldev-targets-trivial-project-2 ()
   (eldev--test-project-dependencies "trivial-project" ("main") eldev--test-targets-trivial-project-main))
 
-(ert-deftest eldev-test-targets-trivial-project-3 ()
+(ert-deftest eldev-targets-trivial-project-3 ()
   (eldev--test-project-dependencies "trivial-project" ("test") eldev--test-targets-trivial-project-test))
 
-(ert-deftest eldev-test-targets-trivial-project-4 ()
+(ert-deftest eldev-targets-trivial-project-4 ()
   (eldev--test-project-dependencies "trivial-project" ("all") eldev--test-targets-trivial-project-main eldev--test-targets-trivial-project-test))
 
 
-(ert-deftest eldev-test-targets-project-a-1 ()
+(ert-deftest eldev-targets-project-a-1 ()
   (eldev--test-project-dependencies "project-a" () eldev--test-targets-project-a-main))
 
-(ert-deftest eldev-test-targets-project-a-2 ()
+(ert-deftest eldev-targets-project-a-2 ()
   (eldev--test-project-dependencies "project-a" ("main") eldev--test-targets-project-a-main))
 
-(ert-deftest eldev-test-targets-project-a-3 ()
+(ert-deftest eldev-targets-project-a-3 ()
   (eldev--test-project-dependencies "project-a" ("test") eldev--test-targets-project-a-test))
 
-(ert-deftest eldev-test-targets-project-a-4 ()
+(ert-deftest eldev-targets-project-a-4 ()
   (eldev--test-project-dependencies "project-a" ("all") eldev--test-targets-project-a-main eldev--test-targets-project-a-test))
 
 
-(ert-deftest eldev-test-targets-project-b-1 ()
+(ert-deftest eldev-targets-project-b-1 ()
   (eldev--test-project-dependencies "project-b" () eldev--test-targets-project-b-main))
 
-(ert-deftest eldev-test-targets-project-b-2 ()
+(ert-deftest eldev-targets-project-b-2 ()
   (eldev--test-project-dependencies "project-b" ("main") eldev--test-targets-project-b-main))
 
-(ert-deftest eldev-test-targets-project-b-3 ()
+(ert-deftest eldev-targets-project-b-3 ()
   (eldev--test-project-dependencies "project-b" ("test") eldev--test-targets-project-b-test))
 
-(ert-deftest eldev-test-targets-project-b-4 ()
+(ert-deftest eldev-targets-project-b-4 ()
   (eldev--test-project-dependencies "project-b" ("all") eldev--test-targets-project-b-main eldev--test-targets-project-b-test))
 
 
-(ert-deftest eldev-test-targets-project-c-1 ()
+(ert-deftest eldev-targets-project-c-1 ()
   (eldev--test-project-dependencies "project-c" () eldev--test-targets-project-c-main))
 
-(ert-deftest eldev-test-targets-project-c-2 ()
+(ert-deftest eldev-targets-project-c-2 ()
   (eldev--test-project-dependencies "project-c" ("main") eldev--test-targets-project-c-main))
 
-(ert-deftest eldev-test-targets-project-c-3 ()
+(ert-deftest eldev-targets-project-c-3 ()
   (eldev--test-project-dependencies "project-c" ("test") eldev--test-targets-project-c-test))
 
-(ert-deftest eldev-test-targets-project-c-4 ()
+(ert-deftest eldev-targets-project-c-4 ()
   (eldev--test-project-dependencies "project-c" ("all") eldev--test-targets-project-c-main eldev--test-targets-project-c-test))
 
 
-(ert-deftest eldev-test-targets-project-d-1 ()
+(ert-deftest eldev-targets-project-d-1 ()
   (eldev--test-project-dependencies "project-d" () eldev--test-targets-project-d-main))
 
-(ert-deftest eldev-test-targets-project-d-2 ()
+(ert-deftest eldev-targets-project-d-2 ()
   (eldev--test-project-dependencies "project-d" ("main") eldev--test-targets-project-d-main))
 
-(ert-deftest eldev-test-targets-project-d-3 ()
+(ert-deftest eldev-targets-project-d-3 ()
   (eldev--test-project-dependencies "project-d" ("test") eldev--test-targets-project-d-test))
 
-(ert-deftest eldev-test-targets-project-d-4 ()
+(ert-deftest eldev-targets-project-d-4 ()
   (eldev--test-project-dependencies "project-d" ("all") eldev--test-targets-project-d-main eldev--test-targets-project-d-test))
 
 
-(ert-deftest eldev-test-targets-project-e-1 ()
+(ert-deftest eldev-targets-project-e-1 ()
   (eldev--test-project-dependencies "project-e" () eldev--test-targets-project-e-main))
 
-(ert-deftest eldev-test-targets-project-e-2 ()
+(ert-deftest eldev-targets-project-e-2 ()
   (eldev--test-project-dependencies "project-e" ("main") eldev--test-targets-project-e-main))
 
-(ert-deftest eldev-test-targets-project-e-3 ()
+(ert-deftest eldev-targets-project-e-3 ()
   (eldev--test-project-dependencies "project-e" ("test") eldev--test-targets-project-e-test))
 
-(ert-deftest eldev-test-targets-project-e-4 ()
+(ert-deftest eldev-targets-project-e-4 ()
   (eldev--test-project-dependencies "project-e" ("all") eldev--test-targets-project-e-main eldev--test-targets-project-e-test))
 
 
-(ert-deftest eldev-test-targets-project-f-1 ()
+(ert-deftest eldev-targets-project-f-1 ()
   (eldev--test-project-dependencies "project-f" () eldev--test-targets-project-f-main))
 
-(ert-deftest eldev-test-targets-project-f-2 ()
+(ert-deftest eldev-targets-project-f-2 ()
   (eldev--test-project-dependencies "project-f" ("main") eldev--test-targets-project-f-main))
 
-(ert-deftest eldev-test-targets-project-f-3 ()
+(ert-deftest eldev-targets-project-f-3 ()
   (eldev--test-project-dependencies "project-f" ("test") eldev--test-targets-project-f-test))
 
-(ert-deftest eldev-test-targets-project-f-4 ()
+(ert-deftest eldev-targets-project-f-4 ()
   (eldev--test-project-dependencies "project-f" ("all") eldev--test-targets-project-f-main eldev--test-targets-project-f-test))
 
 
-(ert-deftest eldev-test-targets-project-g-1 ()
+(ert-deftest eldev-targets-project-g-1 ()
   (eldev--test-project-dependencies "project-g" () eldev--test-targets-project-g-main))
 
-(ert-deftest eldev-test-targets-project-g-2 ()
+(ert-deftest eldev-targets-project-g-2 ()
   (eldev--test-project-dependencies "project-g" ("main") eldev--test-targets-project-g-main))
 
-(ert-deftest eldev-test-targets-project-g-3 ()
+(ert-deftest eldev-targets-project-g-3 ()
   (eldev--test-project-dependencies "project-g" ("test") eldev--test-targets-project-g-test))
 
-(ert-deftest eldev-test-targets-project-g-4 ()
+(ert-deftest eldev-targets-project-g-4 ()
   (eldev--test-project-dependencies "project-g" ("all") eldev--test-targets-project-g-main eldev--test-targets-project-g-test))
 
 

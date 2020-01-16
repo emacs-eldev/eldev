@@ -1,13 +1,13 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-just-run-1 ()
+(ert-deftest eldev-just-run-1 ()
   (eldev--test-run "empty-project" ()
     (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-capture-output (eldev-usage))) stdout))
     (should (= exit-code 0))))
 
 ;; This should work even in broken projects.
-(ert-deftest eldev-test-just-run-missing-dependency-1 ()
+(ert-deftest eldev-just-run-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.
   (let ((eldev--test-project "missing-dependency-a"))
@@ -16,7 +16,7 @@
       (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-capture-output (eldev-usage))) stdout))
       (should (= exit-code 0)))))
 
-(ert-deftest eldev-test-bootstrapping-1 ()
+(ert-deftest eldev-bootstrapping-1 ()
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (let ((eldev--test-project     "trivial-project")
         (eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))

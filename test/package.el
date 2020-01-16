@@ -52,24 +52,24 @@
          ,@body))))
 
 
-(ert-deftest eldev-test-package-1 ()
+(ert-deftest eldev-package-1 ()
   (eldev--test-packaging "trivial-project"))
 
-(ert-deftest eldev-test-package-2 ()
+(ert-deftest eldev-package-2 ()
   (eldev--test-packaging "project-a"))
 
-(ert-deftest eldev-test-package-3 ()
+(ert-deftest eldev-package-3 ()
   ;; This project comes with an Info "manual".  Make sure it gets
   ;; installed.
   (eldev--test-packaging "project-b" (info "project-b")))
 
-(ert-deftest eldev-test-package-4 ()
+(ert-deftest eldev-package-4 ()
   (eldev--test-packaging "project-c"))
 
-(ert-deftest eldev-test-package-5 ()
+(ert-deftest eldev-package-5 ()
   (eldev--test-packaging "project-d"))
 
-(ert-deftest eldev-test-package-6 ()
+(ert-deftest eldev-package-6 ()
   (eldev--test-packaging "project-e"))
 
 

@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-local-dependencies-1 ()
+(ert-deftest eldev-local-dependencies-1 ()
   (let ((eldev--test-project "project-a"))
     (eldev--test-delete-cache)
     ;; Run all commands in the same test to make sure that the various
@@ -17,7 +17,7 @@
       (should (string= stdout (eldev--test-lines "t" "(1 0)")))
       (should (= exit-code 0)))))
 
-(ert-deftest eldev-test-local-dependencies-2 ()
+(ert-deftest eldev-local-dependencies-2 ()
   (let ((eldev--test-project "project-b"))
     (eldev--test-delete-cache)
     ;; Similar to the previous test.  Now we have two dependencies, A
@@ -49,7 +49,7 @@
       (should (= exit-code 0)))))
 
 
-(ert-deftest eldev-test-local-dependency-fixes-missing-dependency-1 ()
+(ert-deftest eldev-local-dependency-fixes-missing-dependency-1 ()
   (eldev--test-run "dependency-a" ("clean")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -77,7 +77,7 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-test-local-dependency-fixes-missing-dependency-2 ()
+(ert-deftest eldev-local-dependency-fixes-missing-dependency-2 ()
   (eldev--test-run "dependency-a" ("clean")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -98,7 +98,7 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-test-local-dependency-fixes-missing-dependency-3 ()
+(ert-deftest eldev-local-dependency-fixes-missing-dependency-3 ()
   (eldev--test-run "dependency-a" ("compile")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -120,7 +120,7 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-test-local-dependency-fixes-missing-dependency-4 ()
+(ert-deftest eldev-local-dependency-fixes-missing-dependency-4 ()
   (eldev--test-run "dependency-a" ("clean")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
