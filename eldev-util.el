@@ -569,43 +569,77 @@ is not meant for humans."
 
 ;; Child processes.
 
-(defvar eldev--tar-executable t)
-(defvar eldev--makeinfo-executable t)
-(defvar eldev--install-info-executable t)
-(defvar eldev--git-executable t)
+(defvar eldev-tar-executable t
+  "Tar executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Autofinder prefers
+`gtar' (GNU tar) if that is present.  Since Eldev 0.2.")
+
+(defvar eldev-makeinfo-executable t
+  "`makeinfo' executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.2.")
+
+(defvar eldev-install-info-executable t
+  "`install-info' executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.2.")
+
+(defvar eldev-git-executable t
+  "Git executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.2.")
 
 
-(defmacro eldev--find-executable (var not-required finder-form error-message &rest error-arguments)
+(defmacro eldev-find-executable (cache-var not-required finder-form error-message &rest error-arguments)
+  "Find and executable using FINDER-FORM.
+The form will usually call `executable-find'.  Result is cached
+in CACHE-VAR, unless that is nil.  If CACHE-VAR is a string,
+declare and use variable with that name as a cache.
+
+If executable cannot be found and NOT-REQUIRED is nil,
+`eldev-error' is signalled.  If NOT-REQUIRED is equal to
+\\='warn, a warning is reported through `eldev-warn'.  Error or
+warning is formatted using ERROR-MESSAGE and ERROR-ARGUMENTS.
+
+Since Eldev 0.2."
   (declare (indent 2))
-  `(progn
-     (when (eq ,var t)
-       (setf ,var ,finder-form))
-     (unless ,var
-       (cond ((eq ,not-required 'warn) (eldev-warn ,error-message ,@error-arguments))
-             ((null ,not-required)     (signal 'eldev-error `(,',error-message ,@',error-arguments)))))
-     ,var))
+  (when (stringp cache-var)
+    (setf cache-var (intern cache-var))
+    (unless (special-variable-p cache-var)
+      (eval `(defvar ,cache-var t) t)))
+  `(or ,(if cache-var
+            `(setf ,cache-var (if (eq ,cache-var t) ,finder-form ,cache-var))
+          finder-form)
+       (pcase ,not-required
+         (`warn (eldev-warn ,error-message ,@error-arguments) nil)
+         (`nil  (signal 'eldev-error `(,',error-message ,@',error-arguments))))))
 
 (defun eldev-tar-executable (&optional not-required)
-  "Find `tar' executable."
-  (eldev--find-executable eldev--tar-executable not-required
+  "Find `tar' executable.
+See also variable `eldev-tar-executable'."
+  (eldev-find-executable eldev-tar-executable not-required
     (or (executable-find "gtar") (executable-find "tar"))
     "Cannot find `tar' program"))
 
 (defun eldev-makeinfo-executable (&optional not-required)
-  "Find `makeinfo' executable."
-  (eldev--find-executable eldev--makeinfo-executable not-required
+  "Find `makeinfo' executable.
+See also variable `eldev-makeinfo-executable'."
+  (eldev-find-executable eldev-makeinfo-executable not-required
     (executable-find "makeinfo")
     "Cannot find `makeinfo' program"))
 
 (defun eldev-install-info-executable (&optional not-required)
-  "Find `install-info' executable."
-  (eldev--find-executable eldev--install-info-executable not-required
+  "Find `install-info' executable.
+See also variable `eldev-install-info-executable'."
+  (eldev-find-executable eldev-install-info-executable not-required
     (executable-find "install-info")
     "Cannot find `install-info' program"))
 
 (defun eldev-git-executable (&optional not-required)
-  "Find `git' executable."
-  (eldev--find-executable eldev--git-executable not-required
+  "Find `git' executable.
+See also variable `eldev-git-executable'."
+  (eldev-find-executable eldev-git-executable not-required
     (executable-find "git")
     "Git is not installed (cannot find `git' executable)"))
 
