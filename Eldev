@@ -5,11 +5,6 @@
 ;; Avoid including files in test "projects".
 (setf eldev-standard-excludes (append eldev-standard-excludes '("./test/*/" "./webinstall")))
 
-;; Only to simplify `eval' usage, Eldev itself doesn't depend on Dash.
-(eldev-use-package-archive 'melpa-stable)
-(eldev-add-extra-dependencies '(eval exec emacs) 'dash)
-(setq eldev-default-required-features '(:project-name dash))
-
 
 (add-hook 'eldev-test-hook (lambda () (eldev-print "Eldev tests are fairly slow, since they spawn lots of child processes")))
 
