@@ -1960,17 +1960,13 @@ If left nil (default value), Eldev will try to autodetect.")
 Should normally be specified only from command line.")
 
 (defvar eldev-test-known-frameworks '((ERT . ((detect               . (lambda () (featurep 'ert)))
-                                              (preprocess-selectors . (lambda (selectors)
-                                                                        (require 'eldev-ert)
-                                                                        (eldev-test-ert-preprocess-selectors selectors)))
+                                              (require              . eldev-ert)
+                                              (preprocess-selectors . eldev-test-ert-preprocess-selectors)
                                               (prepare              . (lambda (_selectors)
-                                                                        (require 'eldev-ert)
                                                                         (eldev-test-ert-load-results)))
                                               (run-tests            . (lambda (selectors _runner environment)
-                                                                        (require 'eldev-ert)
                                                                         (eldev-run-ert-tests selectors environment)))
                                               (finalize             . (lambda (_selectors)
-                                                                        (require 'eldev-ert)
                                                                         (eldev-test-ert-save-results))))))
   "Alist of all test frameworks known to Eldev.
 While this variable is public and can be modified, you most
@@ -2048,9 +2044,20 @@ unexpected result."
       (eldev-print "No test files to load"))))
 
 (defun eldev-test-get-framework-data (framework)
-  "Get handlers for given FRAMEWORK."
-  (or (cdr (assq framework eldev-test-known-frameworks))
-      (error "Unknown test framework `%s'" framework)))
+  "Get all data for given FRAMEWORK."
+ (or (cdr (assq framework eldev-test-known-frameworks))
+     (error "Unknown test framework `%s'" framework)))
+
+(defun eldev-test-get-framework-entry (framework key &optional require-features)
+  "Get an entry for given FRAMEWORK."
+  (when (symbolp framework)
+    (setf framework (eldev-test-get-framework-data framework)))
+  (let* ((entry      (cdr (assq key framework)))
+         (to-require (eldev-listify (cdr (assq 'require framework)))))
+    (when (if (eq require-features 'non-nil) entry require-features)
+      (dolist (feature to-require)
+        (require feature))
+    entry)))
 
 (defun eldev-test-framework ()
   "Get used test framework.
@@ -2069,7 +2076,7 @@ autodetected if possible."
 
 (defun eldev-test-preprocess-selectors (framework selectors)
   "Convert specified SELECTORS for use by given FRAMEWORK."
-  (let ((preprocess-selectors (cdr (assq 'preprocess-selectors (eldev-test-get-framework-data framework)))))
+  (let ((preprocess-selectors (eldev-test-get-framework-entry framework 'preprocess-selectors 'non-nil)))
     (if preprocess-selectors
         (funcall preprocess-selectors selectors)
       selectors)))
@@ -2085,14 +2092,14 @@ implementations."
 
 (defun eldev-test-prepare-framework (framework selectors)
   "Prepare given test FRAMEWORK."
-  (let ((prepare (cdr (assq 'prepare (eldev-test-get-framework-data framework)))))
+  (let ((prepare (eldev-test-get-framework-entry framework 'prepare 'non-nil)))
     (when prepare
       (funcall prepare selectors))))
 
 (defun eldev-test-finalize-framework (framework selectors)
   "Finalize given test FRAMEWORK after executing tests."
   (condition-case error
-      (let ((finalize (cdr (assq 'finalize (eldev-test-get-framework-data framework)))))
+      (let ((finalize (eldev-test-get-framework-entry framework 'finalize 'non-nil)))
         (when finalize
           (funcall finalize selectors)))
     (error (eldev-warn "When finalizing test framework `%s': %s" framework (error-message-string error)))))
@@ -2155,7 +2162,7 @@ selectors (e.g. ERT's `:new')."
 
 (eldev-deftestrunner eldev-test-runner-standard (framework selectors)
   "Invokes test framework without changing anything."
-  (funcall (cdr (assq 'run-tests (eldev-test-get-framework-data framework))) selectors 'standard nil))
+  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard nil))
 
 (eldev-deftestrunner eldev-test-runner-simple (framework selectors)
   "Simple test runner with a few tweaks to the defaults.
@@ -2170,7 +2177,7 @@ For ERT:
   (let ((right-margin (if (get 'ert-batch-backtrace-right-margin 'custom-type)
                           nil
                         1000000)))
-    (funcall (cdr (assq 'run-tests (eldev-test-get-framework-data framework))) selectors 'simple
+    (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
              ;; Non-ERT frameworks are just invoked with empty environment.
              (pcase framework
                (`ERT `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
