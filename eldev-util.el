@@ -539,7 +539,7 @@ BODY."
                                           (if (functionp eldev-message-rerouting-wrapper)
                                               (apply eldev-message-rerouting-wrapper args)
                                             ;; Assume a macro (`eldev-warn' or something like that).
-                                            (eval `(,eldev-message-rerouting-wrapper ,@args) t)))
+                                            (eval `(,eldev-message-rerouting-wrapper ,@(mapcar #'eldev-macroexp-quote args)) t)))
                                          (t
                                           (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args)))))))
      ,@body))
