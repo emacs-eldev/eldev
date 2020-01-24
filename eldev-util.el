@@ -566,6 +566,27 @@ is not meant for humans."
           (buffer-substring 1 (point))))))
 
 
+(defmacro eldev-suppress-warning-emacs-text (&rest body)
+  "Execute BODY with “Warning (emacs):” from `warn' suppressed.
+This macro should be used when this text carries no meaning and
+potentially lots of warnings is expected.  A good example is
+`checkdoc' linter, which otherwise prepends this noise to any
+warning it issues.
+
+Since 0.2."
+  (declare (indent 0) (debug (body)))
+  `(progn (eval-and-compile (require 'warnings))
+          (eldev-advised ('display-warning :around
+                                           (lambda (original type message &rest arguments)
+                                             (let* ((suppressing    (eq (if (consp type) (car type) type) 'emacs))
+                                                    (warning-levels (if suppressing `((:warning "") ,@warning-levels) warning-levels)))
+                                               ;; Remove the first newline: it makes no sense with silencing.
+                                               (apply original type
+                                                      (if (and suppressing (string-prefix-p "\n" message)) (substring message 1) message)
+                                                      arguments))))
+            ,@body)))
+
+
 
 ;; Child processes.
 

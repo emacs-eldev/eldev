@@ -1016,15 +1016,10 @@ show details about that command instead."
              (real-command (or (cdr (assq command eldev--command-aliases)) command))
              (handler      (cdr (assq real-command eldev--commands))))
         (if handler
-            (let ((parameters  (eldev-get handler :parameters))
-                  aliases)
-              (dolist (alias eldev--command-aliases)
-                (when (eq (cdr alias) real-command)
-                  (push (car alias) aliases)))
+            (let ((parameters (eldev-get handler :parameters)))
               (eldev-output "Usage: %s%s %s" (eldev-shell-command t) (if (cdr (assq command eldev--options)) " [OPTION...]" "")
                             (if parameters (format "%s %s" real-command parameters) real-command))
-              (when aliases
-                (eldev-output "\n%s" (eldev-message-enumerate '("Command alias:" "Command aliases:") aliases #'symbol-name t t)))
+              (eldev-help-list-aliases real-command eldev--command-aliases "\n%s" '("Command alias:" "Command aliases:"))
               (eldev-options-help real-command)
               (eldev-output "\n%s" (or (eldev-documentation handler) "Not documented")))
           (eldev-error "Unknown command `%s'" command)
@@ -1050,6 +1045,14 @@ Influential environment variables: `ELDEV_EMACS' (also just `EMACS'),
    :options       (-i --only-interesting)
    :hidden-if     :default)
   :for-command    help)
+
+(defun eldev-help-list-aliases (name alias-alist &optional format-string label-string)
+  (let (aliases)
+    (dolist (alias alias-alist)
+      (when (eq (cdr alias) name)
+        (push (car alias) aliases)))
+    (when aliases
+      (eldev-output (or format-string "%s") (eldev-message-enumerate (or label-string '("Alias:" "Aliases:")) aliases #'symbol-name t t)))))
 
 (defun eldev-options-help (&optional command title)
   "List options for given COMMAND.
@@ -1755,13 +1758,9 @@ used"
              (function (cdr cleaner))
              (header   (if (eldev-get function :default) (format "%s [*]" name) (format "%s" name))))
         (if (eldev-unless-quiet t)
-            (let (aliases)
-              (dolist (alias eldev--cleaner-aliases)
-                (when (eq (cdr alias) name)
-                  (push (car alias) aliases)))
+            (progn
               (eldev-output "%s\n" (eldev-colorize header 'section))
-              (when aliases
-                (eldev-output "    %s\n" (eldev-message-enumerate '("Alias:" "Aliases:") aliases #'symbol-name t t)))
+              (eldev-help-list-aliases name eldev--cleaner-aliases "    %s\n")
               (eldev-output "%s" (or (eldev-documentation function) "Not documented"))
               (when all-cleaners
                 (eldev-output "\n")))
@@ -1992,8 +1991,12 @@ mode output is restricted to just the version."
 (declare-function eldev-test-ert-save-results "eldev-ert" ())
 (declare-function eldev-run-ert-tests "eldev-ert" (selectors &optional environment))
 
+(defvaralias 'eldev-test-dwim 'eldev-dwim)
+
 (defvar eldev-dwim t
-  "Employ some heuristics when parsing command line of `test' command.
+  "Employ some heuristics when parsing command line of certain commands.
+
+For `test':
 
 * Any selector that ends in `.el' is instead treated as a file
   pattern.
@@ -2001,9 +2004,13 @@ mode output is restricted to just the version."
 * For ERT: any symbol selector that doesn’t match a test name is
   instead treated as regular expression (i.e. as a string).
 
-These heuristics are aimed at further simplifying test execution.")
+For `lint':
 
-(defvaralias 'eldev-test-dwim 'eldev-dwim)
+* Any linter name that ends in `.el' is instead treated as a file
+  pattern.
+
+These heuristics are aimed at further simplifying of test
+execution and other common commands.")
 
 (defvar eldev-test-stop-on-unexpected nil
   "If non-nil, stop as soon as a test produces an unexpected result.")
@@ -2314,6 +2321,296 @@ For ERT:
               (eldev-output "%s" name)))))))
   (signal 'eldev-quit 0))
 
+
+
+;; eldev lint
+
+(defvar eldev-lint-default t
+  "Linters to run by default.
+Default value t means all linters known to Eldev.  Variables
+`eldev-lint-default-excluded' and `eldev-lint-disabled' take
+precedence.")
+
+(defvar eldev-lint-default-excluded nil
+  "Linters to be excluded from those run by default.")
+
+(defvar eldev-lint-disabled nil
+  "Linters that are disabled for the current project.")
+
+(defvar eldev-lint-file-patterns nil
+  "Lint only files that match one of these patterns.
+Should normally be specified only from command line.")
+
+(defvar eldev-lint-stop-mode nil
+  "Whether and when Eldev should stop early when linting.
+Possible modes:
+
+  - nil: don't stop early;
+  - linter: run a linter that issued a warnings to the end, but
+    don't execute any further linters;
+  - file: if a warning is issued, run current linter on that file
+    to the end and then stop;
+  - warning: immediately stop after the first warning.")
+
+
+(defvar eldev--linters nil)
+(defvar eldev--linter-aliases nil)
+
+(defvar eldev--lint-have-warnings)
+
+
+;; Internal helper for `eldev-deflinter'.
+(defun eldev--register-linter (linter name keywords)
+  (while keywords
+    (eldev-pcase-exhaustive (pop keywords)
+      (:aliases
+       (eldev-register-linter-aliases name (pop keywords)))))
+  (eldev--assq-set name linter eldev--linters))
+
+(defun eldev-register-linter-aliases (linter aliases)
+  (dolist (alias (eldev-listify aliases))
+    (eldev--assq-set alias linter eldev--linter-aliases)))
+
+(defmacro eldev-deflinter (name arguments &rest body)
+  "Register a linter in Eldev."
+  (declare (doc-string 3) (indent 2))
+  (let ((parsed-body (eldev-macroexp-parse-body body))
+        (linter-name (intern (replace-regexp-in-string (rx bol (1+ (not (any "-"))) (1+ "-") (? "linter-")) "" (symbol-name name))))
+        keywords)
+    (setf body (cdr parsed-body))
+    (while (keywordp (car body))
+      (pcase (pop body)
+        (:name   (setf linter-name (pop body)))
+        (keyword (push keyword keywords) (push (pop body) keywords))))
+    (when (eq linter-name 'all)
+      (error "Linter name `all' is reserved and cannot be registered"))
+    `(progn (defun ,name ,arguments
+              ,@(car parsed-body)
+              ,@body)
+            (eldev--register-linter ',name ',linter-name ',(nreverse keywords)))))
+
+
+(eldev-defcommand eldev-lint (&rest parameters)
+  "Run standard linters on the project's source code.  By default,
+linters listed in variable `eldev-lint-default' and not specified
+in `eldev-lint-default-excluded' or `eldev-lint-disabled' are
+executed.  Default values of these variables mean that all
+supported linters will be run.
+
+You can also request specific linters by name.  Use option
+`--list-linters' to find all supported by Eldev.  Special name
+`all' runs all non-disabled linters, which is useful if value of
+`eldev-lint-default-excluded' is not empty.
+
+If `eldev-dwim' variable is on (default), Eldev employs
+additional heuristics when processing LINTERs.  Any name that
+ends in `.el' is instead treated as a file pattern.
+
+This command exits with error code 1 if any linter issues at
+least one warning."
+  :parameters     "[LINTER...]"
+  :aliases        linter
+  (let ((eldev-lint-file-patterns eldev-lint-file-patterns)
+        linters
+        all)
+    (dolist (name parameters)
+      (if (and eldev-dwim (string-match-p (rx ".el" eol) name))
+          (setf eldev-lint-file-patterns (nconc eldev-lint-file-patterns `(,name)))
+        (setf name (intern name))
+        (if (eq name 'all)
+            (setf all t)
+          (unless (or (assq name eldev--linters) (assq name eldev--linter-aliases))
+            (signal 'eldev-error `(:hint ("Check output of `%s lint --list-linters'" ,(eldev-shell-command t)) "Unknown linter `%s'" ,name)))
+          (push name linters))))
+    (unless linters
+      (setf linters (eldev-filter (eldev-lint-default-p it) (mapcar #'car eldev--linters))))
+    (when all
+      (setf linters (eldev-filter (not (memq it eldev-lint-disabled)) (mapcar #'car eldev--linters))))
+    (setf linters (nreverse linters))
+    (if linters
+        (let (eldev--lint-have-warnings)
+          (eldev-trace "Going to run the following %s" (eldev-message-enumerate '("linter:" "linters:") linters))
+          (catch 'eldev--lint-stop
+            (dolist (linter linters)
+              (let ((canonical-name (or (cdr (assq linter eldev--linter-aliases)) linter)))
+                (when (or (memq linter eldev-lint-disabled) (memq canonical-name eldev-lint-disabled))
+                  ;; This can only happen if a linter is requested explicitly.
+                  (signal 'eldev-error `("Linter `%s' is disabled (see variable `eldev-lint-disabled')" linter)))
+                (eldev-verbose "Running linter `%s'..." linter)
+                (funcall (cdr (assq canonical-name eldev--linters)))
+                (when (and (eq eldev-lint-stop-mode 'linter) eldev--lint-have-warnings)
+                  (eldev-trace "Stopping after the linter that issued warnings")
+                  (throw 'eldev--lint-stop nil)))))
+          (if eldev--lint-have-warnings
+              (signal 'eldev-error `("Linting produced warnings"))
+            (eldev-print (if (cdr linters) "Linters have no complaints" "Linter has no complaints"))))
+      (eldev-print "Nothing to do"))))
+
+(defun eldev-lint-default-p (linter)
+  (and (or (eq eldev-lint-default t) (memq linter eldev-lint-default))
+       (not (memq linter eldev-lint-default-excluded)) (not (memq linter eldev-lint-disabled))))
+
+
+(eldev-defoption eldev-lint-files (pattern)
+  "Lint only given file(s)"
+  :options        (-f --file)
+  :for-command    lint
+  :value          PATTERN
+  (push pattern eldev-lint-file-patterns))
+
+(eldev-defoption eldev-lint-continue-mode ()
+  "Execute all scheduled linters regardless of any warnings"
+  :options        (-c --continue)
+  :for-command    lint
+  :if-default     (null eldev-lint-stop-mode)
+  (setf eldev-lint-stop-mode nil))
+
+(eldev-defoption eldev-lint-finish-linter-mode ()
+  "Don't run further linters if one issues a warning"
+  :options        (-S --stop-on-linter)
+  :for-command    lint
+  :if-default     (eq eldev-lint-stop-mode 'linter)
+  (setf eldev-lint-stop-mode 'linter))
+
+(eldev-defoption eldev-lint-finish-file-mode ()
+  "Stop after the first file with warnings"
+  :options        (-s --stop-on-file)
+  :for-command    lint
+  :if-default     (eq eldev-lint-stop-mode 'file)
+  (setf eldev-lint-stop-mode 'file))
+
+(eldev-defoption eldev-lint-stop-on-warning-mode ()
+  "Immediately stop if a warning is issued"
+  :options        (-w --stop-on-warning)
+  :for-command    lint
+  :if-default     (eq eldev-lint-stop-mode 'warning)
+  (setf eldev-lint-stop-mode 'warning))
+
+(eldev-defoption eldev-lint-list-linters ()
+  "List known linters and exit"
+  :options        (-L --list-linters --list)
+  :for-command    lint
+  (eldev-print "Linter(s) marked with `*' are default, i.e. executed also when\nno names are specified on the command line.\n")
+  (let ((all-linters (reverse eldev--linters)))
+    (while all-linters
+      (let* ((linter   (pop all-linters))
+             (name     (car linter))
+             (function (cdr linter))
+             (header   (if (eldev-lint-default-p name) (format "%s [*]" name) (format "%s" name))))
+        (if (eldev-unless-quiet t)
+            (progn
+              (eldev-output "%s\n" (eldev-colorize header 'section))
+              (eldev-help-list-aliases name eldev--linter-aliases "    %s\n")
+              (eldev-output "%s" (or (eldev-documentation function) "Not documented"))
+              (when all-linters
+                (eldev-output "\n")))
+          (let ((documentation (eldev-briefdoc function)))
+            (if documentation
+                (eldev-output "%-18s  %s" header documentation)
+              (eldev-output "%s" header)))))))
+  (signal 'eldev-quit 0))
+
+
+(defmacro eldev-lint-printing-warning (level &rest body)
+  (declare (indent 1) (debug (body)))
+  (unless level
+    (setf level :warning))
+  `(prog1 (let ((eldev-message-rerouting-wrapper ,(if (keywordp level)
+                                                      (if (eq level :error) '#'eldev-error '#'eldev-warn)
+                                                    `(if (eq ,level :error) #'eldev-error #'eldev-warn))))
+            ,@body)
+     (eldev-lint-note-warning)))
+
+(defmacro eldev-lint-linting-file (file &rest body)
+  (declare (indent 1) (debug (body)))
+  `(progn
+     (eldev-verbose "Linting file `%s'" ,file)
+     ,@body
+     (eldev-lint-note-file-finished)))
+
+(defun eldev-lint-note-warning ()
+  (setf eldev--lint-have-warnings t)
+  (when (eq eldev-lint-stop-mode 'warning)
+    (eldev-trace "Stopping after the first linter warning")
+    (throw 'eldev--lint-stop nil)))
+
+(defun eldev-lint-note-file-finished ()
+  (when (and (eq eldev-lint-stop-mode 'file) eldev--lint-have-warnings)
+    (eldev-trace "Stopping after the first file with linter warnings")
+    (throw 'eldev--lint-stop nil)))
+
+
+(defvar checkdoc-diagnostic-buffer)
+(declare-function checkdoc-file "checkdoc")
+
+(eldev-deflinter eldev-linter-doc ()
+  "Check documentation for style errors."
+  :aliases        (checkdoc documentation)
+  ;; Old Emacs version don't have `checkdoc-file' and also don't use `warn'.
+  (let ((newer-emacs (fboundp 'checkdoc-file)))
+    (eldev-advised ('checkdoc-error :around (lambda (original &rest arguments)
+                                              (eldev-suppress-warning-emacs-text
+                                                (let ((from (with-current-buffer (get-buffer checkdoc-diagnostic-buffer) (point-max))))
+                                                  (apply original arguments)
+                                                  (unless newer-emacs
+                                                    (warn "%s" (with-current-buffer (get-buffer checkdoc-diagnostic-buffer)
+                                                                 (buffer-substring from (point-max)))))
+                                                  (eldev-lint-note-warning)))))
+      (dolist (file (eldev-lint-find-files "*.el"))
+        (eldev-lint-linting-file file
+          (if newer-emacs
+              (checkdoc-file file)
+            (with-current-buffer (find-file-noselect file)
+              (checkdoc-current-buffer t))))))))
+
+
+(declare-function package-lint-buffer "package-lint")
+
+(eldev-deflinter eldev-linter-package ()
+  "Check package metadata, e.g. correctness of its dependencies."
+  :aliases        (package-lint pack)
+  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archive melpa-stable))
+  (eldev-load-extra-dependencies 'runtime)
+  (require 'package-lint)
+  (dolist (file (eldev-lint-find-files "*.el"))
+    (eldev-lint-linting-file file
+      ;; Adapted `package-lint-batch-and-exit-1'.
+      (with-temp-buffer
+        (insert-file-contents file t)
+        (emacs-lisp-mode)
+        (pcase-dolist (`(,line ,col ,type ,message) (package-lint-buffer))
+          (eldev-lint-printing-warning (if (eq type 'error) :error :warning)
+            (message "%s:%d:%d: %s: %s" file line col type message)))))))
+
+
+(declare-function relint-file "relint")
+
+(eldev-deflinter eldev-linter-re ()
+  "Find errors, deprecated syntax etc. in regular expressions."
+  :aliases        (relint regex regexp)
+  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu))
+  (eldev-load-extra-dependencies 'runtime)
+  (require 'relint)
+  ;; I see no way to avoid diving into internals.
+  (eldev-advised ('relint--report :around (lambda (original &rest arguments)
+                                            (eldev-lint-printing-warning :warning
+                                              (apply original arguments))))
+    (dolist (file (eldev-lint-find-files "*.el"))
+      (eldev-lint-linting-file file
+        (relint-file file)))))
+
+
+(defun eldev-lint-fileset ()
+  ;; Target set is hardcoded for now.
+  (eldev-standard-fileset 'main))
+
+(defun eldev-lint-find-files (filter &optional fileset filter-description)
+  "Find files to lint matching given FILTER in the FILESET."
+  (let ((files (eldev-find-and-trace-files `(:and ,(or fileset (eldev-lint-fileset)) ,filter) (or filter-description "file%s to lint"))))
+    (when (and files eldev-lint-file-patterns)
+      (setf files (eldev-filter-files files eldev-lint-file-patterns))
+      (eldev-trace "%s" (eldev-message-enumerate-files "Remaining file%s to lint after applying `--file' filter(s): %s (%d)" files)))
+    files))
 
 
 ;; eldev eval, eldev exec
