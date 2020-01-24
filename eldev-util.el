@@ -530,10 +530,10 @@ disabled by setting `eldev-disable-message-rerouting' inside
 BODY."
   (declare (indent 0) (debug (body)))
   `(eldev-advised (#'message :around
-                             (unless (or eldev-disable-message-rerouting eldev--output-rerouted)
+                             (unless eldev--output-rerouted
                                (lambda (original &rest args)
                                  (unless (and (boundp 'inhibit-message) inhibit-message)
-                                   (cond (eldev--real-stderr-output
+                                   (cond ((or eldev--real-stderr-output eldev-disable-message-rerouting)
                                           (apply original args))
                                          (eldev-message-rerouting-wrapper
                                           (if (functionp eldev-message-rerouting-wrapper)
