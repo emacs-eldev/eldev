@@ -1992,7 +1992,7 @@ mode output is restricted to just the version."
 (declare-function eldev-test-ert-save-results "eldev-ert" ())
 (declare-function eldev-run-ert-tests "eldev-ert" (selectors &optional environment))
 
-(defvar eldev-test-dwim t
+(defvar eldev-dwim t
   "Employ some heuristics when parsing command line of `test' command.
 
 * Any selector that ends in `.el' is instead treated as a file
@@ -2002,6 +2002,8 @@ mode output is restricted to just the version."
   instead treated as regular expression (i.e. as a string).
 
 These heuristics are aimed at further simplifying test execution.")
+
+(defvaralias 'eldev-test-dwim 'eldev-dwim)
 
 (defvar eldev-test-stop-on-unexpected nil
   "If non-nil, stop as soon as a test produces an unexpected result.")
@@ -2064,7 +2066,7 @@ match any of the specified selectors are executed.  When used in
 combination with `--file', they result in `and' operation: only
 those tests that are loaded and match the selectors are executed.
 
-If `eldev-test-dwim' variable is on (default), Eldev employs
+If `eldev-dwim' variable is on (default), Eldev employs
 additional heuristics when processing SELECTORs.  This variable
 is not controllable from command line---change its value in
 `~/.eldev/config' or `Eldev-local'.
@@ -2078,7 +2080,7 @@ unexpected result."
     (when files
       (let ((filter-patterns eldev-test-file-patterns))
         (dolist (selector parameters)
-          (if (and eldev-test-dwim (string-match-p (rx ".el" eol) selector))
+          (if (and eldev-dwim (string-match-p (rx ".el" eol) selector))
               (push selector filter-patterns)
             (push selector selectors)))
         (setf selectors (nreverse selectors))

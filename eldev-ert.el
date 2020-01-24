@@ -150,13 +150,13 @@ use this for ERT framework, unless they can do better."
 If the list contains several selectors, they are combined with
 `or' operator, as promised by the `test' command documentation.
 
-When `eldev-test-dwim' is set, any symbol that is not an exact
-test name is instead treated as a regular expression that is
-supposed to match test names."
+When `eldev-dwim' is set, any symbol that is not an exact test
+name is instead treated as a regular expression that is supposed
+to match test names."
   (let ((ert-selectors (mapcar (lambda (selector)
                                  (let ((as-elisp  (car selector))
                                        (as-string (cdr selector)))
-                                   (if (and eldev-test-dwim
+                                   (if (and eldev-dwim
                                             (or (and (symbolp as-elisp) (not (memq as-elisp '(nil t))) (not (keywordp as-elisp)) (not (ert-test-boundp as-elisp)))
                                                 (numberp as-elisp)))
                                        as-string
