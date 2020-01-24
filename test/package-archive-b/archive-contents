@@ -1,3 +1,4 @@
 (1
  (dependency-a . [(1 1) nil "Dependency test package A" single nil])
- (dependency-b . [(1 1) ((dependency-a (1 1))) "Dependency test package B" single nil]))
+ (dependency-b . [(1 1) ((dependency-a (1 1))) "Dependency test package B" single nil])
+ (misc-a . [(1 1) nil "Miscellaneous package A" single nil]))

@@ -865,10 +865,7 @@ If PRIORITY is non-nil, ARCHIVE is given this priority (see
 specify something explicitly."
   (unless priority
     (setf priority (nth 2 (assq archive eldev--known-package-archives))))
-  (cond ((assq archive eldev--known-package-archives)
-         (setf archive (nth 1 (assq archive eldev--known-package-archives))))
-        ((not (and (consp archive) (stringp (car archive)) (stringp (cdr archive))))
-         (error "Unknown package archive `%S'" archive)))
+  (setf archive (eldev--resolve-package-archive archive))
   (when (string= (car archive) eldev--internal-pseudoarchive)
     (error "Package archive name `%s' is reserved for internal use" eldev--internal-pseudoarchive))
   (eldev-verbose "Using package archive `%s' at `%s' with %s"
@@ -876,6 +873,14 @@ specify something explicitly."
   (push archive package-archives)
   (when (and priority (boundp 'package-archive-priorities))
     (push (cons (car archive) priority) package-archive-priorities)))
+
+(defun eldev--resolve-package-archive (archive)
+  (cond ((assq archive eldev--known-package-archives)
+         (nth 1 (assq archive eldev--known-package-archives)))
+        ((and (consp archive) (stringp (car archive)) (stringp (cdr archive)))
+         archive)
+        (t
+         (error "Unknown package archive `%S'" archive))))
 
 (defun eldev-use-local-dependency (dir &optional loading-mode)
   "Use local dependency found in DIR.
@@ -903,6 +908,20 @@ for details."
     (let ((set-dependencies (or (assq set eldev--extra-dependencies) (car (push `(,set . nil) eldev--extra-dependencies)))))
       (dolist (dependency dependencies)
         (push (if (symbolp dependency) (list dependency) dependency) (cdr set-dependencies))))))
+
+(defvar eldev--know-installed-runtime-dependencies nil)
+
+(defun eldev--load-installed-runtime-dependencies ()
+  (eldev-do-load-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 1
+    (apply #'eldev-add-extra-dependencies 'runtime (cdr (assq 'dependencies contents))))
+  (setf eldev--know-installed-runtime-dependencies t))
+
+(defun eldev--save-installed-runtime-dependencies ()
+  (let ((eldev--extra-dependencies eldev--extra-dependencies))
+    (unless eldev--know-installed-runtime-dependencies
+      (eldev--load-installed-runtime-dependencies))
+    (eldev-do-save-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 1
+      `((dependencies . ,(cdr (assq 'runtime eldev--extra-dependencies)))))))
 
 
 (defun eldev-substitute (source target &optional open-string close-string)
@@ -1132,7 +1151,7 @@ remote copy to be upgraded, make it non-local first (e.g. by
 commenting out `eldev-use-local-dependency' in `Eldev-local')
 before upgrading."
   :parameters     "[PACKAGE...]"
-  (eldev--install-or-upgrade-dependencies nil (mapcar #'car eldev--extra-dependencies) (or (mapcar #'intern parameters) t) eldev-upgrade-dry-run-mode nil t))
+  (eldev--install-or-upgrade-dependencies 'project (mapcar #'car eldev--extra-dependencies) (or (mapcar #'intern parameters) t) eldev-upgrade-dry-run-mode nil t))
 
 (eldev-defcommand eldev-upgrade-self (&rest parameters)
   "Upgrade Eldev itself.
@@ -1144,7 +1163,7 @@ sources will be replaced with a package downloaded from MELPA."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) eldev-dir)))
-    (eldev--install-or-upgrade-dependencies t nil t eldev-upgrade-dry-run-mode nil t)))
+    (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t)))
 
 (eldev-defbooloptions eldev-upgrade-self-from-stable eldev-upgrade-self-from-unstable eldev-upgrade-self-from-stable
   ("Use MELPA Stable (stable.melpa.org)"
@@ -1180,25 +1199,58 @@ NO-ERROR-IF-MISSING."
   ;; dependencies, which of course fails.
   (when eldev-too-old
     (signal 'eldev-too-old eldev-too-old))
-  (eldev--install-or-upgrade-dependencies nil additional-sets nil nil t nil no-error-if-missing))
+  (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing))
+
+(defun eldev-load-extra-dependencies (sets &optional no-error-if-missing)
+  "Load extra dependencies, but without normal project's dependencies.
+This is exactly like `eldev-load-project-dependencies' except
+that the project itself and its normal dependencies are not
+loaded.  Mostly useful to load runtime dependencies.
+
+Since 0.2."
+  (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing))
 
 ;; `package-compute-transaction' and friends are not enough in our case, mostly because of
-;; local dependencies that can change unpredictably.  Roll our own.
-(defun eldev--install-or-upgrade-dependencies (self additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
+;; local dependencies that can change unpredictably and also requirement that certain
+;; dependencies are installed only from certain archives.  Roll our own.
+(defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
+         (self                    (eq core 'eldev))
          (package-name            (if self 'eldev (package-desc-name (eldev-package-descriptor))))
-         (all-packages            `((,package-name)))
-         (package-archives        `(,@(if self
-                                          (if eldev--upgrade-self-from-forced-pa
-                                              `(("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa)))
-                                            `(,(nth 1 (assq (if eldev-upgrade-self-from-stable 'melpa-stable 'melpa-unstable) eldev--known-package-archives))))
-                                        `((,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir)))))
-                                    ,@package-archives))
-         (package-pinned-packages `(,@(unless self (mapcar (lambda (entry) `(,(car entry) . ,eldev--internal-pseudoarchive)) eldev--local-dependencies)) ,@package-pinned-packages))
-         (plan                    (list nil)))
-    (unless self
-      (eldev--create-internal-pseudoarchive-descriptor))
+         ;; These two variable will be altered inside the `let' form.
+         (package-archives        package-archives)
+         (package-pinned-packages package-pinned-packages)
+         (plan                    (list nil))
+         default-archives
+         all-packages)
+    (if self
+        (setf package-archives `(,(if eldev--upgrade-self-from-forced-pa
+                                      `("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa))
+                                    `(eldev--resolve-package-archive (if eldev-upgrade-self-from-stable 'melpa-stable 'melpa-unstable))))
+              all-packages     '((:package eldev)))
+      (eldev--create-internal-pseudoarchive-descriptor)
+      (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
+      (setf default-archives package-archives)
+      (when (eq core 'project)
+        (push `(:package ,package-name :archives ,default-archives) all-packages))
+      (dolist (set (eldev-listify additional-sets))
+        (let ((extra-dependencies (cdr (assq set eldev--extra-dependencies))))
+          (when extra-dependencies
+            (setf extra-dependencies (mapcar #'eldev--create-package-plist extra-dependencies))
+            (eldev-verbose "Need the following extra dependencies for set `%s': %s" set
+                           (eldev-message-enumerate nil extra-dependencies
+                                                    (lambda (plist)
+                                                      (eldev-format-message "%s %s" (plist-get plist :package) (eldev-message-version (plist-get plist :version))))
+                                                    t))
+            (setf all-packages (append all-packages extra-dependencies))
+            (dolist (plist extra-dependencies)
+              (dolist (archive (eldev--package-plist-get-archives plist))
+                (let ((existing (assoc (car archive) package-archives)))
+                  (if existing
+                      (unless (equal (cdr archive) (cdr existing))
+                        (error "Conflicting URLs for package archive `%s': `%s' and `%s'" (car archive) (cdr existing) (cdr archive)))
+                    (push archive package-archives)))))))))
     (eldev--fetch-archive-contents to-be-upgraded)
     (package-read-all-archive-contents)
     (package-load-all-descriptors)
@@ -1209,18 +1261,8 @@ NO-ERROR-IF-MISSING."
       ;; packages to our pseudoarchive.  This doesn't quite feel right, but I don't see a
       ;; better way.
       (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
-    (when additional-sets
-      (dolist (set (eldev-listify additional-sets))
-        (let ((extra-dependencies (cdr (assq set eldev--extra-dependencies))))
-          (when extra-dependencies
-            (eldev-verbose "Need the following extra dependencies for set `%s': %s" set
-                           (eldev-message-enumerate nil extra-dependencies
-                                                    (lambda (package)
-                                                      (eldev-format-message "%s %s" (car package) (eldev-message-version (cadr package))))
-                                                    t))
-            (setf all-packages (append all-packages extra-dependencies))))))
     (condition-case error
-        (eldev--plan-install-or-upgrade self to-be-upgraded all-packages plan)
+        (eldev--plan-install-or-upgrade self to-be-upgraded all-packages default-archives plan)
       (eldev-error (cond (no-error-if-missing
                           (eldev-verbose "%s" (error-message-string error)))
                          ((null to-be-upgraded)
@@ -1228,7 +1270,7 @@ NO-ERROR-IF-MISSING."
                           (eldev--fetch-archive-contents t)
                           (package-read-all-archive-contents)
                           (setf plan (list nil))
-                          (eldev--plan-install-or-upgrade self nil all-packages plan)))))
+                          (eldev--plan-install-or-upgrade self nil all-packages default-archives plan)))))
     (let ((planned-packages    (nreverse (car plan)))
           (non-local-plan-size 0)
           (dependency-index    0)
@@ -1263,7 +1305,9 @@ NO-ERROR-IF-MISSING."
             (unless dry-run
               (let ((inhibit-message t))
                 (package-install-from-archive dependency))))))
-      (when (= non-local-plan-size 0)
+      (if (> non-local-plan-size 0)
+          (when (memq 'runtime (eldev-listify additional-sets))
+            (eldev--save-installed-runtime-dependencies))
         (if additional-sets
             (eldev-verbose "All project dependencies (including those for %s) have been installed already or are local"
                            (eldev-message-enumerate "set" additional-sets))
@@ -1329,62 +1373,86 @@ NO-ERROR-IF-MISSING."
                                                    (eldev-trace "(Re)installing local dependency package `%s'..." dependency-name)
                                                    (eldev-install-package-file (nth 1 generated-package))))
                                                (pop recursing-for)))))))))
-            (dolist (package all-packages)
-              (unless (package-activate (car package))
+            (dolist (plist all-packages)
+              (unless (package-activate (plist-get plist :package))
                 ;; We don't report the required version, but if you look at
                 ;; `package-activate-1' (as of 2019-11-24), it also has problems with versions
                 (if no-error-if-missing
                     (eldev-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
                   (signal 'eldev-error `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency)))))))))))
 
-(defun eldev--plan-install-or-upgrade (self to-be-upgraded all-packages plan)
-  (let ((visited (make-hash-table :test #'eq)))
-    (dolist (package all-packages)
-      (eldev--do-plan-install-or-upgrade self to-be-upgraded (car package) (cadr package) plan visited))))
+(defun eldev--create-package-plist (package &optional default-archives)
+  (setf package (pcase package
+                  ((pred symbolp)                   `(:package ,package))
+                  (`(,(pred symbolp))               `(:package . ,package))
+                  (`(,(pred symbolp) ,(pred listp)) `(:package ,(car package) :version ,(cadr package)))
+                  (_                                (copy-sequence package))))
+  (unless (or (null default-archives) (plist-member package :archive) (plist-member package :archives))
+    (setf package (plist-put package :archives default-archives)))
+  package)
 
-(defun eldev--do-plan-install-or-upgrade (self to-be-upgraded package-name required-version plan visited)
-  (unless (gethash package-name visited)
-    (if (package-built-in-p package-name)
-        (unless (package-built-in-p package-name required-version)
-          (signal 'eldev-error `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
-                                 ,package-name ,(eldev-message-version required-version) "?")))
-      (let* ((local             (and (not self) (eldev--loading-mode package-name)))
-             (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
-             (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed)))
-        (unless package
-          ;; Not installed, installed not in the version we need or to be upgraded.
-          (let ((available (cdr (assq package-name package-archive-contents)))
-                package-disabled
-                best-version)
-            (while (and available (not package))
-              (let* ((candidate (pop available))
-                     (version   (package-desc-version candidate))
-                     (disabled  (package-disabled-p package-name version)))
-                (when (or (not local) (string= (package-desc-archive candidate) eldev--internal-pseudoarchive))
-                  (cond ((version-list-< version required-version)
-                         (when (version-list-< best-version version)
-                           (setf best-version version)))
-                        (disabled
-                         (unless package-disabled
-                           (setf package-disabled (if (stringp disabled)
-                                                      `("Dependency `%s' is held at version %s, but version %s is required"
-                                                        ,package-name ,disabled ,(eldev-message-version version))
-                                                    `("Dependency `%s' is disabled" ,package-name)))))
-                        ((or (null already-installed) (version-list-< (package-desc-version already-installed) version))
-                         (setf package candidate))))))
-            (unless package
-              (setf package already-installed))
-            (unless package
-              (signal 'eldev-error (or package-disabled
-                                       (if best-version
-                                           `("Dependency `%s' version %s is required, but at most %s is available"
-                                             ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version))
-                                         `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))
-        (dolist (requirement (package-desc-reqs package))
-          (eldev--do-plan-install-or-upgrade self to-be-upgraded (car requirement) (cadr requirement) plan visited))
-        (unless (eq package already-installed)
-          (push `(,package . ,already-installed) (car plan)))))
-    (puthash package-name t visited)))
+(defun eldev--package-plist-get-archives (package-plist)
+  (mapcar #'eldev--resolve-package-archive
+          (or (eldev-listify (plist-get package-plist :archives))
+              (let ((archive (plist-get package-plist :archive)))
+                (when archive
+                  (list archive))))))
+
+(defun eldev--plan-install-or-upgrade (self to-be-upgraded all-packages default-archives plan)
+  (let ((visited (make-hash-table :test #'eq)))
+    (dolist (package-plist all-packages)
+      (eldev--do-plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan visited))))
+
+(defun eldev--do-plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan visited)
+  (let ((package-name     (plist-get package-plist :package))
+        (required-version (plist-get package-plist :version)))
+    (unless (gethash package-name visited)
+      (if (package-built-in-p package-name)
+          (unless (package-built-in-p package-name required-version)
+            (signal 'eldev-error `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
+                                   ,package-name ,(eldev-message-version required-version) "?")))
+        (let* ((local             (and (not self) (eldev--loading-mode package-name)))
+               (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
+               (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
+               (archives          (eldev--package-plist-get-archives package-plist)))
+          (unless package
+            ;; Not installed, installed not in the version we need or to be upgraded.
+            (let ((available (cdr (assq package-name package-archive-contents)))
+                  package-disabled
+                  best-version)
+              (while (and available (not package))
+                (let* ((candidate (pop available))
+                       (version   (package-desc-version candidate))
+                       (disabled  (package-disabled-p package-name version)))
+                  ;; Make sure we don't install a package from a wrong archive.
+                  (when (if local
+                            (string= (package-desc-archive candidate) eldev--internal-pseudoarchive)
+                          (or (null archives) (assoc (package-desc-archive candidate) archives)))
+                    (cond ((version-list-< version required-version)
+                           (when (version-list-< best-version version)
+                             (setf best-version version)))
+                          (disabled
+                           (unless package-disabled
+                             (setf package-disabled (if (stringp disabled)
+                                                        `("Dependency `%s' is held at version %s, but version %s is required"
+                                                          ,package-name ,disabled ,(eldev-message-version version))
+                                                      `("Dependency `%s' is disabled" ,package-name)))))
+                          ((or (null already-installed) (version-list-< (package-desc-version already-installed) version))
+                           (setf package candidate))))))
+              (unless package
+                (setf package already-installed))
+              (unless package
+                (signal 'eldev-error (or package-disabled
+                                         (if best-version
+                                             `("Dependency `%s' version %s is required, but at most %s is available"
+                                               ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version))
+                                           `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))
+          (dolist (requirement (package-desc-reqs package))
+            (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
+                                               default-archives plan visited))
+          (unless (eq package already-installed)
+            (push `(,package . ,already-installed) (car plan)))))
+      (puthash package-name t visited))))
 
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
   (let ((dir (expand-file-name eldev--internal-pseudoarchive (expand-file-name "archives" package-user-dir))))
@@ -1885,6 +1953,7 @@ mode output is restricted to just the version."
     ;; Special handling of the project itself so that its version can
     ;; be queried even if there are unavailable dependencies.
     (when (eldev-any-p (not (or (eq it 'emacs) (eq it (package-desc-name this-package)) (eldev-find-package-descriptor it nil t))) packages)
+      (eldev--load-installed-runtime-dependencies)
       (eldev-load-project-dependencies (mapcar #'car eldev--extra-dependencies)))
     (dolist (package packages)
       (let ((version (if (eq package 'emacs)
@@ -2275,6 +2344,9 @@ See `eldev-default-required-features' for value description.
 Special value `:default' means to use that variable's value
 instead.")
 
+;; Used in Eldev tests.
+(defvar eldev--eval-skip-load nil)
+
 (eldev-defcommand eldev-eval (&rest parameters)
   "Evaluate Lisp expressions and print results.  Expressions are
 evaluated in project's environment, with all the dependencies
@@ -2302,11 +2374,12 @@ being that it doesn't print form results."
   (unless parameters
     (signal 'eldev-wrong-command-usage `(t ,(if print-results "Missing expressions to evaluate" "Missing forms to execute"))))
   (let ((forms (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters)))
-    (eldev-load-project-dependencies (if print-results 'eval 'exec))
-    (when eldev-eval-require-main-feature
-      (dolist (feature (eldev-required-features eldev-eval-required-features))
-        (eldev-verbose "Autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
-        (require feature)))
+    (unless eldev--eval-skip-load
+      (eldev-load-project-dependencies (if print-results 'eval 'exec))
+      (when eldev-eval-require-main-feature
+        (dolist (feature (eldev-required-features eldev-eval-required-features))
+          (eldev-verbose "Autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
+          (require feature))))
     (dolist (form forms)
       (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
       (let ((result (eval (cdr form) eldev-eval-lexical)))
