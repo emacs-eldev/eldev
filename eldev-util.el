@@ -744,6 +744,8 @@ Since 0.2.")
             (error "No .el files with package headers in `%s'" default-directory))
           info)))))
 
+(declare-function eldev--cross-project-internal-eval "eldev" (project-dir form))
+
 (defun eldev-package-descriptor (&optional project-dir skip-cache)
   "Return descriptor of the package in PROJECT-DIR.
 If PROJECT-DIR is not specified, use `eldev-project-dir', i.e.
