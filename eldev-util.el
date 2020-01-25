@@ -699,6 +699,14 @@ bound to the exit code of the process."
 (defvar eldev-project-dir nil
   "Directory of the project being built.")
 
+(defvar eldev-project-main-file nil
+  "Name of the file with project headers.
+If there is only one such file in the root directory, this can be
+left to nil.  In this case `package-dir-info' will automatically
+find the file.
+
+Since 0.2.")
+
 (defvar eldev--package-descriptors nil
   "Cache for `eldev-package-descriptor'.")
 
@@ -745,10 +753,14 @@ return the descriptor of the project being built."
   (let ((descriptor (unless skip-cache
                       (cdr (assoc project-dir eldev--package-descriptors)))))
     (unless descriptor
-      (setf descriptor (with-temp-buffer
-                         (setf default-directory project-dir)
-                         (dired-mode)
-                         (eldev--package-dir-info)))
+      (let ((eldev-project-main-file (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file)))
+        (setf descriptor (with-temp-buffer
+                           (if eldev-project-main-file
+                               (progn (insert-file-contents (expand-file-name eldev-project-main-file project-dir))
+                                      (package-buffer-info))
+                             (let ((default-directory project-dir))
+                               (dired-mode)
+                               (eldev--package-dir-info))))))
       (unless skip-cache
         (push (cons project-dir descriptor) eldev--package-descriptors)))
     descriptor))

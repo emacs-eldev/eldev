@@ -2759,6 +2759,21 @@ obligations."
                                       (eldev-listify feature-names)))))
 
 
+(defun eldev--cross-project-internal-eval (project-dir form)
+  (if (string= (file-name-as-directory project-dir) (file-name-as-directory eldev-project-dir))
+      (eval form t)
+    (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
+    ;; FIXME: Are we sure `--quiet' is enough to silence stderr?  Maybe redirect it instead?
+    (let ((default-directory project-dir))
+      (eldev-call-process (eldev-shell-command) `("--quiet" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
+        (unless (= exit-code 0)
+          (eldev-warn "Output of the child Eldev process:\n%s" (buffer-string))
+          (signal 'eldev-error `("Failed to evaluate Eldev expression in directory `%s'" ,project-dir)))
+        (let ((result (read (current-buffer))))
+          (eldev-trace "Evaluated to `%S'" result)
+          result)))))
+
+
 
 ;; eldev emacs
 

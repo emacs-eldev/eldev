@@ -252,8 +252,11 @@ integration>> server.
 
 Eldev picks up project dependencies from package declaration,
 i.e. usually from `Package-Requires` header in the project’s main
-`.el` file.  You don’t need to declare these dependencies second time
-in `Eldev` and keep track that they remain in sync.
+`.el` file.  If you have several files with package headers in the the
+root directory, you need to set variable `eldev-project-main-file`,
+else function `package-dir-info` can pick a wrong one.  In any case,
+you don’t need to declare these dependencies second time in `Eldev`
+and keep track that they remain in sync.
 
 However, you do need to tell Eldev how to _find_ these dependencies.
 Like Cask, by default it doesn’t use any package archives.  To tell it
