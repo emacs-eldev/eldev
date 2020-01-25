@@ -1497,10 +1497,28 @@ Since 0.2."
     (when unfetched-archives
       (eldev-verbose "Fetching contents of %s..." (eldev-message-enumerate "package archive" unfetched-archives #'car))
       ;; See comments in `eldev-cli'.
+      (eval-and-compile (require 'gnutls))
       (let ((eldev-message-rerouting-destination :stderr)
             (package-archives                    unfetched-archives)
-            (inhibit-message                     t))
-        (package-refresh-contents)))))
+            (inhibit-message                     t)
+            ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8
+            (gnutls-algorithm-priority           (or gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")))
+        (when (catch 'eldev--bad-signature
+                (eldev-advised ('package--download-one-archive :around
+                                                               (lambda (original &rest arguments)
+                                                                 (condition-case nil
+                                                                     (apply original arguments)
+                                                                   ;; If we don't convert it into a thrown tag, the error
+                                                                   ;; will be eaten in `package--download-and-read-archives'.
+                                                                   (bad-signature (throw 'eldev--bad-signature t)))))
+                  (package-refresh-contents))
+                nil)
+          ;; This probably largely defeats the purpose of signatures, but it is basically
+          ;; what `gnu-elpa-keyring-update' itself proposes (only perhaps not in automated
+          ;; way).
+          (let ((package-check-signature nil))
+            (package-refresh-contents)
+            (package-install 'gnu-elpa-keyring-update)))))))
 
 (defun eldev--loading-mode (dependency)
   "Get loading mode of package DEPENDENCY.
