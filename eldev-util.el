@@ -775,6 +775,13 @@ return the descriptor of the project being built."
       (when (and found-package (or (null version) (version-list-<= version (package-desc-version found-package))))
         found-package))))
 
+;; Of course this is not exposed through a public interface.
+(defun eldev-find-built-in-version (package-name)
+  (when (and (package-built-in-p package-name) (boundp 'package--builtins) (fboundp 'package--bi-desc-version))
+    (let ((data (cdr (assq package-name package--builtins))))
+      (when data
+        (package--bi-desc-version data)))))
+
 
 (defun eldev-install-package-file (file)
   "Install given FILE as a package, suppressing messages.

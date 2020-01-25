@@ -1410,19 +1410,17 @@ Since 0.2."
   (let ((package-name     (plist-get package-plist :package))
         (required-version (plist-get package-plist :version)))
     (unless (gethash package-name visited)
-      (if (package-built-in-p package-name)
-          (unless (package-built-in-p package-name required-version)
-            (signal 'eldev-error `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
-                                   ,package-name ,(eldev-message-version required-version) "?")))
+      (unless (package-built-in-p package-name required-version)
         (let* ((local             (and (not self) (eldev--loading-mode package-name)))
                (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
                (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
                (archives          (eldev--package-plist-get-archives package-plist)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
-            (let ((available (cdr (assq package-name package-archive-contents)))
-                  package-disabled
-                  best-version)
+            (let* ((available        (cdr (assq package-name package-archive-contents)))
+                   (built-in-version (eldev-find-built-in-version package-name))
+                   (best-version     built-in-version)
+                   package-disabled)
               (while (and available (not package))
                 (let* ((candidate (pop available))
                        (version   (package-desc-version candidate))
@@ -1446,10 +1444,14 @@ Since 0.2."
                 (setf package already-installed))
               (unless package
                 (signal 'eldev-error (or package-disabled
-                                         (if best-version
-                                             `("Dependency `%s' version %s is required, but at most %s is available"
-                                               ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version))
-                                           `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))
+                                         (cond ((and best-version (not (eq best-version built-in-version)))
+                                                `("Dependency `%s' version %s is required, but at most %s is available"
+                                                  ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
+                                               (built-in-version
+                                                `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
+                                                  ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
+                                               (t
+                                                `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version)))))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
                                                default-archives plan visited))
