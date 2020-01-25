@@ -4,8 +4,7 @@
 (ert-deftest eldev-runtime-dependencies-1 ()
   (let ((eldev--test-project "trivial-project"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(setf eldev--eval-skip-load t)"
-                          "exec"
+    (eldev--test-run nil ("exec" "--dont-load"
                           "(when (require 'trivial-project nil t) (error \"must not be loaded\"))"
                           "(eldev-add-extra-dependencies 'runtime `(:package dependency-a :archive (\"archive-a\" . ,(expand-file-name \"../package-archive-a\"))))"
                           "(eldev-add-extra-dependencies 'runtime `(:package misc-a :archive (\"archive-b\" . ,(expand-file-name \"../package-archive-b\"))))"
@@ -19,8 +18,7 @@
 (ert-deftest eldev-runtime-dependencies-2 ()
   (let ((eldev--test-project "trivial-project"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(setf eldev--eval-skip-load t)"
-                          "exec"
+    (eldev--test-run nil ("exec" "--dont-load"
                           "(when (require 'trivial-project nil t) (error \"must not be loaded\"))"
                           "(eldev-add-extra-dependencies 'runtime `(:package dependency-a :archive (\"archive-b\" . ,(expand-file-name \"../package-archive-b\"))))"
                           "(eldev-add-extra-dependencies 'runtime `(:package misc-a :archive (\"archive-a\" . ,(expand-file-name \"../package-archive-a\"))))"
@@ -34,8 +32,7 @@
 (ert-deftest eldev-runtime-dependencies-3 ()
   (let ((eldev--test-project "trivial-project"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(setf eldev--eval-skip-load t)"
-                          "exec"
+    (eldev--test-run nil ("exec" "--dont-load"
                           "(when (require 'trivial-project nil t) (error \"must not be loaded\"))"
                           "(eldev-add-extra-dependencies 'runtime `(:package dependency-b :archive (\"archive-a\" . ,(expand-file-name \"../package-archive-a\"))))"
                           "(eldev-add-extra-dependencies 'runtime `(:package misc-a :archive (\"archive-b\" . ,(expand-file-name \"../package-archive-b\"))))"
@@ -49,8 +46,7 @@
 (ert-deftest eldev-runtime-dependencies-4 ()
   (let ((eldev--test-project "trivial-project"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(setf eldev--eval-skip-load t)"
-                          "exec"
+    (eldev--test-run nil ("exec" "--dont-load"
                           "(when (require 'trivial-project nil t) (error \"must not be loaded\"))"
                           "(eldev-add-extra-dependencies 'runtime `(:package dependency-b :archive (\"archive-b\" . ,(expand-file-name \"../package-archive-b\"))))"
                           "(eldev-add-extra-dependencies 'runtime `(:package misc-a :archive (\"archive-a\" . ,(expand-file-name \"../package-archive-a\"))))"

@@ -2633,6 +2633,12 @@ means not to require anything).")
 (defvar eldev-eval-require-main-feature t
   "Whether to autorequire main project features.")
 
+(defvar eldev-eval-load-project t
+  "Whether to load project and its dependencies.
+Not loading means that `eldev-eval-require-main-feature' is also
+ignored.  This is available from command line, but the options
+are not advertised, since they are rarely useful.")
+
 (defvar eldev-eval-printer-function #'eldev-prin1
   "Default printer function for `eval' command.
 Standard value is `eldev-prin1', but can be customized.")
@@ -2642,9 +2648,6 @@ Standard value is `eldev-prin1', but can be customized.")
 See `eldev-default-required-features' for value description.
 Special value `:default' means to use that variable's value
 instead.")
-
-;; Used in Eldev tests.
-(defvar eldev--eval-skip-load nil)
 
 (eldev-defcommand eldev-eval (&rest parameters)
   "Evaluate Lisp expressions and print results.  Expressions are
@@ -2673,7 +2676,7 @@ being that it doesn't print form results."
   (unless parameters
     (signal 'eldev-wrong-command-usage `(t ,(if print-results "Missing expressions to evaluate" "Missing forms to execute"))))
   (let ((forms (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters)))
-    (unless eldev--eval-skip-load
+    (when eldev-eval-load-project
       (eldev-load-project-dependencies (if print-results 'eval 'exec))
       (when eldev-eval-require-main-feature
         (dolist (feature (eldev-required-features eldev-eval-required-features))
@@ -2703,6 +2706,17 @@ being that it doesn't print form results."
    :options       (-r --require))
   ("Don't require project's features before evaluating"
    :options       (-R --dont-require))
+  :for-command    (eval exec))
+
+;; Uncommon `:hidden-if' values mean these options are usually hidden.  They are rarely
+;; useful to normal users.
+(eldev-defbooloptions eldev-eval-load-project eldev-eval-dont-load-project eldev-eval-load-project
+  ("Load project and its dependencies before evaluating"
+   :options       (--load)
+   :hidden-if     :default)
+  ("Don't load project and its dependencies; only Eldev itself and Emacs built-ins will be available"
+   :options       (--dont-load)
+   :hidden-if     eldev-eval-load-project)
   :for-command    (eval exec))
 
 (eldev-defoption eldev-eval-printer (function)
