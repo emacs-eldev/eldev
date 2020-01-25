@@ -2571,7 +2571,8 @@ least one warning."
 (eldev-deflinter eldev-linter-package ()
   "Check package metadata, e.g. correctness of its dependencies."
   :aliases        (package-lint pack)
-  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archive melpa-stable))
+  ;; Need GNU ELPA for `let-alist' on older Emacs versions.
+  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa-stable gnu)))
   (eldev-load-extra-dependencies 'runtime)
   (require 'package-lint)
   (dolist (file (eldev-lint-find-files "*.el"))
