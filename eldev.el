@@ -655,9 +655,9 @@ Used by Eldev startup script."
                                (:command (pop arguments) (setf hint-about-command (pop arguments))))
                              (eldev-error "%s" (apply #'eldev-format-message arguments))
                              (when hint
-                               (eldev-print "%s" (apply #'eldev-format-message (eldev-listify hint))))
+                               (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
                              (when hint-about-command
-                               (eldev-print "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))))
+                               (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))))
       (eldev-trace "Finished %s on %s" (if (eq exit-code 0) "successfully" "erroneously") (replace-regexp-in-string " +" " " (current-time-string))))
@@ -1406,11 +1406,18 @@ Since 0.2."
     (dolist (package-plist all-packages)
       (eldev--do-plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan visited))))
 
-(defun eldev--do-plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan visited)
+(defun eldev--do-plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan visited &optional required-by)
   (let ((package-name     (plist-get package-plist :package))
-        (required-version (plist-get package-plist :version)))
+        (required-version (plist-get package-plist :version))
+        (required-by-hint (lambda ()
+                            (when required-by
+                              (eldev-format-message "Required by package %s"
+                                                    (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) required-by " <- "))))))
     (unless (gethash package-name visited)
       (unless (package-built-in-p package-name required-version)
+        (when (eq package-name 'emacs)
+          (signal 'eldev-error `(:hint ,(funcall required-by-hint)
+                                       "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local             (and (not self) (eldev--loading-mode package-name)))
                (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
                (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
@@ -1443,18 +1450,19 @@ Since 0.2."
               (unless package
                 (setf package already-installed))
               (unless package
-                (signal 'eldev-error (or package-disabled
-                                         (cond ((and best-version (not (eq best-version built-in-version)))
-                                                `("Dependency `%s' version %s is required, but at most %s is available"
-                                                  ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
-                                               (built-in-version
-                                                `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
-                                                  ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
-                                               (t
-                                                `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version)))))))))
+                (signal 'eldev-error `(:hint ,(funcall required-by-hint)
+                                             ,@(or package-disabled
+                                                   (cond ((and best-version (not (eq best-version built-in-version)))
+                                                          `("Dependency `%s' version %s is required, but at most %s is available"
+                                                            ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
+                                                         (built-in-version
+                                                          `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
+                                                            ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
+                                                         (t
+                                                          `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
-                                               default-archives plan visited))
+                                               default-archives plan visited (cons package-name required-by)))
           (unless (eq package already-installed)
             (push `(,package . ,already-installed) (car plan)))))
       (puthash package-name t visited))))
