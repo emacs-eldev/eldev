@@ -2028,6 +2028,9 @@ mode output is restricted to just the version."
 (declare-function eldev-test-ert-save-results "eldev-ert" ())
 (declare-function eldev-run-ert-tests "eldev-ert" (selectors &optional environment))
 
+(declare-function eldev-test-buttercup-preprocess-selectors "eldev-buttercup" (selectors))
+(declare-function eldev-run-buttercup-tests "eldev-buttercup" (selectors &optional environment))
+
 (defvaralias 'eldev-test-dwim 'eldev-dwim)
 
 (defvar eldev-dwim t
@@ -2074,15 +2077,22 @@ If left nil (default value), Eldev will try to autodetect.")
   "Load only those test files that match one of these patterns.
 Should normally be specified only from command line.")
 
-(defvar eldev-test-known-frameworks '((ERT . ((detect               . (lambda () (featurep 'ert)))
-                                              (require              . eldev-ert)
-                                              (preprocess-selectors . eldev-test-ert-preprocess-selectors)
-                                              (prepare              . (lambda (_selectors)
-                                                                        (eldev-test-ert-load-results)))
-                                              (run-tests            . (lambda (selectors _runner environment)
-                                                                        (eldev-run-ert-tests selectors environment)))
-                                              (finalize             . (lambda (_selectors)
-                                                                        (eldev-test-ert-save-results))))))
+(defvar eldev-test-known-frameworks '((ert .       ((detect               . (lambda () (and (featurep 'ert) (not (featurep 'buttercup)))))
+                                                    (require              . eldev-ert)
+                                                    (preprocess-selectors . eldev-test-ert-preprocess-selectors)
+                                                    (prepare              . (lambda (_selectors)
+                                                                              (eldev-test-ert-load-results)))
+                                                    (run-tests            . (lambda (selectors _runner environment)
+                                                                              (eldev-run-ert-tests selectors environment)))
+                                                    (finalize             . (lambda (_selectors)
+                                                                              (eldev-test-ert-save-results)))))
+                                      (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
+                                                    (features             . buttercup)
+                                                    (packages             . ((:package buttercup :archive melpa-stable)))
+                                                    (require              . eldev-buttercup)
+                                                    (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
+                                                    (run-tests            . (lambda (selectors _runner environment)
+                                                                              (eldev-run-buttercup-tests selectors environment))))))
   "Alist of all test frameworks known to Eldev.
 While this variable is public and can be modified, you most
 likely shouldn't do that.  Leave adding support for more
@@ -2093,7 +2103,8 @@ it.")
 (eldev-defcommand eldev-test (&rest parameters)
   "Run project's regression/unit tests.  By default all tests
 defined in the project are executed.  However, you can restrict
-their set using SELECTORs and/or `--file' option listed above.
+their set using SELECTORs (to be interpreted by the used test
+framework) and/or `--file' option listed above.
 
 If `--file' is specified, only files that match the PATTERN (and
 also project's test fileset) are loaded.  See documentation on
@@ -2135,13 +2146,34 @@ unexpected result."
     ;; `if' is important.
     (if files
         (progn
-          (dolist (file files)
-            (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
-                   (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
-              (if already-loaded
-                  (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
-                (eldev-verbose "Loading test file `%s'..." file)
-                (load absolute-without-el nil t nil t))))
+          ;; If framework is specified explicitly, ensure it is installed first.
+          ;; Otherwise appropriate framework will be installed from `require' advice
+          ;; below.
+          (when eldev-test-framework
+            (let ((to-install (eldev-test-get-framework-entry eldev-test-framework 'packages)))
+              (when to-install
+                (eldev-verbose "Preparing testing framework `%s' as specified by variable `eldev-test-framework'..." eldev-test-framework)
+                (apply #'eldev-add-extra-dependencies 'runtime to-install)
+                (eldev-load-extra-dependencies 'runtime))))
+          (eldev-advised ('require :before (unless eldev-test-framework
+                                             (lambda (feature &optional filename no-error)
+                                               ;; Only perform autoinstallation for simple `(require 'x)' forms.
+                                               (unless (or filename no-error (featurep feature))
+                                                 (let (autoinstall)
+                                                   (dolist (framework eldev-test-known-frameworks)
+                                                     (when (memq feature (eldev-listify (eldev-test-get-framework-entry (cdr framework) 'features)))
+                                                       (setf autoinstall (nconc autoinstall (eldev-test-get-framework-entry (cdr framework) 'packages)))))
+                                                   (when autoinstall
+                                                     (eldev-verbose "Installing testing framework package(s) as required...")
+                                                     (apply #'eldev-add-extra-dependencies 'runtime autoinstall)
+                                                     (eldev-load-extra-dependencies 'runtime)))))))
+            (dolist (file files)
+              (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
+                     (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
+                (if already-loaded
+                    (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
+                  (eldev-verbose "Loading test file `%s'..." file)
+                  (load absolute-without-el nil t nil t)))))
           (let* ((runner-name (or eldev-test-runner 'simple))
                  (runner      (or (cdr (assq runner-name eldev--test-runners))
                                   (signal 'eldev-error `(:hint ("Check output of `%s test --list-runners'" ,(eldev-shell-command t)) "Unknown test runner `%s'" ,runner-name))))
@@ -2171,8 +2203,8 @@ unexpected result."
          (to-require (eldev-listify (cdr (assq 'require framework)))))
     (when (if (eq require-features 'non-nil) entry require-features)
       (dolist (feature to-require)
-        (require feature))
-    entry)))
+        (require feature)))
+    entry))
 
 (defun eldev-test-framework ()
   "Get used test framework.
@@ -2277,7 +2309,10 @@ selectors (e.g. ERT's `:new')."
 
 (eldev-deftestrunner eldev-test-runner-standard (framework selectors)
   "Invokes test framework without changing anything."
-  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard nil))
+  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard
+           (pcase framework
+             ;; For Buttercup we still pass through our color setting.
+             (`buttercup `((buttercup-color . ,(eldev-output-colorized-p)))))))
 
 (eldev-deftestrunner eldev-test-runner-simple (framework selectors)
   "Simple test runner with a few tweaks to the defaults.
@@ -2285,19 +2320,30 @@ selectors (e.g. ERT's `:new')."
 For ERT:
   - if Eldev is in quiet mode, set `ert-quiet' to t;
   - only backtrace frames inside test functions are printed;
-  - long line trimming is disabled."
-  ;; Workaround: older Emacs versions don't support setting
-  ;; `ert-batch-backtrace-right-margin' to nil.  We assume that if the
-  ;; variable is customizable, nil is already supported.
-  (let ((right-margin (if (get 'ert-batch-backtrace-right-margin 'custom-type)
-                          nil
-                        1000000)))
-    (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
-             ;; Non-ERT frameworks are just invoked with empty environment.
+  - long line trimming in backtraces is disabled.
+
+For Buttercup:
+  - output for skipped tests (e.g. because of selectors) is omitted;
+  - if Eldev is in quiet mode, only failed tests are mentioned;
+  - backtraces lines are not truncated (i.e. `full' stack frame style)."
+  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
+             ;; Other frameworks are just invoked with empty environment.
              (pcase framework
-               (`ERT `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
-                       (ert-batch-backtrace-right-margin . ,right-margin)
-                       (eldev--test-ert-short-backtraces . t)))))))
+               ;; Workaround: older Emacs versions don't support setting
+               ;; `ert-batch-backtrace-right-margin' to nil.  We assume that if the
+               ;; variable is customizable, nil is already supported.
+               (`ert
+                (let ((right-margin (if (get 'ert-batch-backtrace-right-margin 'custom-type)
+                                        nil
+                                      1000000)))
+                  `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
+                    (ert-batch-backtrace-right-margin . ,right-margin)
+                    (eldev--test-ert-short-backtraces . t))))
+               (`buttercup
+                `((buttercup-color                  . ,(eldev-output-colorized-p))
+                  (eldev--buttercup-silent-skipping . t)
+                  (eldev--buttercup-quiet           . ,(not (eldev-unless-quiet t)))
+                  (buttercup-stack-frame-style      . full))))))
 
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"

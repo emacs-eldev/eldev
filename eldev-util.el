@@ -184,6 +184,13 @@ Needed for compatibility."
          (push (cons key value) ,place)
          value))))
 
+(defun eldev-valid-regexp-p (regexp)
+  "Determine if REGEXP is valid.
+Since 0.2."
+  (ignore-errors
+    (string-match regexp "")
+    t))
+
 
 (defsubst eldev-get (symbol property)
   "Similar to built-in `get', used to avoid accidental name clashes."
@@ -406,6 +413,11 @@ later (preserving semantics)."
     (add-face-text-property 0 (length string) types nil string))
   string)
 
+(defsubst eldev-output-colorized-p ()
+  "Determine if output should be colorized.
+Since 0.2."
+  (if (eq eldev-coloring-mode 'auto) eldev--tty eldev-coloring-mode))
+
 (defun eldev-output (format-string &rest arguments)
   "Unconditionally format and print given message."
   (let (stderr
@@ -428,7 +440,7 @@ later (preserving semantics)."
                (elapsed-millis  (floor (* (- elapsed-sec-raw elapsed-sec) 1000))))
           (setf message (concat (eldev-colorize (format "[%02d:%02d.%03d]" elapsed-min elapsed-sec elapsed-millis) 'timestamp)
                                 "  " (replace-regexp-in-string "\n" "\n             " message t t)))))
-      (when (and (not nocolor) (if (eq eldev-coloring-mode 'auto) eldev--tty eldev-coloring-mode))
+      (when (and (not nocolor) (eldev-output-colorized-p))
         (let ((colorizing-scheme (eldev--get-colorizing-scheme))
               (from 0)
               chunks)
