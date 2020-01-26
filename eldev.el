@@ -204,11 +204,12 @@ Should normally be specified only via command line.")
 
 
 (eldev-define-error 'eldev-error               "Unhandled Eldev error")
-(eldev-define-error 'eldev-too-old             "Eldev is too old"    'eldev-error)
-(eldev-define-error 'eldev-wrong-command-usage "Wrong command usage" 'eldev-error)
-(eldev-define-error 'eldev-wrong-option-usage  "Wrong option usage"  'eldev-error)
-(eldev-define-error 'eldev-build-failed        "Build failed"        'eldev-error)
-(eldev-define-error 'eldev-build-abort-branch  "Build failed"        'eldev-error)
+(eldev-define-error 'eldev-missing-dependency  "Dependency is missing" 'eldev-error)
+(eldev-define-error 'eldev-too-old             "Eldev is too old"      'eldev-error)
+(eldev-define-error 'eldev-wrong-command-usage "Wrong command usage"   'eldev-error)
+(eldev-define-error 'eldev-wrong-option-usage  "Wrong option usage"    'eldev-error)
+(eldev-define-error 'eldev-build-failed        "Build failed"          'eldev-error)
+(eldev-define-error 'eldev-build-abort-branch  "Build failed"          'eldev-error)
 (eldev-define-error 'eldev-quit                nil)
 
 
@@ -666,6 +667,14 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+(defun eldev-extract-error-message (error)
+  "Extract the message from an `eldev-error'.
+Since 0.2."
+  (let ((arguments (cdr error)))
+    (pcase (car arguments)
+      ((or :hint :command) (pop arguments) (pop arguments)))
+    (apply #'eldev-format-message arguments)))
 
 (defun eldev--set-up ()
   (dolist (config `((,eldev-user-config-file . "No file `%s', not applying user-specific configuration")
@@ -1382,7 +1391,7 @@ Since 0.2."
                 ;; `package-activate-1' (as of 2019-11-24), it also has problems with versions
                 (if no-error-if-missing
                     (eldev-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
-                  (signal 'eldev-error `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency)))))))))))
+                  (signal 'eldev-missing-dependency `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency)))))))))))
 
 (defun eldev--create-package-plist (package &optional default-archives)
   (setf package (pcase package
@@ -1416,8 +1425,8 @@ Since 0.2."
     (unless (gethash package-name visited)
       (unless (package-built-in-p package-name required-version)
         (when (eq package-name 'emacs)
-          (signal 'eldev-error `(:hint ,(funcall required-by-hint)
-                                       "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
+          (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
+                                                    "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local             (and (not self) (eldev--loading-mode package-name)))
                (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
                (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
@@ -1450,16 +1459,16 @@ Since 0.2."
               (unless package
                 (setf package already-installed))
               (unless package
-                (signal 'eldev-error `(:hint ,(funcall required-by-hint)
-                                             ,@(or package-disabled
-                                                   (cond ((and best-version (not (eq best-version built-in-version)))
-                                                          `("Dependency `%s' version %s is required, but at most %s is available"
-                                                            ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
-                                                         (built-in-version
-                                                          `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
-                                                            ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
-                                                         (t
-                                                          `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))))
+                (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
+                                                          ,@(or package-disabled
+                                                                (cond ((and best-version (not (eq best-version built-in-version)))
+                                                                       `("Dependency `%s' version %s is required, but at most %s is available"
+                                                                         ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
+                                                                      (built-in-version
+                                                                       `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
+                                                                         ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
+                                                                      (t
+                                                                       `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
                                                default-archives plan visited (cons package-name required-by)))
@@ -2465,7 +2474,9 @@ least one warning."
                   ;; This can only happen if a linter is requested explicitly.
                   (signal 'eldev-error `("Linter `%s' is disabled (see variable `eldev-lint-disabled')" linter)))
                 (eldev-verbose "Running linter `%s'..." linter)
-                (funcall (cdr (assq canonical-name eldev--linters)))
+                (condition-case error
+                    (funcall (cdr (assq canonical-name eldev--linters)))
+                  (eldev-missing-dependency (eldev-warn "%s; skipping linter `%s'" (eldev-extract-error-message error) linter)))
                 (when (and (eq eldev-lint-stop-mode 'linter) eldev--lint-have-warnings)
                   (eldev-trace "Stopping after the linter that issued warnings")
                   (throw 'eldev--lint-stop nil)))))
