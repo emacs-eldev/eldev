@@ -1311,9 +1311,9 @@ Since 0.2."
                              dependency-index non-local-plan-size
                              (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
                              (package-desc-archive dependency))
-              (eldev-print :stderr "[%d/%d] Installing package `%s' (%s) from `%s'..."
+              (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
                            dependency-index non-local-plan-size
-                           (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t) (package-desc-archive dependency)))
+                           (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
             (unless dry-run
               (let ((inhibit-message t))
                 (package-install-from-archive dependency))))))
@@ -1468,7 +1468,7 @@ Since 0.2."
                                                                        `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
                                                                          ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
                                                                       (t
-                                                                       `("Dependency `%s' (%s) is not available" ,package-name ,(eldev-message-version required-version))))))))))
+                                                                       `("Dependency `%s' %s is not available" ,package-name ,(eldev-message-version required-version t))))))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
                                                default-archives plan visited (cons package-name required-by)))

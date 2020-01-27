@@ -384,15 +384,17 @@ See function `eldev-message-enumerate' for details."
                         (if files (mapconcat (lambda (file) (eldev-format-message "`%s'" file)) files ", ") "none")
                         (length files)))
 
-(defun eldev-message-version (version &optional colorized)
+(defun eldev-message-version (version &optional colorized parenthesized)
   "Format VERSION for use in human-readable messages.
 VERSION can be a string, a list (see `version-to-list') or a
 package descriptor."
   (let ((string (cond ((stringp version)                        version)
                       ((and version (not (equal version '(0)))) (package-version-join (if (listp version) version (package-desc-version version))))
-                      (t                                        "(any)"))))
+                      (t                                        "any"))))
     (when colorized
       (setf string (eldev-colorize string 'version)))
+    (when (or parenthesized (string= string "any"))
+      (setf string (format "(%s)" string)))
     string))
 
 (defun eldev-message-command-line (executable command-line)
