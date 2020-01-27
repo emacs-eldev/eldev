@@ -1,4 +1,5 @@
 (1
  (dependency-a . [(1 0) nil "Dependency test package A" single nil])
  (dependency-b . [(1 0) ((dependency-a (0))) "Dependency test package B" single nil])
- (misc-a . [(1 0) nil "Miscellaneous package A" single nil]))
+ (misc-a . [(1 0) nil "Miscellaneous package A" single nil])
+ (dummy-lint . [(1 0) nil "Dummy linter" single nil]))

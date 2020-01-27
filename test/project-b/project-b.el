@@ -6,6 +6,7 @@
 (require 'dependency-b)
 
 (defun project-b-hello ()
+  ;; DUMMY-LINT-WARN-HERE
   (dependency-b-hello))
 
 ;; This function is syntactically correct, but produces a
