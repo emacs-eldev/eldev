@@ -51,19 +51,20 @@
   "Run Buttercup tests according to given SELECTORS (patterns)."
   (when eldev-test-stop-on-unexpected
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Buttercup framework"))
-  (when eldev-test-expect-at-least
-    (eldev-warn "Option `--expect' (`-N') is not supported with Buttercup framework"))
   (unless eldev-test-print-backtraces
     (eldev-warn "Option `--omit-backtraces' (`-B') is not supported with Buttercup framework"))
   (eldev-bind-from-environment environment (buttercup-color eldev--buttercup-silent-skipping eldev--buttercup-quiet buttercup-stack-frame-style)
     ;; Ugly, but as of 1.19 there is no better way in Buttercup.
-    (when selectors
-      (dolist (spec (buttercup--specs buttercup-suites))
-        (let ((spec-full-name (buttercup-spec-full-name spec)))
-          (unless (eldev-any-p (string-match it spec-full-name) selectors)
-            (eval `(setf (buttercup-spec-function ,spec)
-                         (lambda () (signal 'buttercup-pending "SKIPPED")))
-                  t)))))
+    (let ((num-skipped 0))
+      (when selectors
+        (dolist (spec (buttercup--specs buttercup-suites))
+          (let ((spec-full-name (buttercup-spec-full-name spec)))
+            (unless (eldev-any-p (string-match it spec-full-name) selectors)
+              (eval `(setf (buttercup-spec-function ,spec)
+                           (lambda () (signal 'buttercup-pending "SKIPPED")))
+                    t)
+              (setf num-skipped (1+ num-skipped))))))
+      (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) num-skipped)))
     (let ((buttercup-reporter (if (or eldev--buttercup-silent-skipping eldev--buttercup-quiet)
                                   (eldev--buttercup-reporter-delaying-adapter buttercup-reporter)
                                 buttercup-reporter)))
