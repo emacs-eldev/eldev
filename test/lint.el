@@ -6,20 +6,21 @@
 ;; upstream) and slow (would need to download packages from Melpa or
 ;; GNU ELPA).
 
-(defun eldev--test-dummy-linter (&optional archive)
-  (unless archive
-    (setf archive "archive-a"))
-  (let ((archive-path (expand-file-name (format "test/package-%s" archive) eldev-project-dir)))
-    `(eldev-deflinter eldev-linter-dummy ()
-       (eldev-add-extra-dependencies 'runtime '(:package dummy-lint :archive (,archive . ,archive-path)))
-       (eldev-load-extra-dependencies 'runtime)
-       (require 'dummy-lint)
-       (eldev-advised ('dummy-lint-warn :around (lambda (original &rest arguments)
-                                                  (eldev-lint-printing-warning :warning
-                                                    (apply original arguments))))
-         (dolist (file (eldev-lint-find-files "*.el"))
-           (eldev-lint-linting-file file
-             (dummy-lint-file file)))))))
+(eval-and-compile
+  (defun eldev--test-dummy-linter (&optional archive)
+    (unless archive
+      (setf archive "archive-a"))
+    (let ((archive-path (expand-file-name (format "test/package-%s" archive) eldev-project-dir)))
+      `(eldev-deflinter eldev-linter-dummy ()
+         (eldev-add-extra-dependencies 'runtime '(:package dummy-lint :archive (,archive . ,archive-path)))
+         (eldev-load-extra-dependencies 'runtime)
+         (require 'dummy-lint)
+         (eldev-advised ('dummy-lint-warn :around (lambda (original &rest arguments)
+                                                    (eldev-lint-printing-warning :warning
+                                                      (apply original arguments))))
+           (dolist (file (eldev-lint-find-files "*.el"))
+             (eldev-lint-linting-file file
+               (dummy-lint-file file))))))))
 
 (defmacro eldev--test-linting (test-project linter-archive command-line &rest body)
   (declare (indent 3) (debug (stringp sexp sexp body)))

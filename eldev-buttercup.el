@@ -34,6 +34,7 @@
 (declare-function buttercup-run "buttercup")
 (declare-function buttercup-spec-status "buttercup")
 (declare-function buttercup-spec-failure-description "buttercup")
+(declare-function buttercup-suites-total-specs-defined "buttercup")
 
 
 (defvar eldev--buttercup-silent-skipping nil)
