@@ -9,6 +9,10 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
+:uri-ert-sel: https://www.gnu.org/software/emacs/manual/html_node/ert/Test-Selectors.html
+:uri-buttercup: https://github.com/jorgenschaefer/emacs-buttercup
+:uri-buttercup-rt: https://github.com/jorgenschaefer/emacs-buttercup/blob/master/docs/running-tests.md
 :uri-cask: https://github.com/cask/cask
 :uri-emake: https://github.com/vermiculus/emake.el
 :uri-evm: https://github.com/rejeep/evm
@@ -16,6 +20,7 @@ endif::[]
 :uri-makem-sh: https://github.com/alphapapa/makem.sh
 :uri-travis: https://travis-ci.org/
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
+:since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 
 = Eldev
 
@@ -740,9 +745,10 @@ FIXME
 == Testing
 
 Eldev has built-in support for running regression/unit tests of your
-project.  Currently, Eldev supports only ERT.  Other frameworks will
-also be supported in the future; leave a feature request in the issue
-tracker if you are interested.
+project.  Currently, Eldev supports only {uri-ert}[ERT] and
+{uri-buttercup}[Buttercup] testing frameworks.  Leave a feature
+request in the issue tracker if you are interested in a different
+library.
 
 Simply executing
 
@@ -759,15 +765,16 @@ development you often need to run one or a few tests only — when you
 hunt a specific bug, for example.  Eldev provides two ways to select
 which tests to run.
 
-First is by using a _selector_:
+First is by using a _selector_ (<<frameworks,framework-specific>>,
+this example is for <<ert,ERT>>):
 
     $ eldev test foo-test-15
 
 will run only the test with that specific name.  It is of course
 possible to select more than one test by specifying multiple
 selectors: they are combined with ‘or’ operation.  You can use any
-selector supported by the testing framework here, see its (i.e. read:
-“ERT’s”) documentation.
+selector supported by the testing framework here, see its
+documentation.
 
 The second way is to avoid loading (and executing) certain test files
 altogether.  This can be achieved with `--file` (`-f`) option:
@@ -790,12 +797,60 @@ of available test runners with their descriptions using
 it is a good idea to set it as the default in file `~/.eldev/config`.
 Finally, you can even write your own runner.
 
+[#frameworks]
+=== Frameworks
+
+As stated above, Eldev supports {uri-ert}[ERT] (Emacs built-in) and
+{uri-buttercup}[Buttercup] testing frameworks.  Normally, you don’t
+need to specify which framework the project uses, as the tool can
+autodetect that.  But in rare cases you may need to set variable
+`eldev-test-framework` to either `'ert` or `'buttercup`, as
+appropriate.  You also don’t need to declare testing package as
+<<additional-dependencies,an extra dependency>>: Eldev will install it
+itself when needed.
+
+Eldev tries to provide uniform command line interface to the supported
+frameworks, but of course there are many differences between them.
+
+[#ert]
+==== ERT
+
+{uri-ert}[ERT] is the “default” testing framework and also an Emacs
+built-in.  This means that no additional packages need to be installed
+and the framework is available on all non-ancient Emacs versions (at
+least all Eldev itself supports).
+
+All functionality of `test` command works with ERT.
+
+[#buttercup]
+==== Buttercup
+
+{since-0-2} {uri-buttercup}[Buttercup] is a behavior-driven
+development framework for testing Emacs Lisp code.  Its support in
+Eldev has some limitations.  On the other hand, certain functionality
+is not supported by the library itself, and e.g. its `bin/buttercup`
+script also doesn’t provide similar features.
+
+When using Buttercup, selectors are _patterns_ from
+{uri-buttercup-rt}[the library’s documentation].  I.e. they are
+regular expressions in Emacs syntax, and only tests with names
+matching at least one of the specified selectors/patterns are
+executed.
+
+Things that won’t work with Buttercup at the moment:
+
+* option `--stop-on-unexpected` (`-s`);
+* option `--omit-backtraces` (`-B`).
+
+Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
+on the previous run’s results.
+
 === Reusing previous test results
 
-ERT provides a few selectors that operate on tests’ last results.
-Even though different Eldev executions will run in different Emacs
-processes, you can still use these selectors: Eldev stores and then
-loads last results of test execution as needed.
+<<ert,ERT>> provides a few selectors that operate on tests’ last
+results.  Even though different Eldev executions will run in different
+Emacs processes, you can still use these selectors: Eldev stores and
+then loads last results of test execution as needed.
 
 For example, execute all tests until some fails (`-s` is a shortcut
 for `--stop-on-unexpected`):
@@ -807,17 +862,18 @@ fix helped.  The easiest way is:
 
     $ eldev test :failed
 
-For more information, see documentation on ERT selectors — other
-“special” selectors (e.g. `:new` or `:unexpected`) also work.
+For more information, see {uri-ert-sel}[documentation on ERT
+selectors] — other “special” selectors (e.g. `:new` or `:unexpected`)
+also work.
 
 === Testing command line simplifications
 
-When variable `eldev-test-dwim` (“do what I mean”) is non-nil (as by
+When variable `eldev-dwim` (“do what I mean”) is non-nil (as by
 default), Eldev supports a few simplifications of the command line to
 make testing even more streamlined.
 
-* Any selector that ends in `.el` is instead treated as a file
-  pattern.  For example:
+* For all frameworks: any selector that ends in `.el` is instead
+  treated as a file pattern.  For example:
 +
 --
     $ eldev test foo.el
@@ -825,8 +881,8 @@ make testing even more streamlined.
 will work as if you specified `-f` before `foo.el`.
 --
 
-* For ERT: any symbol selector that doesn’t match a test name is
-  instead treated as regular expression (i.e. as a string).  For
+* For <<ert,ERT>>: any symbol selector that doesn’t match a test name
+  is instead treated as regular expression (i.e. as a string).  For
   example:
 +
 --
@@ -839,7 +895,7 @@ documentation) like this:
     $ eldev test \"foo\"
 --
 
-If you dislike these simplifications, set `eldev-test-dwim` to nil in
+If you dislike these simplifications, set `eldev-dwim` to nil in
 `~/.eldev/config`.
 
 
@@ -960,7 +1016,8 @@ don’t forget to clean the directory.
 Because of Eldev’s trivial installation and built-in support for
 testing, it is a suitable tool for use on continuous integration
 servers.  But of course this only applies if the test framework your
-project uses is already supported (currently only ERT).
+project uses is already supported (currently <<ert,ERT>> and
+<<buttercup,Buttercup>>).
 
 [#travis-ci]
 === Travis CI
@@ -1354,8 +1411,9 @@ write a nice and polished builder, investigate them too.
 
 Eldev has lots of standard commands, but sometimes you need to define
 yet more.  Commands should generally be defined for things that cannot
-be reformulated in terms of building targets — for that you should
-rather write an additional builder.
+be reformulated in terms of building targets.  If a command would just
+create a file, e.g. extract documentation from source code, an
+additional builder would be more suitable.
 
 Defining a command is not much more complicated than defining a normal
 Elisp function:
@@ -1381,11 +1439,10 @@ give your command any number of aliases, as shown above.
 
 Keyword `:parameter` describes what the command expects to see on the
 command line.  It is used when invoking `eldev help COMMAND` to
-improve documentation.  Note that all commands are automatically
-documented.  The short one-liner for `eldev help` is derived from the
-function’s documentation by taking the first sentence.  If this is not
-good enough in your case, use keyword `:briefdoc` to set it
-explicitly.
+improve documentation: all commands are automatically documented.  The
+short one-liner for `eldev help` is derived from the function’s
+documentation by taking the first sentence.  If this is not good
+enough in your case, use keyword `:briefdoc` to set it explicitly.
 
 When command is invoked from command line, Eldev calls the
 corresponding function, passing all remaining parameters to it as
@@ -1439,8 +1496,8 @@ by `:options` keyword.  It can specify any number of alternatives, but
 they all must be either short-style (single `-` followed by one
 letter) or long-style (`--` followed by a longer name) options.  Some
 options take a value; it is determined by parameter `:optional-value`
-or `:value` (if it is mandatory) and must match arguments in function
-definition.
+or `:value` (if the value is mandatory) and must match arguments in
+function definition.
 
 Options can be either global or command-specific.  In the latter case
 — the one you’ll typically need — you define to which command(s) the
@@ -1454,9 +1511,9 @@ To test how the new option works, run:
 It should print text “Repeat this” in bold, unless you’ve disabled
 output colorizing.
 
-Note that it doesn’t repeat “-c”, even though it appears on the
-command line after the command.  That’s because Eldev doesn’t pass the
-options as parameters to commands: only non-option arguments remain.
+Note that the command doesn’t repeat “-c”, even though it appears on
+the command line.  That’s because Eldev doesn’t pass the options as
+parameters to commands: only non-option arguments remain.
 
 Documentation (i.e. output of `eldev help parrot`) for the command we
 defined above now automatically lists the accepted option:
