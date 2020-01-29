@@ -1259,7 +1259,8 @@ specific project that you maintain.
 
 === Hooks
 
-Eldev defines a few hooks (more might be added later).
+Eldev defines several hooks executed at different times (more might be
+added later).
 
 `eldev-executing-command-hook`::
 
@@ -1274,12 +1275,31 @@ Eldev defines a few hooks (more might be added later).
     arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
     print a disclaimer about its fairly slow tests.
 
+{since-0-2} `eldev-load-dependencies-hook`::
+
+    Executed after successfully loading dependencies.  Functions are
+    called with arguments `NORMAL-DEPENDENCIES` and `ADDITIONAL-SETS`.
+    The first is non-nil when invoked from
+    `eldev-load-project-dependencies` and nil if from
+    `eldev-load-extra-dependencies`.  The second specifies which
+    <<additional-dependencies,sets of additional dependencies>> have
+    been loaded.
+
 {since-0-1-1} `eldev-build-system-hook`::
 
     Hook executed whenever build system is used.  This is useful since
     at least commands `build`, `compile` and `package` invoke the
     build system: it would be impractical to add the same function to
     all three hooks.
+
+{since-0-2} `eldev-test-FRAMEWORK-hook`::
+
+    Called immediately before executing tests with given framework
+    (<<ert,ERT>> or <<buttercup,Buttercup>>).  Functions on the hook
+    get passed `SELECTORS` as the only argument.  At this point
+    project dependencies and additional set `test` will have been
+    loaded already, so functions can `require` features from the
+    project.
 
 === Writing builders
 
