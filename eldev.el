@@ -1122,6 +1122,15 @@ If COMMAND is nil, list global options instead."
 
 ;; Loading dependencies; eldev prepare, eldev upgrade, eldev upgrade-self
 
+(defvar eldev-load-dependencies-hook nil
+  "Hook executed whenever dependencies are loaded.
+Functions are called with arguments NORMAL-DEPENDENCIES and
+ADDITIONAL-SETS.  The first is nil only if invoked from
+`eldev-load-extra-dependencies'.  The second is a list of
+additional dependency sets (see `eldev-add-extra-dependencies').
+
+Since Eldev 0.2.")
+
 (defvar eldev-upgrade-dry-run-mode nil
   "Don't upgrade if non-nil, just pretend to do so.")
 
@@ -1211,7 +1220,8 @@ NO-ERROR-IF-MISSING."
   ;; dependencies, which of course fails.
   (when eldev-too-old
     (signal 'eldev-too-old eldev-too-old))
-  (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing))
+  (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing)
+  (run-hook-with-args 'eldev-load-dependencies-hook t additional-sets))
 
 (defun eldev-load-extra-dependencies (sets &optional no-error-if-missing)
   "Load extra dependencies, but without normal project's dependencies.
@@ -1220,7 +1230,8 @@ that the project itself and its normal dependencies are not
 loaded.  Mostly useful to load runtime dependencies.
 
 Since 0.2."
-  (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing))
+  (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing)
+  (run-hook-with-args 'eldev-load-dependencies-hook nil sets))
 
 ;; `package-compute-transaction' and friends are not enough in our case, mostly because of
 ;; local dependencies that can change unpredictably and also requirement that certain
@@ -2071,6 +2082,18 @@ If left nil (default value), Eldev will try to autodetect.")
 (defvar eldev-test-runner nil
   "Test runner to use.")
 
+(defvar eldev-test-ert-hook nil
+  "Hook executed before running ERT tests.
+Functions are called with SELECTORS as argument.
+
+Since Eldev 0.2.")
+
+(defvar eldev-test-buttercup-hook nil
+  "Hook executed before running Buttercup tests.
+Functions are called with SELECTORS as argument.
+
+Since Eldev 0.2.")
+
 (defvar eldev--test-runners nil)
 
 (defvar eldev-test-file-patterns nil
@@ -2184,6 +2207,7 @@ unexpected result."
               (signal 'eldev-error `(:hint ("Run `%s test --list-runners' for more information" ,(eldev-shell-command t))
                                            "Test runner `%s' doesn't support framework `%s'" ,runner-name ,framework)))
             (setf selectors (eldev-test-preprocess-selectors framework selectors))
+            (run-hook-with-args (intern (format "eldev-test-%s-hook" framework)) selectors)
             (eldev-test-prepare-framework framework selectors)
             (unwind-protect
                 (funcall runner framework selectors)
@@ -2917,8 +2941,8 @@ Emacs, else it will most likely fail."
 ;; eldev targets, eldev build, eldev compile, eldev package
 
 (defvar eldev-build-system-hook nil
-  "Hook executed whenever build system is used.  Since Eldev
-0.1.1.")
+  "Hook executed whenever build system is used.
+Since Eldev 0.1.1.")
 
 (defvar eldev--builders nil)
 (defvar eldev--build-targets (make-hash-table :test #'equal))
