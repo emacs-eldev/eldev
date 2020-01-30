@@ -2869,19 +2869,53 @@ obligations."
                                       (eldev-listify feature-names)))))
 
 
-(defun eldev--cross-project-internal-eval (project-dir form)
+(defvar eldev--internal-eval-cache nil)
+(defvar eldev--internal-eval-cache-modified nil)
+
+(defun eldev--cross-project-internal-eval (project-dir form &optional use-caching)
+  (setf project-dir (expand-file-name project-dir eldev-project-dir))
   (if (string= (file-name-as-directory project-dir) (file-name-as-directory eldev-project-dir))
       (eval form t)
-    (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
-    ;; FIXME: Are we sure `--quiet' is enough to silence stderr?  Maybe redirect it instead?
-    (let ((default-directory project-dir))
-      (eldev-call-process (eldev-shell-command) `("--quiet" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
-        (unless (= exit-code 0)
-          (eldev-warn "Output of the child Eldev process:\n%s" (buffer-string))
-          (signal 'eldev-error `("Failed to evaluate Eldev expression in directory `%s'" ,project-dir)))
-        (let ((result (read (current-buffer))))
-          (eldev-trace "Evaluated to `%S'" result)
-          result)))))
+    (when (and use-caching (null eldev--internal-eval-cache))
+      (eldev-do-load-cache-file (expand-file-name "internal-eval.cache" (eldev-cache-dir t)) "internal evaluation cache" 1
+        (setf eldev--internal-eval-cache (cdr (assq 'cache contents)))))
+    (catch 'result
+      (let ((cache-key  (when use-caching `(,form . ,project-dir)))
+            (timestamps (when use-caching
+                          ;; Modification time; mnemonic-name functions are too new.
+                          `(,(nth 5 (file-attributes (expand-file-name eldev-file       project-dir)))
+                            ,(nth 5 (file-attributes (expand-file-name eldev-local-file project-dir)))))))
+        (when (and use-caching eldev--internal-eval-cache)
+          (let ((cached (gethash cache-key eldev--internal-eval-cache)))
+            (when cached
+              (when (equal (car cached) timestamps)
+                (eldev-trace "Using cached value for form `%S' in directory `%s': %S" form project-dir (cdr cached))
+                (throw 'result (cdr cached)))
+              (remhash cache-key eldev--internal-eval-cache)
+              (setf eldev--internal-eval-cache-modified t)
+              (eldev-trace "Discarded cached value for form `%S' in directory `%s' as `Eldev' and/or `Eldev-local' are newer" form project-dir))))
+        (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
+        ;; FIXME: Are we sure `--quiet' is enough to silence stderr?  Maybe redirect it instead?
+        (let ((default-directory project-dir))
+          (eldev-call-process (eldev-shell-command) `("--quiet" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
+            (unless (= exit-code 0)
+              (eldev-warn "Output of the child Eldev process:\n%s" (buffer-string))
+              (signal 'eldev-error `("Failed to evaluate Eldev expression in directory `%s'" ,project-dir)))
+            (let ((result (read (current-buffer))))
+              (eldev-trace "Evaluated to `%S'" result)
+              (when use-caching
+                (unless eldev--internal-eval-cache
+                  (setf eldev--internal-eval-cache (make-hash-table :test #'equal)))
+                (puthash cache-key `(,timestamps . ,result) eldev--internal-eval-cache)
+                (setf eldev--internal-eval-cache-modified t))
+              result)))))))
+
+(defun eldev--save-internal-eval-cache ()
+  (when eldev--internal-eval-cache-modified
+    (eldev-do-save-cache-file (expand-file-name "internal-eval.cache" (eldev-cache-dir t t)) "internal evaluation cache" 1
+      `((cache . ,eldev--internal-eval-cache)))))
+
+(add-hook 'kill-emacs-hook #'eldev--save-internal-eval-cache)
 
 
 
