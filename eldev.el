@@ -1434,6 +1434,8 @@ Since 0.2."
                               (eldev-format-message "Required by package %s"
                                                     (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) required-by " <- "))))))
     (unless (gethash package-name visited)
+      (when (stringp required-version)
+        (setf required-version (version-to-list required-version)))
       (unless (package-built-in-p package-name required-version)
         (when (eq package-name 'emacs)
           (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
@@ -2698,7 +2700,7 @@ least one warning."
 (eldev-deflinter eldev-linter-re ()
   "Find errors, deprecated syntax etc. in regular expressions."
   :aliases        (relint regex regexp)
-  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu))
+  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu :version "1.13"))
   (eldev-load-extra-dependencies 'runtime)
   (require 'relint)
   ;; I see no way to avoid diving into internals.
