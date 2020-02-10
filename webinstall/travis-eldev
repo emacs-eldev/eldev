@@ -12,7 +12,7 @@ set -e
 
 ELDEV_BIN_DIR=~/.eldev/bin
 
-export PATH="$ELDEV_BIN_DIR/bin:$PATH"
+export PATH="$ELDEV_BIN_DIR:$PATH"
 
 mkdir -p $ELDEV_BIN_DIR
 curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
