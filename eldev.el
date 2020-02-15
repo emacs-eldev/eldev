@@ -1251,7 +1251,7 @@ Since 0.2."
          ;; These two variable will be altered inside the `let' form.
          (package-archives        package-archives)
          (package-pinned-packages package-pinned-packages)
-         (plan                    (list nil))
+         (plan                    (cons nil nil))
          default-archives
          all-packages)
     (if self
@@ -1299,16 +1299,18 @@ Since 0.2."
                           ;; Refetch archive contents and retry.
                           (eldev--fetch-archive-contents t)
                           (package-read-all-archive-contents)
-                          (setf plan (list nil))
+                          (setf plan (cons nil nil))
                           (eldev--plan-install-or-upgrade self nil all-packages default-archives plan)))))
     (let ((planned-packages    (nreverse (car plan)))
+          (up-to-date-packages (cdr plan))
           (non-local-plan-size 0)
           (dependency-index    0)
           unknown-packages
           missing-dependency)
       (when (and to-be-upgraded (not (eq to-be-upgraded t)))
         (dolist (package-to-be-upgraded to-be-upgraded)
-          (unless (eldev-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
+          (unless (or (eldev-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
+                      (memq package-to-be-upgraded up-to-date-packages))
             (push package-to-be-upgraded unknown-packages)))
         (when unknown-packages
           (signal 'eldev-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(eldev-shell-command t)))
@@ -1447,24 +1449,30 @@ Since 0.2."
         (when (eq package-name 'emacs)
           (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
                                                     "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
-        (let* ((local             (and (not self) (eldev--loading-mode package-name)))
-               (already-installed (unless local (eldev-find-package-descriptor package-name required-version nil)))
-               (package           (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
-               (archives          (eldev--package-plist-get-archives package-plist)))
+        (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
+               (already-installed         (unless local (eldev-find-package-descriptor package-name required-version nil)))
+               (already-installed-version (when already-installed (package-desc-version already-installed)))
+               (package                   (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
+               (archives                  (eldev--package-plist-get-archives package-plist)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
-            (let* ((available        (cdr (assq package-name package-archive-contents)))
+            (let* ((best-version     already-installed-version)
+                   (best-priority    most-negative-fixnum)
                    (built-in-version (eldev-find-built-in-version package-name))
-                   (best-version     built-in-version)
+                   (available        (cdr (assq package-name package-archive-contents)))
                    package-disabled)
-              (while (and available (not package))
+              (when (version-list-< best-version built-in-version)
+                (setf best-version built-in-version))
+              (while available
                 (let* ((candidate (pop available))
+                       (archive   (package-desc-archive candidate))
+                       (priority  (eldev-package-archive-priority archive))
                        (version   (package-desc-version candidate))
                        (disabled  (package-disabled-p package-name version)))
                   ;; Make sure we don't install a package from a wrong archive.
                   (when (if local
-                            (string= (package-desc-archive candidate) eldev--internal-pseudoarchive)
-                          (or (null archives) (assoc (package-desc-archive candidate) archives)))
+                            (string= archive eldev--internal-pseudoarchive)
+                          (or (null archives) (assoc archive archives)))
                     (cond ((version-list-< version required-version)
                            (when (version-list-< best-version version)
                              (setf best-version version)))
@@ -1474,9 +1482,14 @@ Since 0.2."
                                                         `("Dependency `%s' is held at version %s, but version %s is required"
                                                           ,package-name ,disabled ,(eldev-message-version version))
                                                       `("Dependency `%s' is disabled" ,package-name)))))
-                          ((or (null already-installed) (version-list-< (package-desc-version already-installed) version))
-                           (setf package candidate))))))
-              (unless package
+                          ;; On Emacs 24 candidates are not sorted by archive priority, so
+                          ;; the comparison must not assume any particular order.
+                          ((or (< best-priority priority)
+                               (and (= best-priority priority) (version-list-< best-version version)))
+                           (setf package       candidate
+                                 best-version  version
+                                 best-priority priority))))))
+              (unless (version-list-< already-installed-version best-version)
                 (setf package already-installed))
               (unless package
                 (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
@@ -1492,7 +1505,8 @@ Since 0.2."
           (dolist (requirement (package-desc-reqs package))
             (eldev--do-plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
                                                default-archives plan visited (cons package-name required-by)))
-          (unless (eq package already-installed)
+          (if (eq package already-installed)
+              (push package-name (cdr plan))
             (push `(,package . ,already-installed) (car plan)))))
       (puthash package-name t visited))))
 
