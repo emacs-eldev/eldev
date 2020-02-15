@@ -1,10 +1,6 @@
 (require 'test/common)
 
 
-;; To silence byte-compilation warnings on Emacs 24.
-(defvar package-archive-priorities)
-
-
 (ert-deftest eldev-archives-1 ()
   (eldev--test-run "trivial-project" ("archives")
     (should (string-prefix-p "None specified" stdout))
@@ -19,21 +15,21 @@
   (eldev--test-run "project-a" ("archives")
     (should (string= stdout (format "archive-a: %s%s\n"
                                     (expand-file-name "test/package-archive-a" eldev-project-dir)
-                                    (if (boundp 'package-archive-priorities) "  (priority: 0, defaulted)" ""))))
+                                    "  (priority: 0, defaulted)" "")))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-archives-4 ()
   (eldev--test-run "project-b" ("archives")
     (should (string= stdout (format "archive-a: %s%s\n"
                                     (expand-file-name "test/package-archive-a" eldev-project-dir)
-                                    (if (boundp 'package-archive-priorities) "  (priority: 0, defaulted)" ""))))
+                                    "  (priority: 0, defaulted)" "")))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-archives-5 ()
   (eldev--test-run "project-c" ("archives")
     (should (string= stdout (format "archive-a: %s%s\n"
                                     (expand-file-name "test/package-archive-a" eldev-project-dir)
-                                    (if (boundp 'package-archive-priorities) "  (priority: 0, defaulted)" ""))))
+                                    "  (priority: 0, defaulted)" "")))
     (should (= exit-code 0))))
 
 ;; It doesn't matter that the project is broken.

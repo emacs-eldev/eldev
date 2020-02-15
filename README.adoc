@@ -284,9 +284,11 @@ that you shouldn’t use it if `melpa-stable` is enough, because you
 wouldn’t want your tests fail only because a dependency in an unstable
 version has a bug.
 
-Emacs 25 and up supports package archive priorities.  Eldev utilizes
-this to assign the standard archives it knows about priorities 300,
-200 and 100 in the order they are listed above.
+Emacs 25 and up supports package archive priorities.  Eldev backports
+this to Emacs 24 and utilizes the feature to assign the standard
+archives it knows about priorities 300, 200 and 100 in the order they
+are listed above.  A dependency from a package with a lower priority
+is installed only if there are no other options.
 
 If dependencies for your project are only available from some other
 archive, you can still use the same function.  Just substite the

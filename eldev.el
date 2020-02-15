@@ -847,6 +847,12 @@ the data."
                                         (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
                                         (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)))
 
+;; This variable will get used on early Emacses: archive priorities
+;; are important at least for our tests.  But let's not define
+;; `package-archive-priorities' variable to avoid breaking something
+;; that might test for it.
+(defvar eldev--package-archive-priorities nil)
+
 
 (defun eldev-require-version (version)
   "Fail if Eldev is too old.
@@ -880,8 +886,9 @@ specify something explicitly."
   (eldev-verbose "Using package archive `%s' at `%s' with %s"
                  (car archive) (cdr archive) (if priority (format "priority %s" priority) "default priority"))
   (push archive package-archives)
-  (when (and priority (boundp 'package-archive-priorities))
-    (push (cons (car archive) priority) package-archive-priorities)))
+  (when priority
+    (push (cons (car archive) priority)
+          (if (boundp 'package-archive-priorities) package-archive-priorities eldev--package-archive-priorities))))
 
 (defun eldev--resolve-package-archive (archive)
   (cond ((assq archive eldev--known-package-archives)
@@ -1878,17 +1885,17 @@ project's `Eldev' file."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (if package-archives
-      (let* ((have-priorities (boundp 'package-archive-priorities))
-             (priorities      (when have-priorities package-archive-priorities)))
-        (dolist (archive (sort package-archives (lambda (a b) (> (or (cdr (assoc (car a) priorities)) 0)
-                                                                 (or (cdr (assoc (car b) priorities)) 0)))))
-          (eldev-output "%s: %s%s"
-                        (eldev-colorize (car archive) 'name)
-                        (eldev-colorize (cdr archive) 'url)
-                        (if have-priorities
-                            (eldev-format-message "  (priority: %s)" (or (cdr (assoc (car archive) priorities)) "0, defaulted"))
-                          ""))))
+      (dolist (archive (sort package-archives (lambda (a b) (> (or (cdr (assoc (car a) priorities)) 0)
+                                                               (or (cdr (assoc (car b) priorities)) 0)))))
+        (eldev-output "%s: %s%s"
+                      (eldev-colorize (car archive) 'name)
+                      (eldev-colorize (cdr archive) 'url)
+                      (eldev-format-message "  (priority: %s)" (eldev-package-archive-priority (car archive) "0, defaulted"))))
     (eldev-print "None specified; add form `(eldev-use-package-archive ...)' in file `%s'" eldev-file)))
+
+(defun eldev-package-archive-priority (archive &optional default)
+  (or (cdr (assoc archive (if (boundp 'package-archive-priorities) package-archive-priorities eldev--package-archive-priorities)))
+      default 0))
 
 (eldev-defcommand eldev-dependencies (&rest parameters)
   "List dependencies of the current project.
