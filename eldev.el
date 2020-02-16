@@ -1552,8 +1552,13 @@ Since 0.2."
       (let ((eldev-message-rerouting-destination :stderr)
             (package-archives                    unfetched-archives)
             (inhibit-message                     t)
-            ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8
-            (gnutls-algorithm-priority           (or gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")))
+            ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8 and
+            ;; https://github.com/magit/ghub/pull/90/files.  Basically, this is a
+            ;; workaround for a bug in older Emacs versions for TLS1.3 support, but it can
+            ;; be activated only if GnuTLS is new enough to know about this TLS version.
+            (gnutls-algorithm-priority           (or gnutls-algorithm-priority
+                                                     (when (and (version<= emacs-version "26.2") (boundp 'libgnutls-version) (>= libgnutls-version 30603))
+                                                       "NORMAL:-VERS-TLS1.3"))))
         (when (catch 'eldev--bad-signature
                 (eldev-advised ('package--download-one-archive :around
                                                                (lambda (original &rest arguments)
@@ -1567,6 +1572,7 @@ Since 0.2."
           ;; This probably largely defeats the purpose of signatures, but it is basically
           ;; what `gnu-elpa-keyring-update' itself proposes (only perhaps not in automated
           ;; way).
+          (eldev-trace "Installing package `gnu-elpa-keyring-update' to hopefully solve `bad-signature' problem...")
           (let ((package-check-signature nil))
             (package-refresh-contents)
             (package-install 'gnu-elpa-keyring-update)))))))
