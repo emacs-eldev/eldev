@@ -15,8 +15,8 @@ endif::[]
 :uri-buttercup-rt: https://github.com/jorgenschaefer/emacs-buttercup/blob/master/docs/running-tests.md
 :uri-cask: https://github.com/cask/cask
 :uri-emake: https://github.com/vermiculus/emake.el
-:uri-nix-emacs: https://github.com/purcell/nix-emacs-ci
 :uri-evm: https://github.com/rejeep/evm
+:uri-nix-emacs: https://github.com/purcell/nix-emacs-ci
 :uri-makel: https://gitea.petton.fr/DamienCassou/makel
 :uri-makem-sh: https://github.com/alphapapa/makem.sh
 :uri-package-lint: https://github.com/purcell/package-lint
@@ -1093,41 +1093,20 @@ Travis CI is perhaps the most used continuous integration service for
 Elisp code, at least until the addition of GitHub actions.  The
 largest problem on {uri-travis}[Travis CI] is to install Emacs binary
 of the desired version.  Luckily, there are tools that can be used for
-this: at least {uri-nix-emacs}[nix-emacs-ci] and {uri-evm}[EVM].
-
-==== nix-emacs-ci
-
-Using {uri-nix-emacs}[nix-emacs-ci] is easy: define environment
-variable `$EMACS_CI` with the desired Emacs version and `curl` a
-single shell script.  With one more line you can also install Eldev.
-A basic `.travis.yml` would look like this:
-
-....
-language: nix
-
-env:
-  # Add more lines like this if you want to test on different Emacs versions.
-  - EMACS_CI=emacs-26-3
-
-install:
-  - bash <(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
-  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev > x.sh && source ./x.sh
-
-script:
-  - eldev -p -dtT test
-....
+this: at least {uri-evm}[EVM] and {uri-nix-emacs}[nix-emacs-ci].
 
 ==== EVM
 
-Another (older) tool to install Emacs is {uri-evm}[EVM].  It appears
-to be faster than `nix-emacs-ci`.  However, Steve Purcell (the author
-of `nix-emacs-ci`) mentions “various issues” he has had with it;
-likewise, I also have had some.
+One of the tools to install Emacs is {uri-evm}[EVM].  Steve Purcell
+(the author of `nix-emacs-ci`) mentions “various issues” he has had
+with it, however Eldev itself and many other projects use it.
+Apparently, you need to fix Ubuntu distribution used at Travis CI to
+Trusty for EVM-provided binaries.
 
-Nevertheless, Eldev itself uses EVM at the moment.  If you also want
-to try it, Eldev provides a simple script specifically for use on
-Travis CI that installs Eldev and EVM in one go.  Here is a simple
-project-agnostic `.travis.yml` file that you can use as a basis:
+If you also want to try it, Eldev provides a simple script
+specifically for use on Travis CI that installs Eldev and EVM in one
+go.  Here is a simple project-agnostic `.travis.yml` file that you can
+use as a basis:
 
 ....
 language: emacs-lisp
@@ -1140,6 +1119,31 @@ env:
 install:
   - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
   - evm install $EVM_EMACS --use
+
+script:
+  - eldev -p -dtT test
+....
+
+==== nix-emacs-ci
+
+A newer tool to install Emacs is {uri-nix-emacs}[nix-emacs-ci].  Using
+it is easy: define environment variable `$EMACS_CI` with the desired
+Emacs version and `curl` a single shell script.  With one more line
+you can also install Eldev.  It appears to be slower than EVM, but for
+continuous integration that’s not terribly important.
+
+A basic `.travis.yml` would look like this:
+
+....
+language: nix
+
+env:
+  # Add more lines like this if you want to test on different Emacs versions.
+  - EMACS_CI=emacs-26-3
+
+install:
+  - bash <(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
+  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev > x.sh && source ./x.sh
 
 script:
   - eldev -p -dtT test
@@ -1710,11 +1714,11 @@ Other build tools you might want to use instead of Eldev:
 Projects and services that can otherwise help you with developing your
 Elisp code:
 
+* {uri-evm}[EVM] — Emacs version manager; has special support for
+  Travis CI.
 * {uri-nix-emacs}[nix-emacs-ci] — installer of different Emacs
   versions that uses Nix and Cachix; useful for continuous
   integration.
-* {uri-evm}[EVM] — Emacs version manager; has special support for
-  Travis CI.
 * {uri-travis}[Travis CI] — continuous integration service, the most
   used one for Elisp projects; Eldev has <<travis-ci,additional
   support>> for it.
