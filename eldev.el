@@ -1919,8 +1919,8 @@ project's `Eldev' file."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (if package-archives
-      (dolist (archive (sort package-archives (lambda (a b) (> (or (cdr (assoc (car a) priorities)) 0)
-                                                               (or (cdr (assoc (car b) priorities)) 0)))))
+      (dolist (archive (sort package-archives (lambda (a b) (> (eldev-package-archive-priority (car a))
+                                                               (eldev-package-archive-priority (car b))))))
         (eldev-output "%s: %s%s"
                       (eldev-colorize (car archive) 'name)
                       (eldev-colorize (cdr archive) 'url)
