@@ -567,6 +567,17 @@ See `eldev-filesets'."
 
 ;; Command line interface.
 
+(defconst eldev-real-user-emacs-directory user-emacs-directory
+  "Original value of variable `user-emacs-directory'.
+During startup, Eldev changes `user-emacs-directory' to point
+inside its cache directory.  This is done to further isolate the
+project being built from the “normal” Emacs, like is done with
+e.g. dependency installation.  However, original value is stored
+in this variable and can be restored in file `Eldev' if certain
+project needs it that way.
+
+Since 0.2.1.")
+
 (defvar eldev-executing-command-hook nil)
 (defvar eldev-too-old nil)
 
@@ -574,8 +585,11 @@ See `eldev-filesets'."
 (defun eldev-start-up ()
   "Prepare Eldev.
 Used by Eldev startup script."
-  (setf package-user-dir (expand-file-name "packages" (eldev-cache-dir t))
-        package-archives nil))
+  (setf package-user-dir     (expand-file-name "packages" (eldev-cache-dir t))
+        package-archives     nil
+        ;; Intentionally not called `.emacs.d' as an additional test for projects.
+        user-emacs-directory (file-name-as-directory (expand-file-name "emacs-dir" (eldev-cache-dir t))))
+  (make-directory user-emacs-directory t))
 
 (defun eldev-cli (command-line)
   "Eldev entry point."

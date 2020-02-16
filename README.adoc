@@ -24,6 +24,7 @@ endif::[]
 :uri-travis: https://travis-ci.org/
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
+:since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
 
 = Eldev
 
@@ -215,7 +216,7 @@ dependencies.
 
 After this step, Eldev is ready to work with your project.
 
-=== Setup procedure in details
+== Setup procedure in details
 
 Now that we have created file `Eldev`, it makes sense to go over the
 full startup process:
@@ -254,6 +255,31 @@ command line using `--setup` (`-S`) option.  This is not supposed to
 be used often, mostly in cases where you run Eldev on a use-once
 project checkout, e.g. on a <<continuous-integration,continuous
 integration>> server.
+
+=== Project isolation
+
+Eldev tries to create a self-contained environment for building and
+testing your project.  It will isolate your project as much as
+possible from your “normal” Emacs, i.e. the one that you use for
+editing.  This is done to avoid interference from your other installed
+packages or configuration, to prevent broken and misbehaving projects
+from affecting your Emacs and, finally, to simplify testing of certain
+“permanent effect” features, like customizing variables.
+
+* Packages installed in your Emacs (usually in `~/.emacs.d/elpa/`) are
+  not visible for projects built with Eldev.  Likewise, dependencies
+  installed for such projects will not appear in your normal Emacs.
+
+* {since-0-2-1} Variable `user-emacs-directory` will point somewhere
+  inside `.eldev` in the project’s directory rather than to
+  `~/.emacs.d`.  This also means that `locate-user-emacs-file` will
+  not find files in your normal configuration directory.  If you want
+  to undo this change (e.g. in file `Eldev` or `Eldev-local`), use
+  original value of the variable stored as
+  `eldev-real-user-emacs-directory`.
+
+* Eldev supports <<different-emacs-versions,executing on different
+  Emacs version>> for the same project without any additional steps.
 
 
 == Project dependencies
@@ -1044,6 +1070,7 @@ packages.  To illustrate:
     $ eldev emacs -- -q foo.bar
 
 
+[#different-emacs-versions]
 == Executing on different Emacs versions
 
 Since Eldev itself is an Elisp program, version of Emacs you use can
