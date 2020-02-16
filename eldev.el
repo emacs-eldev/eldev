@@ -2323,16 +2323,16 @@ implementations."
 This macro is meant for use in framework support
 implementations."
   (declare (indent 3) (debug (stringp stringp numberp body)))
-  (let ((file (expand-file-name (format "test-results.%s" file-extension) (eldev-cache-dir t))))
-    `(eldev-do-load-cache-file ,file ,description ,expected-version ,@body)))
+  (let ((file (format "test-results.%s" file-extension)))
+    `(eldev-do-load-cache-file (expand-file-name ,file (eldev-cache-dir t)) ,description ,expected-version ,@body)))
 
 (defmacro eldev-test-do-save-results (file-extension description version &rest body)
   "Save test results.
 This macro is meant for use in framework support
 implementations."
   (declare (indent 3) (debug (stringp stringp numberp body)))
-  (let ((file (expand-file-name (format "test-results.%s" file-extension) (eldev-cache-dir t t))))
-    `(eldev-do-save-cache-file ,file ,description ,version ,@body)))
+  (let ((file (format "test-results.%s" file-extension)))
+    `(eldev-do-save-cache-file (expand-file-name ,file (eldev-cache-dir t t)) ,description ,version ,@body)))
 
 (defun eldev-test-validate-amount (num-tests)
   "Fail if NUM-TESTS are not enough.
