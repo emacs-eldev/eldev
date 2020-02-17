@@ -22,6 +22,10 @@ endif::[]
 :uri-package-lint: https://github.com/purcell/package-lint
 :uri-relint: https://github.com/mattiase/relint
 :uri-travis: https://travis-ci.org/
+:uri-extmap: https://github.com/doublep/extmap
+:uri-iter2: https://github.com/doublep/iter2
+:uri-logview: https://github.com/doublep/logview
+:uri-datetime: https://github.com/doublep/datetime
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
@@ -69,6 +73,47 @@ Drawbacks:
 * Eldev is a recent development and is not widely used, so there can
   be bugs.  However, Eldev contains a reasonably large regression test
   collection, so it is not completely untested.
+
+=== Example projects
+
+Here is a short list of projects that use Eldev.  I intentionally list
+only my own projects, even if there are others, because this way it’s
+easier to ensure that the comments below stay valid.  Eldev itself
+comes with no examples: I think real-world usage provides better
+models.
+
+{uri-extmap}[`extmap`]; its file {uri-extmap}/blob/master/Eldev[`Eldev`]::
+
+    A trivial project with no dependencies.  As you can see, there is
+    nothing in its `Eldev`.  The file is actually not even needed, it
+    is only there to signify that Eldev can be used on the project.
+
+{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]::
+
+    Another trivial project with no dependencies.  However, it uses
+    its file `Eldev` to define a custom option that activates
+    project-specific development assistance code.
+
+{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]::
+
+    This project has several dependencies, so it needs to instruct
+    Eldev how to find them.  Additionally, it deactivates (i.e. makes
+    it do nothing even if specified) one option provided by Eldev,
+    because of what seems like a bug in Emacs 24.
+
+{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]::
+
+    A library with a fairly complicated file `Eldev`.  The main reason
+    for complexity are two included Java programs that are used for 1)
+    extracting information from Java core libraries; and 2) comparing
+    ``datetime``’s results against a Java implementation during
+    testing.  It also uses `extmap` to generate resource files that
+    are later included in its package.
+
+All these projects also use <<continuous-integration,continuous
+integration>> on <<travis-ci,Travis CI>> for automated testing.
+Various elements of files `Eldev` in these projects are documented
+below.
 
 
 == Requirements
