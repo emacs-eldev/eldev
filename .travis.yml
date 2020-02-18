@@ -42,6 +42,9 @@ script:
   # indicate something is wrong with the test.  Here we can already
   # use Eldev.
   - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time compile --set test --warnings-as-errors
+  # Run `relint' on Eldev's source code, more as a test of
+  # Eldev--relint integration, because we use `rx' macro.
+  - ELDEV_LOCAL=. ./bin/eldev --packaged --debug --trace --time lint re
 
 
 branches:
