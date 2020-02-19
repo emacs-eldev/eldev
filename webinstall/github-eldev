@@ -5,7 +5,7 @@
 #
 # In your `.github/workflows/*.yml' add this:
 #
-#   run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev > x.sh && source ./x.sh
+#   run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
 
 set -e
 
