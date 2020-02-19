@@ -1,0 +1,20 @@
+#! /bin/sh
+
+# This script downloads Eldev startup script as `~/.eldev/bin/eldev'
+# for use in a GitHub workflow.
+#
+# In your `.github/workflows/*.yml' add this:
+#
+#   run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev > x.sh && source ./x.sh
+
+set -e
+
+
+ELDEV_BIN_DIR=~/.eldev/bin
+
+# Magic output that instructs GitHub to modify `$PATH'.
+echo "::add-path::$ELDEV_BIN_DIR"
+
+mkdir -p $ELDEV_BIN_DIR
+curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
+chmod a+x $ELDEV_BIN_DIR/eldev
