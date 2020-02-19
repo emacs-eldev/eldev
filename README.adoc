@@ -9,6 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-search-github: https://github.com/search?utf8=%E2%9C%93&q=filename%3AEldev+language%3A%22Emacs+Lisp%22&type=Code&ref=advsearch&l=Emacs+Lisp&l=
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
 :uri-ert-sel: https://www.gnu.org/software/emacs/manual/html_node/ert/Test-Selectors.html
 :uri-buttercup: https://github.com/jorgenschaefer/emacs-buttercup
@@ -22,6 +23,8 @@ endif::[]
 :uri-package-lint: https://github.com/purcell/package-lint
 :uri-relint: https://github.com/mattiase/relint
 :uri-travis: https://travis-ci.org/
+:uri-github-wflows: https://help.github.com/en/actions
+:uri-setup-emacs: https://github.com/purcell/setup-emacs
 :uri-extmap: https://github.com/doublep/extmap
 :uri-iter2: https://github.com/doublep/iter2
 :uri-logview: https://github.com/doublep/logview
@@ -70,38 +73,38 @@ Drawbacks:
   include dozens of other packages.
 * Eldev depends much more on Emacs internals.  It is more likely to
   break with future Emacs versions than Cask.
-* Eldev is a recent development and is not widely used, so there can
-  be bugs.  However, Eldev contains a reasonably large regression test
-  collection, so it is not completely untested.
+* Eldev is a recent development and is {uri-search-github}[not widely
+  used], so there can be bugs.  However, Eldev contains a reasonably
+  large regression test collection, so it is not completely untested.
 
 === Example projects
 
-Here is a short list of projects that use Eldev.  I intentionally list
-only my own projects, even if there are others, because this way it’s
-easier to ensure that the comments below stay valid.  Eldev itself
-comes with no examples: I think real-world usage provides better
-models.
+Here is a non-exhaustive list of projects that use Eldev and can serve
+as examples.  I intentionally list only my own projects, even if there
+are others, because this way it’s easier to ensure that the comments
+below stay valid.  Eldev source code itself comes with no examples: I
+think real-world usage provides better models.
 
-{uri-extmap}[`extmap`]; its file {uri-extmap}/blob/master/Eldev[`Eldev`]::
+{uri-extmap}[`extmap`]; its file {uri-extmap}/blob/master/Eldev[`Eldev`]; its file {uri-extmap}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
-    A trivial project with no dependencies.  As you can see, there is
+    A simple project with no dependencies.  As you can see, there is
     nothing in its `Eldev`.  The file is actually not even needed, it
     is only there to signify that Eldev can be used on the project.
 
-{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]::
+{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.travis.yml[`.travis.yml`]::
 
-    Another trivial project with no dependencies.  However, it uses
-    its file `Eldev` to define a custom option that activates
+    Another simple project with no dependencies.  However, it uses its
+    file `Eldev` to define a custom option that activates
     project-specific development assistance code.
 
-{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]::
+{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.travis.yml[`.travis.yml`]::
 
     This project has several dependencies, so it needs to instruct
     Eldev how to find them.  Additionally, it deactivates (i.e. makes
     it do nothing even if specified) one option provided by Eldev,
     because of what seems like a bug in Emacs 24.
 
-{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]::
+{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]; its file {uri-datetime}/blob/master/.travis.yml[`.travis.yml`]::
 
     A library with a fairly complicated file `Eldev`.  The main reason
     for complexity are two included Java programs that are used for 1)
@@ -111,9 +114,9 @@ models.
     are later included in its package.
 
 All these projects also use <<continuous-integration,continuous
-integration>> on <<travis-ci,Travis CI>> for automated testing.
-Various elements of files `Eldev` in these projects are documented
-below.
+integration>> on either <<travis-ci,Travis CI>> or
+<<github-workflows,GitHub>> for automated testing.  Various elements
+of files `Eldev` in these projects are documented below.
 
 
 == Requirements
@@ -1161,11 +1164,12 @@ project uses is already supported (currently <<ert,ERT>> and
 [#travis-ci]
 === Travis CI
 
-Travis CI is perhaps the most used continuous integration service for
-Elisp code, at least until the addition of GitHub actions.  The
-largest problem on {uri-travis}[Travis CI] is to install Emacs binary
-of the desired version.  Luckily, there are tools that can be used for
-this: at least {uri-evm}[EVM] and {uri-nix-emacs}[nix-emacs-ci].
+{uri-travis}[Travis CI] is perhaps the most used continuous
+integration service for Elisp code, at least until the addition of
+<<github-workflows,GitHub workflows>>.  The largest problem on Travis
+CI is to install Emacs binary of the desired version.  Luckily, there
+are tools that can be used for this: at least {uri-evm}[EVM] and
+{uri-nix-emacs}[nix-emacs-ci].
 
 ==== EVM
 
@@ -1221,15 +1225,71 @@ script:
   - eldev -p -dtT test
 ....
 
-=== GitHub actions
+[#github-workflows]
+=== GitHub workflows
 
-FIXME
+Another option for continuous integration is
+{uri-github-wflows}[GitHub workflows].  Naturally, it is only
+available to projects hosted on GitHub, but those are probably most of
+Elisp projects anyway.
+
+Workflow definition files for GitHub are somewhat more verbose than
+for Travis CI, but ultimately not really more complicated.  The
+easiest way to install Emacs binary of appropriate version is to use
+{uri-setup-emacs}[`purcell/setup-emacs`] action (which internally uses
+{uri-nix-emacs}[`nix-emacs-ci`]).  Since EVM seems tuned to Ubuntu
+Trusty (i.e. what Travis CI provides), it is likely unsuitable for
+GitHub workflows.
+
+There is yet another short shell script that installs Eldev itself for
+use on GitHub runners.  Modifying `$PATH` there is a bit tricky, so
+you probably should just go with the script, as demonstrated below.
+
+A basic workflow file (you can e.g. name it
+`.github/workflows/test.yml`) would look something like this:
+
+....
+name: CI
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs_version:
+          # Add more lines like this if you want to test on different Emacs versions.
+          - 26.3
+
+    steps:
+    - name: Set up Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
+
+    - name: Install Eldev
+      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+
+    - name: Check out the source code
+      uses: actions/checkout@v2
+
+    - name: Test the project
+      run: |
+        eldev -p -dtT test
+....
 
 === Script commands
 
 Once you have Emacs with Eldev set up on the continuous integration
 server of your choice, it is time to actually test your project.  The
-most basic command is, naturally `eldev test`.  You might want to add
+most basic command is, naturally, `eldev test`.  You might want to add
 a few options to both make project loading more similar to that
 typical for your users and Eldev’s output more informative:
 
@@ -1794,3 +1854,6 @@ Elisp code:
 * {uri-travis}[Travis CI] — continuous integration service, the most
   used one for Elisp projects; Eldev has <<travis-ci,additional
   support>> for it.
+* {uri-github-wflows}[GitHub workflows] — a part of GitHub available
+  to any hosted project, which can be used for
+  <<github-workflows,continuous integration>> among other things.
