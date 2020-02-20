@@ -861,11 +861,11 @@ the data."
                                         (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
                                         (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)))
 
-;; This variable will get used on early Emacses: archive priorities
-;; are important at least for our tests.  But let's not define
-;; `package-archive-priorities' variable to avoid breaking something
-;; that might test for it.
-(defvar eldev--package-archive-priorities nil)
+;; This variable is used only on early Emacses: archive priorities are important at least
+;; for our tests.  But let's not define `package-archive-priorities' variable to avoid
+;; breaking something that might test for it.  If this variable's value is t, use
+;; `package-archive-priorities' instead.
+(defvar eldev--package-archive-priorities (boundp 'package-archive-priorities))
 
 
 (defun eldev-require-version (version)
@@ -902,7 +902,7 @@ specify something explicitly."
   (push archive package-archives)
   (when priority
     (push (cons (car archive) priority)
-          (if (boundp 'package-archive-priorities) package-archive-priorities eldev--package-archive-priorities))))
+          (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities))))
 
 (defun eldev--resolve-package-archive (archive)
   (cond ((assq archive eldev--known-package-archives)
@@ -1260,12 +1260,14 @@ Since 0.2."
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
-         (self                    (eq core 'eldev))
-         (package-name            (if self 'eldev (package-desc-name (eldev-package-descriptor))))
-         ;; These two variable will be altered inside the `let' form.
-         (package-archives        package-archives)
-         (package-pinned-packages package-pinned-packages)
-         (plan                    (cons nil nil))
+         (self                              (eq core 'eldev))
+         (package-name                      (if self 'eldev (package-desc-name (eldev-package-descriptor))))
+         (plan                              (cons nil nil))
+         ;; The following global variables will be altered inside the `let' form.
+         (package-archives                  package-archives)
+         (package-archive-priorities        (when (boundp 'package-archive-priorities) package-archive-priorities))
+         (eldev--package-archive-priorities eldev--package-archive-priorities)
+         (package-pinned-packages           package-pinned-packages)
          default-archives
          all-packages)
     (if self
@@ -1290,11 +1292,14 @@ Since 0.2."
             (setf all-packages (append all-packages extra-dependencies))
             (dolist (plist extra-dependencies)
               (dolist (archive (eldev--package-plist-get-archives plist))
-                (let ((existing (assoc (car archive) package-archives)))
+                (let* ((resolved (eldev--resolve-package-archive archive))
+                       (existing (assoc (car resolved) package-archives)))
                   (if existing
                       (unless (equal (cdr archive) (cdr existing))
                         (error "Conflicting URLs for package archive `%s': `%s' and `%s'" (car archive) (cdr existing) (cdr archive)))
-                    (push archive package-archives)))))))))
+                    (let ((eldev-verbosity-level nil))
+                      ;; Adding archives like this to benefit from default priorities.
+                      (eldev-use-package-archive archive))))))))))
     (eldev--fetch-archive-contents to-be-upgraded)
     (package-read-all-archive-contents)
     (package-load-all-descriptors)
@@ -1437,8 +1442,8 @@ Since 0.2."
     (setf package (plist-put package :archives default-archives)))
   package)
 
-(defun eldev--package-plist-get-archives (package-plist)
-  (mapcar #'eldev--resolve-package-archive
+(defun eldev--package-plist-get-archives (package-plist &optional resolved)
+  (mapcar (if resolved #'eldev--resolve-package-archive #'identity)
           (or (eldev-listify (plist-get package-plist :archives))
               (let ((archive (plist-get package-plist :archive)))
                 (when archive
@@ -1467,7 +1472,7 @@ Since 0.2."
                (already-installed         (unless local (eldev-find-package-descriptor package-name required-version nil)))
                (already-installed-version (when already-installed (package-desc-version already-installed)))
                (package                   (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
-               (archives                  (eldev--package-plist-get-archives package-plist)))
+               (archives                  (eldev--package-plist-get-archives package-plist t)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
             (let* ((best-version     already-installed-version)
@@ -1928,7 +1933,7 @@ project's `Eldev' file."
     (eldev-print "None specified; add form `(eldev-use-package-archive ...)' in file `%s'" eldev-file)))
 
 (defun eldev-package-archive-priority (archive &optional default)
-  (or (cdr (assoc archive (if (boundp 'package-archive-priorities) package-archive-priorities eldev--package-archive-priorities)))
+  (or (cdr (assoc archive (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities)))
       default 0))
 
 (eldev-defcommand eldev-dependencies (&rest parameters)
