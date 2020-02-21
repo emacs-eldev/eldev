@@ -5,6 +5,9 @@
 
 (require 'dependency-b)
 
+;; Don't polish this source file: `checkdoc' and `package-lint' must
+;; issue warnings on it.
+
 (defun project-b-hello ()
   ;; DUMMY-LINT-WARN-HERE
   (dependency-b-hello))
@@ -13,6 +16,11 @@
 ;; byte-compilation warning.
 (defun project-b-unused-argument ()
   (setf project-b-never-declared-this-variable nil))
+
+(defun project-b-never-used-function (s)
+  ;; Regexp below is intentionally faulty: we test that `relint'
+  ;; complains about it.
+  (string-match-p "^\\(.)$" s))
 
 (provide 'project-b)
 

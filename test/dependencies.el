@@ -13,7 +13,7 @@
 
 (ert-deftest eldev-dependencies-3 ()
   (eldev--test-run "project-a" ("dependencies")
-    (should (string= stdout "dependency-a (any)\n"))
+    (should (string= stdout "dependency-a 0.9\n"))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-dependencies-4 ()

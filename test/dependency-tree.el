@@ -11,8 +11,8 @@
 
 (ert-deftest eldev-dependency-tree-2 ()
   (eldev--test-run "project-a" ("--quiet" "dependency-tree")
-    (should (or (string= stdout "project-a 1.0\n    dependency-a (any)\n")
-                (string= stdout "project-a 1.0\n    dependency-a (any)    [1.0 installed]\n")))
+    (should (or (string= stdout "project-a 1.0\n    dependency-a 0.9\n")
+                (string= stdout "project-a 1.0\n    dependency-a 0.9    [1.0 installed]\n")))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-dependency-tree-3 ()

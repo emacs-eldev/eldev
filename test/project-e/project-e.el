@@ -1,4 +1,4 @@
-;;; project-e.el --- Test project with several cross-depending `.el' files and macros
+;;; project-e.el --- Test project with several cross-depending `.el' files and macros; and with Buttercup tests
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-a)

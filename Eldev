@@ -3,10 +3,34 @@
 (setf eldev-files-to-package (append eldev-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
 
 ;; Avoid including files in test "projects".
-(setf eldev-standard-excludes (append eldev-standard-excludes '("./test/*/" "./webinstall")))
+(setf eldev-standard-excludes (append eldev-standard-excludes '((eldev-pcase-exhaustive eldev-test-type
+                                                                  (`main        "./test/*/")
+                                                                  (`integration '("./test/"   "!./test/integration"))
+                                                                  (`all         '("./test/*/" "!./test/integration")))
+                                                                "./webinstall")))
 
 
-(add-hook 'eldev-test-hook (lambda () (eldev-print "Eldev tests are fairly slow, since they spawn lots of child processes")))
+(defvar eldev-test-type 'main)
+
+(eldev-defoption eldev-test-selection (type)
+  "Select tests to run; type can be `main', `integration' or `all'"
+  :options        (-T --test-type)
+  :for-command    test
+  :value          TYPE
+  :default-value  eldev-test-type
+  (unless (memq (intern type) '(main integration all))
+    (signal 'eldev-wrong-option-usage `("unknown test type `%s'" ,type)))
+  (setf eldev-test-type (intern type)))
+
+(add-hook 'eldev-test-hook
+          (lambda ()
+            (eldev-verbose "Using Eldev tests of type `%s'" eldev-test-type)
+            (eldev-print "Eldev tests are fairly slow, since they spawn lots of child processes")))
+(add-hook 'eldev-executing-command-hook
+          (lambda (command)
+            (unless (eq command 'test)
+              ;; So that e.g. byte-compilation works on all tests.
+              (setf eldev-test-type 'all))))
 
 
 (eldev-defbuilder eldev-builder-preprocess-.in (source target)

@@ -47,7 +47,9 @@
 
 (ert-deftest eldev-require-version-info-1 ()
   (eldev--test-require-version "project-a" ("info") t
-    (should (string= stdout "project-a 1.0\n\nTest project with one dependency\n"))))
+    ;; Depending on Emacs (and `package.el') version, summary can be different.
+    (should (or (string= stdout "project-a 1.0\n\nTest project with one dependency\n")
+                (string= stdout "project-a 1.0\n\nComments to make linters happy.\n")))))
 
 (ert-deftest eldev-require-version-init-1 ()
   (eldev--test-require-version "project-a" ("init") nil))

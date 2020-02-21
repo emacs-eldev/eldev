@@ -10,9 +10,14 @@ common.el
     Actual ERT tests.  Most files are named after Eldev commands they
     test.
 
+integration/*.el
+
+    ERT tests that involve third-party tools: linters, testing
+    frameworks etc.
+
 files/
 
-    Nested tree of a variously named files and directories used in
+    Nested tree of variously named files and directories used in
     fileset tests.
 
 package-archive-*/
