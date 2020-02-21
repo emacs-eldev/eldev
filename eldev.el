@@ -1652,6 +1652,17 @@ descriptor."
                                        `("Child Eldev process for local dependency `%s' exited with error code %d" ,dependency-name ,exit-code))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 
+(defmacro eldev-autoinstalling-implicit-dependencies (enabled &rest body)
+  "Evaluate BODY, autoinstalling implicit dependencies when needed.
+If ENABLED is nil, autoinstallation is disabled (this allows to
+keep BODY the same in both cases).  Currently “implicit
+dependencies” include only testing frameworks other than ERT, but
+that could be expanded later.
+
+Since 0.3."
+  (declare (indent 1) (debug (form body)))
+  `(eldev--test-autoinstalling-framework ,enabled (lambda () ,@body)))
+
 
 
 ;; eldev clean
@@ -2217,27 +2228,7 @@ unexpected result."
     ;; `if' is important.
     (if files
         (progn
-          ;; If framework is specified explicitly, ensure it is installed first.
-          ;; Otherwise appropriate framework will be installed from `require' advice
-          ;; below.
-          (when eldev-test-framework
-            (let ((to-install (eldev-test-get-framework-entry eldev-test-framework 'packages)))
-              (when to-install
-                (eldev-verbose "Preparing testing framework `%s' as specified by variable `eldev-test-framework'..." eldev-test-framework)
-                (apply #'eldev-add-extra-dependencies 'runtime to-install)
-                (eldev-load-extra-dependencies 'runtime))))
-          (eldev-advised ('require :before (unless eldev-test-framework
-                                             (lambda (feature &optional filename no-error)
-                                               ;; Only perform autoinstallation for simple `(require 'x)' forms.
-                                               (unless (or filename no-error (featurep feature))
-                                                 (let (autoinstall)
-                                                   (dolist (framework eldev-test-known-frameworks)
-                                                     (when (memq feature (eldev-listify (eldev-test-get-framework-entry (cdr framework) 'features)))
-                                                       (setf autoinstall (nconc autoinstall (eldev-test-get-framework-entry (cdr framework) 'packages)))))
-                                                   (when autoinstall
-                                                     (eldev-verbose "Installing testing framework package(s) as required...")
-                                                     (apply #'eldev-add-extra-dependencies 'runtime autoinstall)
-                                                     (eldev-load-extra-dependencies 'runtime)))))))
+          (eldev-autoinstalling-implicit-dependencies t
             (dolist (file files)
               (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
                      (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
@@ -2261,6 +2252,29 @@ unexpected result."
                 (funcall runner framework selectors)
               (eldev-test-finalize-framework framework selectors))))
       (eldev-print "No test files to load"))))
+
+(defun eldev--test-autoinstalling-framework (enabled callback)
+  ;; If framework is specified explicitly, ensure it is installed first.  Otherwise
+  ;; appropriate framework will be installed from `require' advice below.
+  (when (and enabled eldev-test-framework)
+    (let ((to-install (eldev-test-get-framework-entry eldev-test-framework 'packages)))
+      (when to-install
+        (eldev-verbose "Preparing testing framework `%s' as specified by variable `eldev-test-framework'..." eldev-test-framework)
+        (apply #'eldev-add-extra-dependencies 'runtime to-install)
+        (eldev-load-extra-dependencies 'runtime))))
+  (eldev-advised ('require :before (when (and enabled (null eldev-test-framework))
+                                     (lambda (feature &optional filename no-error)
+                                       ;; Only perform autoinstallation for simple `(require 'x)' forms.
+                                       (unless (or filename no-error (featurep feature))
+                                         (let (autoinstall)
+                                           (dolist (framework eldev-test-known-frameworks)
+                                             (when (memq feature (eldev-listify (eldev-test-get-framework-entry (cdr framework) 'features)))
+                                               (setf autoinstall (nconc autoinstall (eldev-test-get-framework-entry (cdr framework) 'packages)))))
+                                           (when autoinstall
+                                             (eldev-verbose "Installing testing framework package(s) as required...")
+                                             (apply #'eldev-add-extra-dependencies 'runtime autoinstall)
+                                             (eldev-load-extra-dependencies 'runtime)))))))
+    (funcall callback)))
 
 (defun eldev-test-get-framework-data (framework)
   "Get all data for given FRAMEWORK."
@@ -2835,22 +2849,23 @@ being that it doesn't print form results."
     (signal 'eldev-wrong-command-usage `(t ,(if print-results "Missing expressions to evaluate" "Missing forms to execute"))))
   (let ((forms (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters)))
     (when eldev-eval-load-project
-      (eldev-load-project-dependencies (if print-results 'eval 'exec))
-      (when eldev-eval-require-main-feature
+      (eldev-load-project-dependencies (if print-results 'eval 'exec)))
+    (eldev-autoinstalling-implicit-dependencies eldev-eval-load-project
+      (when (and eldev-eval-load-project eldev-eval-require-main-feature)
         (dolist (feature (eldev-required-features eldev-eval-required-features))
           (eldev-verbose "Autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
-          (require feature))))
-    (dolist (form forms)
-      (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
-      (let ((result (eval (cdr form) eldev-eval-lexical)))
-        (when print-results
-          (with-temp-buffer
-            (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
-            ;; Older Emacs version end some value representations with a linefeed for
-            ;; whatever reasons.
-            (when (equal (char-before) ?\n)
-              (delete-char -1))
-            (eldev-output "%s" (buffer-string))))))))
+          (require feature)))
+      (dolist (form forms)
+        (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
+        (let ((result (eval (cdr form) eldev-eval-lexical)))
+          (when print-results
+            (with-temp-buffer
+              (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
+              ;; Older Emacs version end some value representations with a linefeed for
+              ;; whatever reasons.
+              (when (equal (char-before) ?\n)
+                (delete-char -1))
+              (eldev-output "%s" (buffer-string)))))))))
 
 (eldev-defbooloptions eldev-eval-lexical-mode eldev-eval-dynamic-mode eldev-eval-lexical
   ("Evaluate expressions using lexical scoping"
@@ -3508,14 +3523,15 @@ Also see commands `compile' and `package'."
         (when build-sequence
           (setf build-sequence (sort build-sequence (lambda (a b) (< (cdr a) (cdr b)))))
           (eldev-trace "Building plan: %s" (eldev-message-enumerate nil build-sequence #'car nil t))
-          (dolist (entry build-sequence)
-            (if eldev-build-keep-going
-                ;; Ignore errors here: they will have been reported in `eldev-build-target'
-                ;; already.
-                (condition-case nil
-                    (eldev-build-target (car entry))
-                  (eldev-build-abort-branch))
-              (eldev-build-target (car entry)))))
+          (eldev-autoinstalling-implicit-dependencies t
+            (dolist (entry build-sequence)
+              (if eldev-build-keep-going
+                  ;; Ignore errors here: they will have been reported in `eldev-build-target'
+                  ;; already.
+                  (condition-case nil
+                      (eldev-build-target (car entry))
+                    (eldev-build-abort-branch))
+                (eldev-build-target (car entry))))))
         (when (= (hash-table-count eldev--build-results) 0)
           (eldev-print "Nothing to do"))
         (maphash (lambda (_target status) (unless (eq status 'built) (setf anything-failed t))) eldev--build-results)
