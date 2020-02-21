@@ -3952,14 +3952,15 @@ possible to build arbitrary targets this way."
                eldev--feature-providers)))
 
 (defun eldev--validate-el-feature-source (filename)
-  (setf filename (file-relative-name filename eldev-project-dir))
-  (if (or (eldev-external-or-absolute-filename filename)
-          (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
-      'external
-    (setf filename (eldev-replace-suffix filename ".elc" ".el"))
-    (if (file-exists-p (expand-file-name filename eldev-project-dir))
-        filename
-      'unknown)))
+  (or (when filename
+        (setf filename (file-relative-name filename eldev-project-dir))
+        (if (or (eldev-external-or-absolute-filename filename)
+                (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
+            'external
+          (setf filename (eldev-replace-suffix filename ".elc" ".el"))
+          (when (file-exists-p (expand-file-name filename eldev-project-dir))
+            filename)))
+      'unknown))
 
 
 (eldev-defbuilder eldev-builder-makeinfo (source target)
