@@ -563,9 +563,12 @@ BODY."
   "Return Elisp documentation of given FUNCTION.
 Strip calling convention from byte-compiled functions, since that
 is not meant for humans."
-  (let ((documentation (documentation function)))
-    (when documentation
-      (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" documentation))))
+  (let ((documentation (documentation function t)))
+    (setf documentation (if documentation (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" documentation) ""))
+    (dolist (preprocessor (reverse (eldev-get function 'doc-preprocessors)))
+      (setf documentation (funcall preprocessor documentation)))
+    (when (> (length documentation) 0)
+      (substitute-command-keys documentation))))
 
 (defun eldev-briefdoc (function)
   "Return first sentence of Elisp documentation of given FUNCTION."
@@ -578,6 +581,12 @@ is not meant for humans."
           ;; `skip-syntax-backward' also skips e.g. quotes.
           (skip-chars-backward ".;")
           (buffer-substring 1 (point))))))
+
+(defun eldev-add-documentation-preprocessor (functions preprocessor)
+  "Call PREPROCESSOR on documentation string for each of FUNCTIONS.
+FUNCTIONS can be a single symbol or a list of those.  Since 0.3."
+  (dolist (function (eldev-listify functions))
+    (eldev-put function 'doc-preprocessors `(,preprocessor ,@(eldev-get function 'doc-preprocessors)))))
 
 
 (defmacro eldev-suppress-warning-emacs-text (&rest body)
