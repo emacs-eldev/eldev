@@ -2052,19 +2052,21 @@ Normally, package name and version is printed.  However, in quiet
 mode output is restricted to just the version."
   :parameters     "[PACKAGE...]"
   :works-on-old-eldev t
-  (let* ((packages     (if parameters
-                           (mapcar #'intern parameters)
-                         '(eldev)))
-         (this-package (eldev-package-descriptor)))
+  (let* ((packages          (if parameters
+                                (mapcar #'intern parameters)
+                              '(eldev)))
+         ;; Try to work even if invoked from a non-project directory.
+         (this-package      (ignore-errors (eldev-package-descriptor)))
+         (this-package-name (when this-package (package-desc-name this-package))))
     ;; Special handling of the project itself so that its version can
     ;; be queried even if there are unavailable dependencies.
-    (when (eldev-any-p (not (or (eq it 'emacs) (eq it (package-desc-name this-package)) (eldev-find-package-descriptor it nil t))) packages)
+    (when (eldev-any-p (not (or (eq it 'emacs) (eq it this-package-name) (eldev-find-package-descriptor it nil t))) packages)
       (eldev--load-installed-runtime-dependencies)
       (eldev-load-project-dependencies (mapcar #'car eldev--extra-dependencies)))
     (dolist (package packages)
       (let ((version (if (eq package 'emacs)
                          emacs-version
-                       (let ((descriptor (if (eq package (package-desc-name this-package))
+                       (let ((descriptor (if (eq package this-package-name)
                                              this-package
                                            (eldev-find-package-descriptor package nil t))))
                          (unless descriptor

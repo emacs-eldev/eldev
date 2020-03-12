@@ -795,8 +795,10 @@ return the descriptor of the project being built."
   (unless (and only-if-activated (not (memq package-name package-activated-list)))
     (when (stringp version)
       (setf version (version-to-list version)))
-    (let* ((this-package  (eldev-package-descriptor))
-           (found-package (if (equal (package-desc-name this-package) package-name) this-package (cadr (assq package-name package-alist)))))
+    (let* ((this-package  (ignore-errors (eldev-package-descriptor)))
+           (found-package (if (and this-package (eq (package-desc-name this-package) package-name))
+                              this-package
+                            (cadr (assq package-name package-alist)))))
       (when (and found-package (or (null version) (version-list-<= version (package-desc-version found-package))))
         found-package))))
 
