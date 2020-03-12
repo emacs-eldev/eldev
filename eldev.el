@@ -1273,7 +1273,7 @@ Since 0.2."
     (if self
         (setf package-archives `(,(if eldev--upgrade-self-from-forced-pa
                                       `("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa))
-                                    `(eldev--resolve-package-archive (if eldev-upgrade-self-from-stable 'melpa-stable 'melpa-unstable))))
+                                    (eldev--resolve-package-archive (if eldev-upgrade-self-from-stable 'melpa-stable 'melpa-unstable))))
               all-packages     '((:package eldev)))
       (eldev--create-internal-pseudoarchive-descriptor)
       (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
