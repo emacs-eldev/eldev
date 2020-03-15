@@ -705,14 +705,23 @@ Since 0.2."
       ((or :hint :command) (pop arguments) (pop arguments)))
     (apply #'eldev-format-message arguments)))
 
+(declare-function file-name-case-insensitive-p nil (filename))
+
 (defun eldev--set-up ()
   (dolist (config `((,eldev-user-config-file . "No file `%s', not applying user-specific configuration")
                     (,eldev-file             . "No file `%s', project building uses only defaults")
                     (,eldev-local-file       . "No file `%s', not customizing build")))
     (let ((file (locate-file (car config) (list eldev-project-dir))))
       (if file
-          (progn (eldev-trace "Loading file `%s'..." (car config))
-                 (load file nil t t))
+          ;; See issue 9: this is for Mac OS.
+          (if (and (equal (car config) "Eldev")
+                   (or (not (fboundp 'file-name-case-insensitive-p)) (file-name-case-insensitive-p file))
+                   (with-temp-buffer
+                     (insert-file-contents file nil 0 100)
+                     (looking-at (rx "#!"))))
+              (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
+            (progn (eldev-trace "Loading file `%s'..." (car config))
+                   (load file nil t t)))
         (eldev-verbose (cdr config) (car config)))))
   (dolist (form (reverse eldev-setup-forms))
     (eldev-trace "Evaluating form `%S' specified on the command line..." form)
