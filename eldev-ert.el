@@ -128,22 +128,15 @@ use this for ERT framework, unless they can do better."
     (let ((scan (reverse frames)))
       (while scan
         (let ((frame (pop scan)))
-          (when (eq (eldev--ert-frame-function frame) 'ert--run-test-internal)
+          (when (eq (eldev-backtrace-frame-function frame) 'ert--run-test-internal)
             ;; Heuristic: older Emacs versions have two more "uninteresting" frames where
             ;; first is a `funcall' and second is some byte-compiled function.
-            (when (and (eq (eldev--ert-frame-function (car scan)) 'funcall)
-                       (byte-code-function-p (eldev--ert-frame-function (cadr scan))))
+            (when (and (eq (eldev-backtrace-frame-function (car scan)) 'funcall)
+                       (byte-code-function-p (eldev-backtrace-frame-function (cadr scan))))
               (setf scan (cddr scan)))
             (setf frames (nreverse scan)
                   scan   nil))))))
   frames)
-
-(declare-function backtrace-frame-fun "backtrace" (frame))
-
-(defun eldev--ert-frame-function (frame)
-  (cond ((listp frame)                   (nth 1 frame))  ;; Older Emacs versions.
-        ((fboundp #'backtrace-frame-fun) (backtrace-frame-fun frame))
-        (t                               (aref 1 frame))))
 
 (defun eldev-build-ert-selector (selectors)
   "Convert a list of SELECTORS to a single ERT selector.

@@ -189,6 +189,9 @@ that as a precaution.")
 (defvar eldev-project-loading-mode nil
   "Project loading mode, `as-is' if not specified.")
 
+(defvar eldev-print-backtrace-on-abort nil
+  "If Eldev is aborted with C-c, print a backtrace.")
+
 (defvar eldev-setup-forms nil
   "Forms executed as the last step of Eldev setup.
 Should normally be specified only via command line.")
@@ -384,6 +387,13 @@ This is only a wrapper over `eldev-defoption'."
    :options       (-d --debug))
   ("Set `debug-on-error' to nil"
    :options       (-D --no-debug)))
+
+(eldev-defbooloptions eldev-print-backtrace-on-abort eldev-no-backtrace-on-abort eldev-print-backtrace-on-abort
+  ("Print backtrace if aborted with C-c"
+   :options       (-Q --backtrace-on-abort))
+  ("Don't print backtrace if aborted with C-c"
+   :options       --no-backtrace-on-abort
+   :hidden-if     :default))
 
 (eldev-defoption eldev-set-loading-mode (mode)
   "Set the project's loading mode"
@@ -616,6 +626,10 @@ Used by Eldev startup script."
                                                         (let ((inhibit-message nil))
                                                           (apply original arguments))))
                         (eldev-parse-options command-line nil t t)
+                        (when eldev-print-backtrace-on-abort
+                          ;; Using a wrapper function results in unnecessary frame(s) in
+                          ;; the backtrace, so let's avoid this until needed.
+                          (add-hook 'kill-emacs-hook #'backtrace))
                         ;; Since this is printed before `~/.eldev/config' is loaded it can
                         ;; ignore some settings from that file, e.g. colorizing mode.
                         (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
@@ -675,6 +689,7 @@ Used by Eldev startup script."
                                (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))))
+      (remove-hook 'kill-emacs-hook #'backtrace)
       (eldev-trace "Finished %s on %s" (if (eq exit-code 0) "successfully" "erroneously") (replace-regexp-in-string " +" " " (current-time-string))))
     (when eldev-too-old
       (when (eq (car eldev-too-old) :hint)

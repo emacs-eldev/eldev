@@ -77,6 +77,14 @@
       (cons (nreverse decls) body)))
 
 
+(declare-function backtrace-frame-fun "backtrace" (frame))
+
+(defun eldev-backtrace-frame-function (frame)
+  (cond ((listp frame)                   (nth 1 frame))  ;; Older Emacs versions.
+        ((fboundp #'backtrace-frame-fun) (backtrace-frame-fun frame))
+        (t                               (aref 1 frame))))
+
+
 
 ;; General.
 
