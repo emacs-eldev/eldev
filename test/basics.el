@@ -29,5 +29,10 @@
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-command-hook-1 ()
+  ;; Just make sure that the hook is executed.
+  (eldev--test-run "empty-project" ("--setup" (prin1-to-string '(add-hook 'eldev-help-hook (lambda () (error "fail!")))) "help")
+    (should (= exit-code 1))))
+
 
 (provide 'test/basics)

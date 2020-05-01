@@ -223,7 +223,7 @@ Should normally be specified only via command line.")
       (eldev-pcase-exhaustive (pop keywords)
         (:aliases
          (eldev-register-command-aliases command (pop keywords)))
-        ((and (or :briefdoc :parameters :custom-parsing :works-on-old-eldev) keyword)
+        ((and (or :command-hook :briefdoc :parameters :custom-parsing :works-on-old-eldev) keyword)
          (eldev-put function keyword (pop keywords)))
         (:override
          (setf override (pop keywords)))))
@@ -281,12 +281,11 @@ error status, signal an error, probably a `eldev-error'."
         (:command (setf command (pop body)))
         (:hook    (setf hook    (pop body)))
         (keyword  (push keyword keywords) (push (pop body) keywords))))
-    (eldev-put name :command-hook hook)
     `(progn (defun ,name ,arguments
               ,@(car parsed-body)
               ,@body)
             (defvar ,hook nil ,(format "Hook to be executed before command `%s'." command))
-            (eldev--register-command ',name ',command ',(nreverse keywords)))))
+            (eldev--register-command ',name ',command ',`(:command-hook ,hook ,@(nreverse keywords))))))
 
 ;; Internal helper for `eldev-defoption'.
 (defun eldev--register-option (handler options for-command keywords)
