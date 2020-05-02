@@ -17,7 +17,7 @@
   (file-name-as-directory (expand-file-name "test" eldev-project-dir)))
 
 (defun eldev--test-tmp-subdir (name)
-  (expand-file-name name (expand-file-name "test/.tmp" eldev-project-dir)))
+  (expand-file-name name (expand-file-name (format "test/.tmp/%s.%s" emacs-major-version emacs-minor-version) eldev-project-dir)))
 
 (defun eldev--test-project-dir (&optional test-project)
   (file-name-as-directory (expand-file-name (or test-project eldev--test-project) (eldev--test-dir))))
