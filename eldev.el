@@ -4121,6 +4121,40 @@ possible to build arbitrary targets this way."
 
 
 
+;; eldev plugins
+
+(defvar eldev--active-plugin-documentation)
+
+(eldev-defcommand eldev-plugins (&rest parameters)
+  "Document Eldev plugins activated for this project.  You can
+limit output to only documentation of given plugins instead of
+all active.
+
+If run in quiet mode, only plugin names are printed, without
+documentation."
+  :parameters     "[PLUGIN-NAME...]"
+  :aliases        plugin
+  (require 'eldev-plugins)
+  (let ((plugins (if parameters
+                     (mapcar (lambda (name)
+                               (unless (assq (setf name (intern name)) eldev--active-plugin-documentation)
+                                 (signal 'eldev-error `("Plugin `%s' doesn't exist or is not activated for this project" ,name)))
+                               name)
+                             parameters)
+                   (sort (eldev-active-plugins) #'string<))))
+    (if plugins
+        (while plugins
+          (let ((plugin (pop plugins)))
+            (if (eldev-unless-quiet t)
+                (progn (eldev-output "%s\n" (eldev-colorize plugin 'section))
+                       (eldev-output "%s" (or (cdr (assq plugin eldev--active-plugin-documentation)) "Not documented"))
+                       (when plugins
+                         (eldev-output "\n")))
+              (eldev-output "%s" plugin))))
+      (eldev-print "No plugins are activated for this project (see function `eldev-use-plugin')"))))
+
+
+
 ;; eldev init
 
 (defvar eldev-init-interactive t)
@@ -4243,6 +4277,12 @@ will fail if the project already has file named `Eldev'."
   ("Don't ask any questions"
    :options       (-n --non-interactive))
   :for-command    init)
+
+
+;; Using `autoload' function directly instead of ;;;###autoload cookies since the latter
+;; won't work with ELDEV_LOCAL.
+(autoload 'eldev-active-plugins "eldev-plugins")
+(autoload 'eldev-use-plugin "eldev-plugins")
 
 
 (provide 'eldev)

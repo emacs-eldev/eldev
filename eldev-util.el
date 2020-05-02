@@ -870,9 +870,14 @@ For example, result list could be something like this:
 
 (defun eldev-find-and-trace-files (fileset description &optional absolute root)
   "Find files and trace a standard message about them.
-See `eldev-find-files' for details."
+If ABSOLUTE is equal to \\='dont-trace, returned filenames have
+absolute paths, but are traced without them.  See
+`eldev-find-files' for more information."
   (let ((files (eldev-find-files fileset absolute root)))
-    (eldev-trace "%s" (eldev-message-enumerate-files (eldev-format-message "Found %s: %%s (%%d)" description) files))
+    (eldev-trace "%s" (eldev-message-enumerate-files (eldev-format-message "Found %s: %%s (%%d)" description)
+                                                     (if (eq absolute 'dont-trace)
+                                                         (mapcar (lambda (file) (file-relative-name file (or root default-directory))) files)
+                                                       files)))
     files))
 
 (defun eldev-filter-files (files fileset &optional absolute root)
