@@ -10,6 +10,8 @@
 
 (defvar eldev--test-shell-command (expand-file-name "bin/eldev" eldev-project-dir))
 
+(defvar eldev--test-packaged-self nil)
+
 
 (defun eldev--test-dir ()
   (file-name-as-directory (expand-file-name "test" eldev-project-dir)))
@@ -61,7 +63,19 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (declare (indent 2) (debug (stringp sexp body)))
   `(let* ((eldev--test-project (or ,test-project eldev--test-project))
           (default-directory   (eldev--test-project-dir ,test-project))
-          (process-environment `(,(format "ELDEV_LOCAL=%s" (or eldev--test-eldev-local eldev-project-dir))
+          (process-environment `(,(format "ELDEV_LOCAL=%s" (or eldev--test-eldev-local
+                                                               ;; When in mode `packaged', also generate a package
+                                                               ;; for spawned processes to use.
+                                                               (when (and (eq eldev-project-loading-mode 'packaged) (not (eq eldev--test-packaged-self 'in-process)))
+                                                                 (unless eldev--test-packaged-self
+                                                                   ;; Set to prevent recursive reentry.
+                                                                   (setf eldev--test-packaged-self 'in-process)
+                                                                   (eldev--test-create-eldev-archive "packaged-self")
+                                                                   (setf eldev--test-packaged-self t))
+                                                                 (concat ":pa:" (eldev--test-tmp-subdir "packaged-self")))
+                                                               ;; Otherwise, let the child processes use the sources
+                                                               ;; (maybe byte-compiled) directly.
+                                                               eldev-project-dir))
                                  ,(format "ELDEV_DIR=%s"   (or eldev--test-eldev-dir   (eldev--test-tmp-subdir "stdroot")))
                                  ,@process-environment)))
      (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
