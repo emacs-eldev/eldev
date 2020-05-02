@@ -61,30 +61,31 @@ variables.  Stdout output is also available to BODY in the
 current (temporary) buffer, with the point positioned at the
 beginning.  Exit code of the process is bound as EXIT-CODE."
   (declare (indent 2) (debug (stringp sexp body)))
-  (let ((local-directory (or eldev--test-eldev-local
-                             ;; When in mode `packaged', also generate a package for
-                             ;; spawned processes to use.
-                             (when (and (eq eldev-project-loading-mode 'packaged)
-                                        (not (eq eldev--test-packaged-self 'in-process))
-                                        (null eldev--test-eldev-dir))
-                               (unless eldev--test-packaged-self
-                                 ;; Set to prevent recursive reentry.
-                                 (setf eldev--test-packaged-self 'in-process)
-                                 (eldev--test-create-eldev-archive "packaged-self")
-                                 (setf eldev--test-packaged-self t)
-                                 ;; Delete any previously installed in such a way Eldev.
-                                 (ignore-errors (delete-directory (eldev--test-tmp-subdir (format "stdroot/%s.%s/bootstrap" emacs-major-version emacs-minor-version)) t)))
-                               (concat ":pa:" (eldev--test-tmp-subdir "packaged-self")))
-                             ;; Otherwise, let the child processes use the sources (maybe
-                             ;; byte-compiled) directly.
-                             eldev-project-dir)))
-    `(let* ((eldev--test-project (or ,test-project eldev--test-project))
-            (default-directory   (eldev--test-project-dir ,test-project))
-            (process-environment `(,(format "ELDEV_LOCAL=%s" ,local-directory)
-                                   ,(format "ELDEV_DIR=%s"   (or eldev--test-eldev-dir (eldev--test-tmp-subdir "stdroot")))
-                                   ,@process-environment)))
-       (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
-         ,@body))))
+  `(let* ((eldev--test-project (or ,test-project eldev--test-project))
+          (default-directory   (eldev--test-project-dir ,test-project))
+          (process-environment `(,(format "ELDEV_LOCAL=%s" (or eldev--test-eldev-local
+                                                               ;; When in mode `packaged', also generate
+                                                               ;; a package for spawned processes to use.
+                                                               (when (and (eq eldev-project-loading-mode 'packaged)
+                                                                          (not (eq eldev--test-packaged-self 'in-process))
+                                                                          (null eldev--test-eldev-dir))
+                                                                 (unless eldev--test-packaged-self
+                                                                   ;; Set to prevent recursive reentry.
+                                                                   (setf eldev--test-packaged-self 'in-process)
+                                                                   (eldev--test-create-eldev-archive "packaged-self")
+                                                                   (setf eldev--test-packaged-self t)
+                                                                   ;; Delete any previously installed in such a way Eldev.
+                                                                   (ignore-errors (delete-directory (eldev--test-tmp-subdir (format "stdroot/%s.%s/bootstrap"
+                                                                                                                                    emacs-major-version emacs-minor-version))
+                                                                                                    t)))
+                                                                 (concat ":pa:" (eldev--test-tmp-subdir "packaged-self")))
+                                                               ;; Otherwise, let the child processes use the
+                                                               ;; sources (maybe byte-compiled) directly.
+                                                               eldev-project-dir))
+                                 ,(format "ELDEV_DIR=%s"   (or eldev--test-eldev-dir (eldev--test-tmp-subdir "stdroot")))
+                                 ,@process-environment)))
+     (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
+       ,@body)))
 
 
 (defmacro eldev--test-capture-output (&rest body)
