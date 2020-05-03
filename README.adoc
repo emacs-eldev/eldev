@@ -24,7 +24,9 @@ endif::[]
 :uri-relint: https://github.com/mattiase/relint
 :uri-travis: https://travis-ci.org/
 :uri-github-wflows: https://help.github.com/en/actions
+:uri-coveralls: https://coveralls.io/
 :uri-setup-emacs: https://github.com/purcell/setup-emacs
+:uri-undercover: https://github.com/undercover-el/undercover.el
 :uri-extmap: https://github.com/doublep/extmap
 :uri-iter2: https://github.com/doublep/iter2
 :uri-logview: https://github.com/doublep/logview
@@ -32,6 +34,7 @@ endif::[]
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
+:since-0-3: image:https://img.shields.io/badge/since-0.3-8be[Since 0.3,float=right]
 
 = Eldev
 
@@ -264,6 +267,7 @@ dependencies.
 
 After this step, Eldev is ready to work with your project.
 
+[#setup-procedure]
 == Setup procedure in details
 
 Now that we have created file `Eldev`, it makes sense to go over the
@@ -821,6 +825,7 @@ with option `-v` or `-t` to see it):
 FIXME
 
 
+[#testing]
 == Testing
 
 Eldev has built-in support for running regression/unit tests of your
@@ -1237,7 +1242,7 @@ Workflow definition files for GitHub are somewhat more verbose than
 for Travis CI, but ultimately not really more complicated.  The
 easiest way to install Emacs binary of appropriate version is to use
 {uri-setup-emacs}[`purcell/setup-emacs`] action (which internally uses
-{uri-nix-emacs}[`nix-emacs-ci`]).  Since EVM seems tuned to Ubuntu
+{uri-nix-emacs}[nix-emacs-ci]).  Since EVM seems tuned to Ubuntu
 Trusty (i.e. what Travis CI provides), it is likely unsuitable for
 GitHub workflows.
 
@@ -1313,6 +1318,117 @@ your source warning-free today, it might detect problems tomorrow.
 `relint` is probably one of the “safer” linters in this regard:
 
     $ eldev -dtT lint re
+
+
+== Plugins
+
+{since-0-3} Plugins are activatable extensions to Eldev functionality.
+They provide features that are not needed for most projects and
+are therefore not enabled by default.  However, enabling a plugin is
+trivial — just add line:
+
+[source]
+----
+(eldev-use-package-archive 'PLUGIN-NAME)
+----
+
+to file `Eldev` of your project.  For example:
+
+[source]
+----
+(eldev-use-package-archive 'undercover)
+----
+
+As for other configuration, you can also do it in `Eldev-local` or
+<<setup-procedure,other places>>.
+
+In future, plugins may become externally-managed and “detached” from
+Eldev itself (create an issue if you are interested).  For now,
+however, Eldev provides a single built-in plugin.
+
+You can check if a project has any plugins activated — and
+documentation for those plugins:
+
+    $ eldev plugins
+
+Run Eldev in quiet mode (`-q`) to get only the list, without the long
+documentation:
+
+    $ eldev -q plugins
+
+Remember that if a project activates a plugin in a non-standard way,
+for example from <<hooks,a hook>>, command `plugins` will not see it.
+
+There is currently no way to list all available plugins.  However, as
+of yet there is only one plugin anyway.
+
+[#undercover]
+=== undercover
+
+This built-in plugin provides integration with
+{uri-undercover}[undercover] tool that generates coverage reports for
+your tests.  It is active only for <<testing,command `test`>>.  By
+default, behavior of the tool is unaltered (with the exception that
+reports are not merged), so effectively it will do nothing unless run
+on a supported <<continuous-integration,continuous integration>>
+server.
+
+WARNING: As of now (03.05.2020) `undercover` hangs on Emacs 27
+(not-yet-released next stable).  This is not a bug in the plugin, but
+in the tool itself.
+
+To have your project’s code coverage statistics automatically gathered
+during continuous integration, all you need to do is:
+
+. Activate the plugin: add `(eldev-use-plugin 'undercover)` to your
+  project’s file `Eldev`.
+
+. Make sure that command `test` is executed during automated testing
+  (e.g. in file `.travis.yml`) in `as-is`, `source` or `built-source`
+  <<loading-modes,loading mode>>.  If you want, you can run it
+  again additionally in `packaged` mode.
+
+The plugin adds two options for command `test`: `--undercover` (`-u`)
+and `--undercover-report` (`-U`).  First option can be used to
+configure the plugin and the tool, the second — to change report
+filename.  Value for the option `-u` should be a comma and/or
+space-separated list of any of the following flags:
+
+`auto`, `on` (`always`), `off` (`never`)::
+
+    whether to generate the report; default value is `auto`;
+
+`coveralls`, `simplecov`, `text`::
+
+    format of the report to generate; default is `coveralls`;
+
+`merge`, `restart`::
+
+    whether to merge with existing report; note that by default report
+    is _restarted_, i.e. existing report file is deleted;
+
+`send`, `dontsend`::
+
+    whether to send the generated report to
+    {uri-coveralls}[coveralls.io] (only for the suitable format);
+    default is to send.
+
+Additionally, when `eldev-dwim` is non-nil, certain flags can affect
+each other:
+
+* if report format is not set explicitly, it is derived from extension
+  of report filename if possible: `.json` for `simplecov` format,
+  `.txt` or `.text` for a text report;
+* when requested format is not `coveralls`, report is always generated
+  unless `auto` or `off` (`never`) is specified explicitly.
+
+Based on the above, easiest way to generate a local coverage report is
+something like this:
+
+    $ eldev test -U simplecov.json
+
+Full help for the plugin can always be checked by running `eldev
+plugins` in a project with the plugin activated.
 
 
 [#filesets]
@@ -1434,6 +1550,7 @@ if you want a special command for your own needs, for example.  Or
 maybe in `Eldev-local` — if you need something extra only for one
 specific project that you maintain.
 
+[#hooks]
 === Hooks
 
 Eldev defines several hooks executed at different times (more might be
@@ -1857,3 +1974,8 @@ Elisp code:
 * {uri-github-wflows}[GitHub workflows] — a part of GitHub available
   to any hosted project, which can be used for
   <<github-workflows,continuous integration>> among other things.
+* {uri-coveralls}[Coveralls] — web service to help you track your
+  code coverage over time; can be integrated with Eldev using
+  <<undercover,a plugin>>;
+* {uri-undercover}[undercover] — a tool for generating test coverage
+  reports for Elisp code; also see Coveralls above.
