@@ -98,7 +98,9 @@ think real-world usage provides better models.
 
     Another simple project with no dependencies.  However, it uses its
     file `Eldev` to define a custom option that activates
-    project-specific development assistance code.
+    project-specific development assistance code.  Additionally, it
+    enables <<undercover>> plugin to collect test code coverage
+    statistics.
 
 {uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.travis.yml[`.travis.yml`]::
 
