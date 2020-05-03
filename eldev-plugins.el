@@ -64,7 +64,7 @@ effectively not modified.")
 
 (defvar eldev-undercover-fileset "*.el")
 
-(defconst eldev--undercover-flags '(auto always never coveralls simplecov text merge restart send dontsend))
+(defconst eldev--undercover-flags '(auto on off always never coveralls simplecov text merge restart send dontsend))
 
 
 (defvar undercover-force-coverage)
@@ -90,8 +90,8 @@ option `--undercover' (`-u') of command `test' to easily change
 this.  Value of the option must be a comma and/or space-separated
 list of any of the following flags:
 
-  - `auto' (default), `always', `never': whether to collect
-    coverage statistics and generate a report;
+  - `auto' (default), `on' (or `always'), `off' (or `never'):
+    whether to collect coverage statistics and generate a report;
 
   - `coveralls' (default), `simplecov', `text': format of the
     generated report;
@@ -120,7 +120,8 @@ each other:
     `simplecov' format, `.txt' or `.text' for a text report;
 
   - when requested format is not `coveralls', report is always
-    generated unless `auto' or `never' is specified explicitly.
+    generated unless `auto' or `off' (`never') is specified
+    explicitly.
 
 This special handling is aimed at reports created for local use,
 i.e. usually in `simplecov' format.  Default values are normally
@@ -136,7 +137,8 @@ continuous integration services."
         dontsend)
     (dolist (flag (append plugin-configuration (eldev-listify eldev-undercover-config)))
       (eldev-pcase-exhaustive flag
-        ((or `auto `always `never)        (setf mode     flag))
+        ((or `auto `on `off)              (setf mode     flag))
+        ((or `always `never)              (setf mode     (if (eq flag 'always) 'on 'off)))
         ((or `coveralls `simplecov `text) (setf format   flag))
         ((or `merge `restart)             (setf merge    (eq flag 'merge)))
         ((or `send `dontsend)             (setf dontsend (eq flag 'dontsend)))
@@ -149,7 +151,7 @@ continuous integration services."
         (setf format (cond ((string-suffix-p ".json" file)                                    'simplecov)
                            ((or (string-suffix-p ".txt" file) (string-suffix-p ".text" file)) 'text))))
       (unless (or mode (memq format '(nil coveralls)))
-        (setf mode 'always)))
+        (setf mode 'on)))
     ;; Return value is a cons of two lists: a plist for internal use and for use as
     ;; `undercover' library's configuration.
     `((:mode ,(or mode 'auto) :merge ,merge)
@@ -193,7 +195,7 @@ plugin documentation for more information."
   ;; absolute pathnames below.
   (let* ((configuration (eldev--undercover-config configuration))
          (mode          (plist-get (car configuration) :mode)))
-    (cond ((eq mode 'never)
+    (cond ((eq mode 'off)
            (eldev-trace "Disabled `undercover' coverage report generation"))
           ((not (memq eldev-project-loading-mode '(nil as-is source built-source)))
            ;; It looks like Emacs loads source files when they have load handlers, even if
@@ -201,7 +203,7 @@ plugin documentation for more information."
            ;; any of the byte-compiling loading modes are requested: plugin is secondary
            ;; and shouldn't change the mode.  On the bright side, we don't need to care if
            ;; files are byte-compiled when using `as-is' mode with `undercover'.
-           (if (eq mode 'always)
+           (if (eq mode 'on)
                (eldev-warn "Cannot collect coverage information from byte-compiled files; plugin `undercover' will not be enabled")
              (eldev-trace "Not activating plugin `undercover' since the project is in a byte-compiled loading mode")))
           (t
