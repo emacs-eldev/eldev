@@ -1318,7 +1318,7 @@ Since 0.2."
                 (let* ((resolved (eldev--resolve-package-archive archive))
                        (existing (assoc (car resolved) package-archives)))
                   (if existing
-                      (unless (equal (cdr archive) (cdr existing))
+                      (unless (equal (cdr resolved) (cdr existing))
                         (error "Conflicting URLs for package archive `%s': `%s' and `%s'" (car archive) (cdr existing) (cdr archive)))
                     (let ((eldev-verbosity-level nil))
                       ;; Adding archives like this to benefit from default priorities.

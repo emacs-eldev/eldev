@@ -1,0 +1,2 @@
+(eldev-use-package-archive 'melpa-stable)
+(setq eldev-test-framework 'buttercup)
