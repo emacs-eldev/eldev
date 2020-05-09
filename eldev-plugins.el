@@ -242,7 +242,11 @@ plugin documentation for more information."
                    ;; `eldev-advised' here would not be enough.
                    (advice-add 'undercover-report :around (lambda (original &rest etc)
                                                             (when (boundp 'undercover--report-file-path)
-                                                              (eldev-verbose "Saving `undercover' report to file `%s'..." undercover--report-file-path))
+                                                              (eldev-verbose "Saving `undercover' report to file `%s'..." undercover--report-file-path)
+                                                              ;; `undercover' will fail if file is in a non-existing directory.
+                                                              (let ((dir (file-name-directory undercover--report-file-path)))
+                                                                (when dir
+                                                                  (make-directory dir t))))
                                                             (eldev-output-reroute-messages
                                                               (let ((eldev-message-rerouting-wrapper #'eldev-verbose))
                                                                 (apply original etc)))))
