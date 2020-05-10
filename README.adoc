@@ -35,6 +35,7 @@ endif::[]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
 :since-0-3: image:https://img.shields.io/badge/since-0.3-8be[Since 0.3,float=right]
+:since-0-3-2: image:https://img.shields.io/badge/since-0.3.2-8be[Since 0.3.2,float=right]
 
 = Eldev
 
@@ -1413,7 +1414,14 @@ space-separated list of any of the following flags:
 
     whether to send the generated report to
     {uri-coveralls}[coveralls.io] (only for the suitable format);
-    default is to send.
+    default is to send;
+
+{since-0-3-2} `safe`, `force`::
+
+    whether to run `undercover` even if the plugin detects it likely
+    won't work on this Emacs version (as of May 10th 2020 the tool
+    https://github.com/undercover-el/undercover.el/pull/57[doesn’t
+    work on Emacs 27]); default is to behave safely.
 
 Additionally, when `eldev-dwim` is non-nil, certain flags can affect
 each other:
