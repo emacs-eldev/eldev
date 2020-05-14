@@ -1338,7 +1338,7 @@ Since 0.2."
               (with-current-buffer (generate-new-buffer (format " *%s" url))
                 (insert-file-contents-literally cache-path)
                 ;; Hacks!
-                (require 'url-http)
+                (eval-and-compile (require 'url-http))
                 (set (make-local-variable 'url-http-end-of-headers) (point-max))
                 (make-local-variable 'url-http-response-version)
                 (make-local-variable 'url-http-response-status)
