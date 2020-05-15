@@ -1195,6 +1195,13 @@ avoiding repeated HTTP(S) queries to remote package archives to
 retrieve dependency packages and common tools such as testing
 frameworks or linters.")
 
+(defvar eldev-global-cache-archive-contents-max-age 1.0
+  "Expire cached `archive-contents' files after this timeout.
+Value should be a number of hours, possibly fractional.  Negative
+numbers mean to never use cache for `archive-contents'.  If the
+value is nil, never redownload the file (except for `upgrade' or
+`upgrade-self' command).")
+
 
 (eldev-defcommand eldev-prepare (&rest parameters)
   "Explicitly install project dependencies.
@@ -1325,13 +1332,15 @@ Since 0.2."
         (if cache-path
             ;; Modification time; mnemonic-name functions are too new.
             (let ((modification-time (nth 5 (file-attributes cache-path)))
-                  ;; `archive-contents' is cached for one hour only.
-                  ;; FIXME: May want to make this customizable.
-                  (max-age (when (member filename '("archive-contents" "archive-contents.sig")) 3600))
+                  (max-age           (when (member filename '("archive-contents" "archive-contents.sig"))
+                                       eldev-global-cache-archive-contents-max-age))
                   cached)
               (cond ((null modification-time)
                      (eldev-trace "File `%s' is not cached, retrieving..." url))
-                    ((and max-age (> (- (- (float-time) (float-time modification-time))) max-age))
+                    ((and max-age (<= max-age 0))
+                     (eldev-trace "Updating cached file `%s'..." url))
+                    ;; `max-age' is in hours.
+                    ((and max-age (> (- (float-time) (float-time modification-time)) (* max-age 3600)))
                      (eldev-trace "File `%s' is cached, but is too old, refreshing..." url))
                     (t
                      (eldev-trace "Using file `%s' from the global cache..." url)
@@ -1355,7 +1364,7 @@ Since 0.2."
                       (write-region nil nil cache-path))
                     ;; Discard any cached signatures.
                     (unless (string-suffix-p ".sig" filename)
-                      (ignore-errors (delete-file (concat filename ".sig")))))
+                      (ignore-errors (delete-file (concat cache-path ".sig")))))
                   buffer)))
           (eldev-trace "Accessing unexpected URL `%s': not caching" url)
           (apply original url arguments)))
@@ -1676,9 +1685,10 @@ Since 0.2."
       (eldev-verbose "Fetching contents of %s..." (eldev-message-enumerate "package archive" unfetched-archives #'car))
       ;; See comments in `eldev-cli'.
       (eval-and-compile (require 'gnutls))
-      (let ((eldev-message-rerouting-destination :stderr)
-            (package-archives                    unfetched-archives)
-            (inhibit-message                     t)
+      (let ((eldev-message-rerouting-destination         :stderr)
+            (eldev-global-cache-archive-contents-max-age (if refetch-contents -1 eldev-global-cache-archive-contents-max-age))
+            (package-archives                            unfetched-archives)
+            (inhibit-message                             t)
             ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8 and
             ;; https://github.com/magit/ghub/pull/90/files.  Basically, this is a
             ;; workaround for a bug in older Emacs versions for TLS1.3 support, but it can
