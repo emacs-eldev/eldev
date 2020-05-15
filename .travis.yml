@@ -42,7 +42,8 @@ script:
                               (unless (and (byte-compile-file \"eldev-util.el\")
                                            (byte-compile-file \"eldev.el\")
                                            (byte-compile-file \"eldev-ert.el\")
-                                           (byte-compile-file \"eldev-buttercup.el\"))
+                                           (byte-compile-file \"eldev-buttercup.el\")
+                                           (byte-compile-file \"eldev-plugins.el\"))
                                 (kill-emacs 1))))"
   # Ensure that our tests can be compiled cleanly: warnings might
   # indicate something is wrong with the test.  Here we can already
