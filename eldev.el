@@ -2490,6 +2490,14 @@ selectors (e.g. ERT's `:new')."
   (eldev-find-files (format "./%s/test-results.*" (file-relative-name (eldev-cache-dir t) eldev-project-dir))))
 
 
+(eldev-defcleaner eldev-cleaner-global-cache ()
+  "Delete Eldev's global package archive cache directory.  This
+doesn't affect any projects, but if Eldev has to prepare a new
+project (or an existing project for a different Emacs version),
+it will have to redownload all dependency packages."
+  (eldev-global-package-archive-cache-dir))
+
+
 ;; Internal helper for `eldev-deftestrunner'.
 (defun eldev--register-test-runner (runner name keywords)
   (while keywords
