@@ -11,7 +11,14 @@
   ;; Skip `project-b': it intentionally includes an erroneous regexp.
   (let ((eldev--test-project "project-c"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(advice-add 'url-retrieve-synchronously :override (lambda (&rest _) (error \"fail!\")))"
+    ;; Don't assume `url-retrieve-synchronously' is always called with
+    ;; global cache lookup enabled: e.g. look for `bad-signature' in
+    ;; the source code.
+    (eldev--test-run nil ("--setup" (prin1-to-string '(advice-add 'url-retrieve-synchronously :around
+                                                                  (lambda (original &rest arguments)
+                                                                    (if (advice-member-p #'eldev--global-cache-url-retrieve-synchronously #'url-retrieve-synchronously)
+                                                                        (error "fail!")
+                                                                      (apply original arguments)))))
                           "lint" "re")
       (should (= exit-code 0)))))
 
