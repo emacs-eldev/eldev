@@ -23,25 +23,25 @@
        (should (string-suffix-p (eldev--test-lines package-file "generated") stdout))
        (should (= exit-code 0)))
      (let (descriptor)
-       (eldev--test-run nil ("exec" "(prin1 (eldev-package-descriptor))")
+       (eldev--test-run nil ("exec" `(prin1 (eldev-package-descriptor)))
          (should (= exit-code 0))
          (setf descriptor (read stdout)))
        (ignore-errors (delete-directory test-emacs-dir t))
        (eldev--test-call-process "Emacs" eldev-emacs-executable
                                  ("--batch" "--no-site-file" "--no-site-lisp" "--execute"
-                                  (prin1-to-string `(progn
-                                                      (require 'package)
-                                                      (let ((package-user-dir ,test-emacs-dir)
-                                                            ;; Just use all we have, no need to
-                                                            ;; tailor for each test specifically.
-                                                            (package-archives '(("archive-a" . ,(expand-file-name "package-archive-a/" (eldev--test-dir)))
-                                                                                ("archive-b" . ,(expand-file-name "package-archive-b/" (eldev--test-dir))))))
-                                                        (package-initialize t)
-                                                        (package-refresh-contents)
-                                                        (package-install-file ,package-file)
-                                                        (package-activate ',(package-desc-name descriptor))
-                                                        (prin1 (cadr (assq ',(package-desc-name descriptor) package-alist)))
-                                                        ,',child-emacs-form))))
+                                  `(progn
+                                     (require 'package)
+                                     (let ((package-user-dir ,test-emacs-dir)
+                                           ;; Just use all we have, no need to
+                                           ;; tailor for each test specifically.
+                                           (package-archives '(("archive-a" . ,(expand-file-name "package-archive-a/" (eldev--test-dir)))
+                                                               ("archive-b" . ,(expand-file-name "package-archive-b/" (eldev--test-dir))))))
+                                       (package-initialize t)
+                                       (package-refresh-contents)
+                                       (package-install-file ,package-file)
+                                       (package-activate ',(package-desc-name descriptor))
+                                       (prin1 (cadr (assq ',(package-desc-name descriptor) package-alist)))
+                                       ,',child-emacs-form)))
          (should (= exit-code 0))
          ;; Cannot compare just like that.
          (let ((installed-desciptor (read stdout)))

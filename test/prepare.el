@@ -31,22 +31,22 @@
 (ert-deftest eldev-prepare-project-available-1 ()
   (let ((eldev--test-project "dependency-a"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(eldev-use-package-archive `(\"archive-a\" . ,(expand-file-name \"../package-archive-a\")))"
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
                           "prepare")
       (should (= exit-code 0)))
     ;; This is to make sure that `prepare' hasn't screwed up, but
     ;; claimed success.
-    (eldev--test-run nil ("eval" "0")
+    (eldev--test-run nil ("eval" `0)
       (should (= exit-code 0)))))
 
 ;; Same as above, but a _newer_ version is available from the archive.
 (ert-deftest eldev-prepare-project-available-2 ()
   (let ((eldev--test-project "dependency-a"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" "(eldev-use-package-archive `(\"archive-b\" . ,(expand-file-name \"../package-archive-b\")))"
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-b" . ,(expand-file-name "../package-archive-b")))
                           "prepare")
       (should (= exit-code 0)))
-    (eldev--test-run nil ("eval" "0")
+    (eldev--test-run nil ("eval" `0)
       (should (= exit-code 0)))))
 
 

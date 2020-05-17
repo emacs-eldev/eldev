@@ -25,13 +25,14 @@
     (eldev--test-run nil ("version")
       (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))
-    (eldev--test-run nil ("eval" "(byte-code-function-p (symbol-function 'eldev-cli))")
+    (eldev--test-run nil ("eval" `(byte-code-function-p (symbol-function 'eldev-cli)))
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-command-hook-1 ()
   ;; Just make sure that the hook is executed.
-  (eldev--test-run "empty-project" ("--setup" (prin1-to-string '(add-hook 'eldev-help-hook (lambda () (error "fail!")))) "help")
+  (eldev--test-run "empty-project" ("--setup" `(add-hook 'eldev-help-hook (lambda () (error "fail!"))) "help")
+    (should (string-match-p (rx "fail!") stderr))
     (should (= exit-code 1))))
 
 

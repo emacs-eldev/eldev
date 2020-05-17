@@ -24,7 +24,7 @@
 
 (defmacro eldev--test-linting (test-project linter-archive command-line &rest body)
   (declare (indent 3) (debug (stringp sexp sexp body)))
-  `(eldev--test-run ,test-project ("--setup" ,(prin1-to-string (eldev--test-dummy-linter linter-archive)) ,@command-line)
+  `(eldev--test-run ,test-project ("--setup" ',(eldev--test-dummy-linter linter-archive) ,@command-line)
      ,@body))
 
 

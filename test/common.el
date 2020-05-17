@@ -32,22 +32,24 @@
 
 (defmacro eldev--test-call-process (program-name executable command-line &rest body)
   (declare (indent 3) (debug (sexp body)))
-  (let ((no-errors (make-symbol "$no-errors")))
+  (let ((prepared-command-line (make-symbol "$prepared-command-line"))
+        (no-errors             (make-symbol "$no-errors")))
     `(with-temp-buffer
        (let ((stderr-file (make-temp-file "eldev-stderr-")))
          (unwind-protect
-             (let* ((exit-code (call-process ,executable nil (list (current-buffer) stderr-file) nil ,@command-line))
-                    (stdout    (buffer-string))
-                    (stderr    (with-temp-buffer
-                                 (insert-file-contents stderr-file)
-                                 (buffer-string)))
+             (let* ((prepared-command-line (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) (list ,@command-line)))
+                    (exit-code             (apply #'call-process ,executable nil (list (current-buffer) stderr-file) nil prepared-command-line))
+                    (stdout                (buffer-string))
+                    (stderr                (with-temp-buffer
+                                             (insert-file-contents stderr-file)
+                                             (buffer-string)))
                     ,no-errors)
                (goto-char 1)
                (unwind-protect
                    (prog1 (progn ,@body)
                      (setf ,no-errors t))
                  (unless ,no-errors
-                   (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (mapconcat #'eldev-quote-sh-string (list ,executable ,@command-line) " ") default-directory)
+                   (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (mapconcat #'eldev-quote-sh-string (cons ,executable prepared-command-line) " ") default-directory)
                    (eldev-warn "Stdout contents:\n%s" (eldev-colorize stdout 'verbose))
                    (unless (string= stderr "")
                      (eldev-warn "Stderr contents:\n%s" (eldev-colorize stderr 'verbose)))
@@ -183,10 +185,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (let ((archive-dir (eldev--test-tmp-subdir archive-name)))
     (ignore-errors (delete-directory archive-dir t))
     (if forced-version
-        (eldev--test-run ".." ("--setup" (prin1-to-string `(setf eldev-dist-dir ,archive-dir))
+        (eldev--test-run ".." ("--setup" `(setf eldev-dist-dir ,archive-dir)
                                "package" "--entry-file" "--force-version" forced-version)
           (should (= exit-code 0)))
-      (eldev--test-run ".." ("--setup" (prin1-to-string `(setf eldev-dist-dir ,archive-dir))
+      (eldev--test-run ".." ("--setup" `(setf eldev-dist-dir ,archive-dir)
                              "package" "--entry-file")
         (should (= exit-code 0))))
     (with-temp-file (expand-file-name "archive-contents" archive-dir)

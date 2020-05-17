@@ -25,7 +25,7 @@
       (eldev--test-run nil ("version")
         (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-package-descriptor)))))
         (should (= exit-code 0)))
-      (eldev--test-run nil ("eval" "(byte-code-function-p (symbol-function 'eldev-cli))")
+      (eldev--test-run nil ("eval" `(byte-code-function-p (symbol-function 'eldev-cli)))
         (should (string= stdout "t\n"))
         (should (= exit-code 0))))))
 

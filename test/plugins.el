@@ -15,12 +15,12 @@
   ;; It's fine to activate the plugin like this in a non-integration
   ;; test: it won't download third-party packages if command `test' is
   ;; not used.
-  (eldev--test-run "trivial-project" ("--setup" "(eldev-use-plugin 'undercover)" "plugins")
+  (eldev--test-run "trivial-project" ("--setup" `(eldev-use-plugin 'undercover) "plugins")
     (should (string-prefix-p "undercover" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-plugins-4 ()
-  (eldev--test-run "trivial-project" ("--setup" "(eldev-use-plugin 'undercover)" "--quiet" "plugins")
+  (eldev--test-run "trivial-project" ("--setup" `(eldev-use-plugin 'undercover) "--quiet" "plugins")
     (should (string= stdout "undercover\n"))
     (should (= exit-code 0))))
 

@@ -3,7 +3,7 @@
 
 (defmacro eldev--test-require-version (test-project command-line succeeds &rest body)
   (declare (indent 3) (debug (stringp sexp booleanp body)))
-  `(eldev--test-run ,test-project ("--setup" "(eldev-require-version \"999.9\")" ,@command-line)
+  `(eldev--test-run ,test-project ("--setup" `(eldev-require-version "999.9") ,@command-line)
      ,@(if succeeds
           `((should (= exit-code 0)))
         `((should (= exit-code 1))
