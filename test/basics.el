@@ -36,4 +36,41 @@
     (should (= exit-code 1))))
 
 
+(defmacro eldev--test-no-littering (command-line &rest body)
+  (declare (indent 1))
+  `(let ((eldev--test-project "empty-project"))
+     (eldev--test-delete-cache)
+     (eldev--test-run nil ,command-line
+       ,@body
+       (should (not (file-exists-p (eldev--test-project-cache-dir)))))))
+
+
+;; Make sure that `.eldev' is not created when not really needed.
+
+(ert-deftest eldev-no-littering-1 ()
+  (eldev--test-no-littering ()
+    (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-capture-output (eldev-usage))) stdout))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-no-littering-2 ()
+  (eldev--test-no-littering ("help")
+    (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-first-line (eldev--test-capture-output (eldev-help))))
+                             stdout))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-no-littering-3 ()
+  (eldev--test-no-littering ("--quiet" "version" "eldev" "emacs")
+    (should (string= stdout (eldev--test-lines (eldev-message-version (eldev-find-package-descriptor 'eldev)) emacs-version)))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-no-littering-4 ()
+  (eldev--test-no-littering ("info")
+    (should (= exit-code 1))))
+
+(ert-deftest eldev-no-littering-5 ()
+  ;; This should obviously fail in a non-project directory.
+  (eldev--test-no-littering ("compile")
+    (should (= exit-code 1))))
+
+
 (provide 'test/basics)

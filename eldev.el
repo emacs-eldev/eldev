@@ -596,9 +596,10 @@ Since 0.2.1.")
 Used by Eldev startup script."
   (setf package-user-dir     (expand-file-name "packages" (eldev-cache-dir t))
         package-archives     nil
-        ;; Intentionally not called `.emacs.d' as an additional test for projects.
-        user-emacs-directory (file-name-as-directory (expand-file-name "emacs-dir" (eldev-cache-dir t))))
-  (make-directory user-emacs-directory t))
+        user-emacs-directory (eldev-user-emacs-dir))
+  ;; The idea of postponing directory creation is to avoid littering random directories
+  ;; with `.eldev' in case Eldev is executed there by error, for example.
+  (add-hook 'eldev--project-validated-hook (lambda () (eldev-user-emacs-dir t))))
 
 (defun eldev-cli (command-line)
   "Eldev entry point."
@@ -816,6 +817,13 @@ exist yet."
     (when ensure-exists
       (make-directory cache-dir t))
     cache-dir))
+
+(defun eldev-user-emacs-dir (&optional ensure-exists)
+  ;; Intentionally not called `.emacs.d' as an additional test for projects.
+  (let ((emacs-dir (file-name-as-directory (expand-file-name "emacs-dir" (eldev-cache-dir t)))))
+    (when ensure-exists
+      (make-directory emacs-dir t))
+    emacs-dir))
 
 (defun eldev-dist-dir (&optional ensure-exists)
   "Get the directory where to generate package tarballs."

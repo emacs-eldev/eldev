@@ -777,6 +777,9 @@ Since 0.2.")
 
 (declare-function eldev--cross-project-internal-eval "eldev" (project-dir form &optional use-caching))
 
+(defvar eldev--project-validated nil)
+(defvar eldev--project-validated-hook nil)
+
 (defun eldev-package-descriptor (&optional project-dir skip-cache)
   "Return descriptor of the package in PROJECT-DIR.
 If PROJECT-DIR is not specified, use `eldev-project-dir', i.e.
@@ -796,6 +799,10 @@ return the descriptor of the project being built."
                                (eldev--package-dir-info))))))
       (unless skip-cache
         (push (cons project-dir descriptor) eldev--package-descriptors)))
+    (when (string= project-dir eldev-project-dir)
+      (unless eldev--project-validated
+        (run-hooks 'eldev--project-validated-hook)
+        (setf eldev--project-validated t)))
     descriptor))
 
 (defun eldev-find-package-descriptor (package-name &optional version only-if-activated)
