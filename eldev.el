@@ -2659,6 +2659,14 @@ Possible modes:
     to the end and then stop;
   - warning: immediately stop after the first warning.")
 
+(defvar eldev-lint-optional t
+  "Whether to fail on non-installable linters.
+Linters can have differing requirements and some may not be
+installable on older Emacs versions.  This option tells how to
+handle such situation: treat linters as optional (a warning is
+still printed) or fail as if non-installable linter issued an
+error.")
+
 
 (defvar eldev--linters nil)
 (defvar eldev--linter-aliases nil)
@@ -2746,7 +2754,9 @@ least one warning."
                 (eldev-verbose "Running linter `%s'..." linter)
                 (condition-case error
                     (funcall (cdr (assq canonical-name eldev--linters)))
-                  (eldev-missing-dependency (eldev-warn "%s; skipping linter `%s'" (eldev-extract-error-message error) linter)))
+                  (eldev-missing-dependency (if eldev-lint-optional
+                                                (eldev-warn "%s; skipping linter `%s'" (eldev-extract-error-message error) linter)
+                                              (signal 'eldev-error `("%s; cannot use linter `%s'" ,(eldev-extract-error-message error) ,linter)))))
                 (when (and (eq eldev-lint-stop-mode 'linter) eldev--lint-have-warnings)
                   (eldev-trace "Stopping after the linter that issued warnings")
                   (throw 'eldev--lint-stop nil)))))
@@ -2794,6 +2804,13 @@ least one warning."
   :for-command    lint
   :if-default     (eq eldev-lint-stop-mode 'warning)
   (setf eldev-lint-stop-mode 'warning))
+
+(eldev-defbooloptions eldev-lint-allow-skipping-linters eldev-lint-require-linters eldev-lint-optional
+  ("Skip linters that cannot be installed (e.g. because Emacs is too old)"
+   :options       (-O --optional))
+  ("Fail if a linter cannot be installed"
+   :options       (-R --required))
+  :for-command    lint)
 
 (eldev-defoption eldev-lint-list-linters ()
   "List known linters and exit"
