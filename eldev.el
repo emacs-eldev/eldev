@@ -1479,8 +1479,10 @@ Since 0.2."
                            (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
             (unless dry-run
               (let ((inhibit-message t))
-                (eldev-using-global-package-archive-cache
-                  (package-install-from-archive dependency)))))))
+                (eldev--with-pa-access-workarounds (lambda ()
+                                                     (eldev-using-global-package-archive-cache
+                                                       (package-install-from-archive dependency)))
+                                                   t))))))
       (if (> non-local-plan-size 0)
           (when (memq 'runtime (eldev-listify additional-sets))
             (eldev--save-installed-runtime-dependencies))
@@ -1692,37 +1694,42 @@ Since 0.2."
     (when unfetched-archives
       (eldev-verbose "Fetching contents of %s..." (eldev-message-enumerate "package archive" unfetched-archives #'car))
       ;; See comments in `eldev-cli'.
-      (eval-and-compile (require 'gnutls))
       (let ((eldev-message-rerouting-destination         :stderr)
             (eldev-global-cache-archive-contents-max-age (if refetch-contents -1 eldev-global-cache-archive-contents-max-age))
             (package-archives                            unfetched-archives)
-            (inhibit-message                             t)
-            ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8 and
-            ;; https://github.com/magit/ghub/pull/90/files.  Basically, this is a
-            ;; workaround for a bug in older Emacs versions for TLS1.3 support, but it can
-            ;; be activated only if GnuTLS is new enough to know about this TLS version.
-            (gnutls-algorithm-priority           (or gnutls-algorithm-priority
-                                                     (when (and (version<= emacs-version "26.2") (boundp 'libgnutls-version) (>= libgnutls-version 30603))
-                                                       "NORMAL:-VERS-TLS1.3"))))
-        (when (catch 'eldev--bad-signature
-                (eldev-advised ('package--download-one-archive :around
-                                                               (lambda (original &rest arguments)
-                                                                 (condition-case nil
-                                                                     (apply original arguments)
-                                                                   ;; If we don't convert it into a thrown tag, the error
-                                                                   ;; will be eaten in `package--download-and-read-archives'.
-                                                                   (bad-signature (throw 'eldev--bad-signature t)))))
-                  (eldev-using-global-package-archive-cache
-                    (package-refresh-contents)))
-                nil)
-          ;; This probably largely defeats the purpose of signatures, but it is basically
-          ;; what `gnu-elpa-keyring-update' itself proposes (only perhaps not in automated
-          ;; way).
-          (eldev-trace "Installing package `gnu-elpa-keyring-update' to hopefully solve `bad-signature' problem...")
-          (let ((package-check-signature nil))
-            (eldev-using-global-package-archive-cache
-              (package-refresh-contents))
-            (package-install 'gnu-elpa-keyring-update)))))))
+            (inhibit-message                             t))
+        (eldev--with-pa-access-workarounds (lambda ()
+                                             (eldev-using-global-package-archive-cache
+                                               (package-refresh-contents))))))))
+
+(defun eldev--with-pa-access-workarounds (callback &optional call-after-working-around)
+  (eval-and-compile (require 'gnutls))
+  ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=36749#8 and
+  ;; https://github.com/magit/ghub/pull/90/files.  Basically, this is a workaround for a
+  ;; bug in older Emacs versions for TLS1.3 support, but it can be activated only if
+  ;; GnuTLS is new enough to know about this TLS version.
+  (let ((gnutls-algorithm-priority (or gnutls-algorithm-priority
+                                       (when (and (version<= emacs-version "26.2") (boundp 'libgnutls-version) (>= libgnutls-version 30603))
+                                         "NORMAL:-VERS-TLS1.3"))))
+    (when (catch 'eldev--bad-signature
+            (eldev-advised ('package--check-signature-content :around
+                                                              (lambda (original &rest arguments)
+                                                                (condition-case nil
+                                                                    (apply original arguments)
+                                                                  ;; If we don't convert it into a thrown tag, the error will be
+                                                                  ;; eaten e.g. in `package--download-and-read-archives'.
+                                                                  (bad-signature (throw 'eldev--bad-signature t)))))
+              (funcall callback))
+            nil)
+      ;; This probably largely defeats the purpose of signatures, but it is basically what
+      ;; `gnu-elpa-keyring-update' itself proposes (only perhaps not in an automated way).
+      (eldev-trace "Installing package `gnu-elpa-keyring-update' to hopefully solve `bad-signature' problem...")
+      (let ((package-check-signature nil))
+        (eldev-using-global-package-archive-cache
+          (package-refresh-contents))
+        (package-install 'gnu-elpa-keyring-update))
+      (when call-after-working-around
+        (funcall callback)))))
 
 (defun eldev--loading-mode (dependency)
   "Get loading mode of package DEPENDENCY.
