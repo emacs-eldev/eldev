@@ -747,7 +747,10 @@ Since 0.2.")
 ;; Compatibility function.
 (defun eldev--package-dir-info ()
   (if (fboundp #'package-dir-info)
-      (package-dir-info)
+      ;; Work around an Emacs 25 incompatibility: it would return nil
+      ;; where later versions would fail with an error.
+      (or (package-dir-info)
+          (error "No .el files with package headers in `%s'" default-directory))
     ;; Not available on Emacs 24.  Copied from a recent Emacs source.
     (let* ((desc-file (package--description-file default-directory)))
       (if (file-readable-p desc-file)
