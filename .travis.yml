@@ -3,30 +3,45 @@
 #
 #     https://github.com/doublep/eldev#travis-ci
 
-language: emacs-lisp
-dist: trusty
-
-install:
-  - sudo apt-get -y install texinfo
-  - git clone https://github.com/rejeep/evm.git /home/travis/.evm
-  - export PATH="/home/travis/.evm/bin:$PATH"
-  - evm config path /tmp
-  - evm install $EVM_EMACS --use
-
-env:
-  - EVM_EMACS=emacs-24.4-travis
-  - EVM_EMACS=emacs-24.5-travis
-  - EVM_EMACS=emacs-25.1-travis
-  - EVM_EMACS=emacs-25.2-travis
-  - EVM_EMACS=emacs-25.3-travis
-  - EVM_EMACS=emacs-26.1-travis
-  - EVM_EMACS=emacs-26.2-travis
-  - EVM_EMACS=emacs-26.3-travis
-  - EVM_EMACS=emacs-git-snapshot-travis
+language: nix
 
 jobs:
+  include:
+    - os: linux
+      env: EMACS_CI=emacs-24-4
+    - os: linux
+      env: EMACS_CI=emacs-24-5
+    - os: linux
+      env: EMACS_CI=emacs-25-1
+    - os: linux
+      env: EMACS_CI=emacs-25-2
+    - os: linux
+      env: EMACS_CI=emacs-25-3
+    - os: linux
+      env: EMACS_CI=emacs-26-1
+    - os: linux
+      env: EMACS_CI=emacs-26-2
+    - os: linux
+      env: EMACS_CI=emacs-26-3
+    - os: linux
+      env: EMACS_CI=emacs-snapshot
+
+    - os: osx
+      env: EMACS_CI=emacs-26-3
+    - os: osx
+      env: EMACS_CI=emacs-snapshot
+
   allow_failures:
-    - env: EVM_EMACS=emacs-git-snapshot-travis
+    - env: EMACS_CI=emacs-snapshot
+
+addons:
+  apt:
+    packages: texinfo
+  homebrew:
+    packages: texinfo
+
+install:
+  - bash <(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
 
 script:
   - ELDEV_LOCAL=. ./bin/eldev -p -dtT test --omit-backtraces --expect 200

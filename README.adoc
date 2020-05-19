@@ -42,7 +42,7 @@ endif::[]
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
 image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
 image:http://stable.melpa.org/packages/eldev-badge.svg[Melpa Stable, link=http://stable.melpa.org/#/eldev]
-image:https://api.travis-ci.org/doublep/eldev.svg[Build status, link=https://travis-ci.org/doublep/eldev]
+image:https://api.travis-ci.com/doublep/eldev.svg[Build status, link=https://travis-ci.com/doublep/eldev]
 
 Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
 solely at Elisp projects.  It is an alternative to Cask.  Unlike Cask,
@@ -130,9 +130,10 @@ of files `Eldev` in these projects are documented below.
 Eldev runs on Emacs 24.4 and up.  On earlier Emacs versions it will be
 overly verbose, but this is rather an Emacs problem.
 
-Linux or other POSIX-like system is currently required.  However,
-since there is only a small shell script that is really OS-dependent,
-porting to other systems should not be difficult (volunteers welcome).
+Linux, macOS or other POSIX-like system is currently required.
+However, since there is only a small shell script that is really
+OS-dependent, porting to other systems should not be difficult
+(volunteers welcome).
 
 Eldev intentionally has no dependencies, at least currently: otherwise
 your project would also see them, which could in theory lead to some
@@ -1183,9 +1184,10 @@ are tools that can be used for this: at least {uri-evm}[EVM] and
 
 One of the tools to install Emacs is {uri-evm}[EVM].  Steve Purcell
 (the author of `nix-emacs-ci`) mentions “various issues” he has had
-with it, however Eldev itself and many other projects use it.
-Apparently, you need to fix Ubuntu distribution used at Travis CI to
-Trusty for EVM-provided binaries.
+with it, however many projects use it.  Apparently, you need to fix
+Ubuntu distribution used at Travis CI to Trusty for EVM-provided
+binaries.  Also note that EVM provides binaries only for Linux, so if
+you want test on macOS too, `nix-emacs-ci` is a better choice.
 
 If you also want to try it, Eldev provides a simple script
 specifically for use on Travis CI that installs Eldev and EVM in one
@@ -1212,9 +1214,10 @@ script:
 
 A newer tool to install Emacs is {uri-nix-emacs}[nix-emacs-ci].  Using
 it is easy: define environment variable `$EMACS_CI` with the desired
-Emacs version and `curl` a single shell script.  With one more line
-you can also install Eldev.  It appears to be slower than EVM, but for
-continuous integration that’s not terribly important.
+Emacs version and `curl` a single shell script — whether on Linux or
+macOS.  With one more line you can also install Eldev.  It appears to
+be slower than EVM, but for continuous integration that’s not terribly
+important.
 
 A basic `.travis.yml` would look like this:
 
