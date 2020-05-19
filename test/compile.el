@@ -1,6 +1,18 @@
 (require 'test/common)
 
 
+(defun eldev--test-compile-pretend-source-is-changed (el-file &optional test-project)
+  (let* ((el-file  (expand-file-name el-file (eldev--test-project-dir test-project)))
+         (elc-file (concat el-file "c")))
+    (while (progn (set-file-times el-file)
+                  (not (file-newer-than-file-p el-file elc-file)))
+      ;; Apparently if OS time granularity is large enough, we can set
+      ;; `.el' modification time equal to that of `.elc', not newer.
+      ;; Working with time in Elisp is a fucking nightmare, let's just
+      ;; sleep instead.
+      (sleep-for 0.1))))
+
+
 (ert-deftest eldev-compile-everything-1 ()
   (eldev--test-without-files "trivial-project" "trivial-project.elc"
     (eldev--test-run nil ("compile")
@@ -80,7 +92,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (set-file-times (expand-file-name "project-d-misc.el" project-dir))
+    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile")
       ;; `project-d.elc' must be recompiled because of dependency.
       (eldev--test-assert-building stdout '("project-d.el" "project-d-misc.el"))
@@ -91,7 +103,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (set-file-times (expand-file-name "project-d-misc.el" project-dir))
+    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d.el")
       ;; `project-d.elc' must be recompiled because of dependency.
       ;; However, it is not needed to recompile `project-d-misc.el'.
@@ -103,7 +115,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (set-file-times (expand-file-name "project-d-misc.el" project-dir))
+    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d-misc.el")
       (eldev--test-assert-building stdout '("project-d-misc.el"))
       (should (= exit-code 0)))))
@@ -113,7 +125,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (set-file-times (expand-file-name "project-d-misc.el" project-dir))
+    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d-util.el")
       (should (string= stdout "Nothing to do\n"))
       (should (= exit-code 0)))))
