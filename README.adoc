@@ -36,6 +36,7 @@ endif::[]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
 :since-0-3: image:https://img.shields.io/badge/since-0.3-8be[Since 0.3,float=right]
 :since-0-3-2: image:https://img.shields.io/badge/since-0.3.2-8be[Since 0.3.2,float=right]
+:since-0-4: image:https://img.shields.io/badge/since-0.4-8be[Since 0.4,float=right]
 
 = Eldev
 
@@ -492,6 +493,27 @@ You can also check what Eldev would upgrade without actually upgrading
 anything:
 
     $ eldev upgrade --dry-run
+
+=== Global package archive cache
+
+{since-0-4} To avoid downloading the same packages repeatedly, Eldev
+employs a package archive cache.  This cache is shared between all
+projects and <<different-emacs-versions,all Emacs versions>> on your
+machine.  It can significantly speed up package preparation if you use
+a new project, test it on another Emacs version or delete
+project-specific cache (subdirectory `.eldev`) for whatever reason.
+
+By default, downloaded packages stay cached indefinitely, while
+archive contents expires in one hour.  However, if you use command
+`upgrade` or `upgrade-self`, package archive contents is always
+refreshed.
+
+Cache usage is not controllable from command line.  However, you can
+customize it somewhat in `~/.eldev/config`.  Variable
+`eldev-enable-global-package-archive-cache` lets you disable the
+global cache outright.  Using
+`eldev-global-cache-archive-contents-max-age` you can adjust how long
+cached copies of `archive-contents` stay valid.
 
 
 [#loading-modes]
