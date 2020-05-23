@@ -33,7 +33,11 @@
 (defmacro eldev--test-call-process (program-name executable command-line &rest body)
   (declare (indent 3) (debug (sexp body)))
   (let ((prepared-command-line (make-symbol "$prepared-command-line"))
-        (no-errors             (make-symbol "$no-errors")))
+        (no-errors             (make-symbol "$no-errors"))
+        important-files)
+    (while (keywordp (car body))
+      (eldev-pcase-exhaustive (pop body)
+        (:important-files (setf important-files (eldev-listify (pop body))))))
     `(with-temp-buffer
        (let ((stderr-file (make-temp-file "eldev-stderr-")))
          (unwind-protect
@@ -53,7 +57,13 @@
                    (eldev-warn "Stdout contents:\n%s" (eldev-colorize stdout 'verbose))
                    (unless (string= stderr "")
                      (eldev-warn "Stderr contents:\n%s" (eldev-colorize stderr 'verbose)))
-                   (eldev-warn "Process exit code: %s" exit-code))))
+                   (eldev-warn "Process exit code: %s" exit-code)
+                   ,@(when important-files
+                       `((eldev-warn "Important files (oldest first):")
+                         (dolist (data (sort (mapcar (lambda (file) (cons file (nth 5 (file-attributes file)))) ',important-files)
+                                             (lambda (a b) (< (if (cdr a) (float-time (cdr a)) 0) (if (cdr b) (float-time (cdr b)) 0)))))
+                           ;; Not using `current-time-string' as not precise enough.
+                           (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing"))))))))
            (delete-file stderr-file))))))
 
 (defmacro eldev--test-run (test-project command-line &rest body)

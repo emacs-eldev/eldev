@@ -94,6 +94,7 @@
       (should (= exit-code 0)))
     (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile")
+      :important-files ("project-d-misc.el" "project-d-misc.elc" "project-d.elc")
       ;; `project-d.elc' must be recompiled because of dependency.
       (eldev--test-assert-building stdout '("project-d.el" "project-d-misc.el"))
       (should (= exit-code 0)))))
@@ -105,6 +106,7 @@
       (should (= exit-code 0)))
     (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d.el")
+      :important-files ("project-d-misc.el" "project-d.elc")
       ;; `project-d.elc' must be recompiled because of dependency.
       ;; However, it is not needed to recompile `project-d-misc.el'.
       (eldev--test-assert-building stdout '("project-d.el"))
@@ -117,6 +119,7 @@
       (should (= exit-code 0)))
     (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d-misc.el")
+      :important-files ("project-d-misc.el" "project-d-misc.elc")
       (eldev--test-assert-building stdout '("project-d-misc.el"))
       (should (= exit-code 0)))))
 
