@@ -540,7 +540,9 @@ human-readable errors if there are any problems."
                    (error (signal 'eldev-error `("When reading %s: %s" ,description ,(error-message-string error))))))
          (tail   (replace-regexp-in-string (rx (or (: bol (1+ whitespace)) (: (1+ whitespace) eol))) "" (substring string (cdr result)) t t)))
     (unless (= (length tail) 0)
-      (signal 'eldev-error `("Trailing garbage after the expression in %s: `%s'" ,description ,tail)))
+      (signal 'eldev-error (if (string-suffix-p "expression" description)
+                               `("Trailing garbage after the %s: `%s'" ,description ,tail)
+                             `("Trailing garbage after the expression in %s: `%s'" ,description ,tail))))
     (car result)))
 
 
