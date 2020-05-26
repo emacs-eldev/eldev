@@ -748,16 +748,20 @@ Since 0.2.")
 
 ;; Compatibility function.
 (defun eldev--package-dir-info ()
-  (if (fboundp #'package-dir-info)
-      ;; Work around an Emacs 25 incompatibility: it would return nil
-      ;; where later versions would fail with an error.
-      (or (package-dir-info)
-          (error "No .el files with package headers in `%s'" default-directory))
-    ;; Not available on Emacs 24.  Copied from a recent Emacs source.
-    (let* ((desc-file (package--description-file default-directory)))
-      (if (file-readable-p desc-file)
-          (with-temp-buffer
-            (insert-file-contents desc-file)
+  ;; Workaround: `package-dir-info' can fail if the directory contains an unreadable file:
+  ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=41489
+  (eldev-advised (#'insert-file-contents :around (lambda (original &rest arguments)
+                                                   (ignore-errors (apply original arguments))))
+    (if (fboundp #'package-dir-info)
+        ;; Work around an Emacs 25 incompatibility: it would return nil
+        ;; where later versions would fail with an error.
+        (or (package-dir-info)
+            (error "No .el files with package headers in `%s'" default-directory))
+      ;; Not available on Emacs 24.  Copied from a recent Emacs source.
+      (let* ((desc-file (package--description-file default-directory)))
+        (if (file-readable-p desc-file)
+            (with-temp-buffer
+              (insert-file-contents desc-file)
               (goto-char (point-min))
               (unwind-protect
                   (let* ((pkg-def-parsed (read (current-buffer)))
@@ -768,17 +772,17 @@ Since 0.2.")
                     (when pkg-desc
                       (setf (package-desc-kind pkg-desc) 'dir)
                       pkg-desc))))
-        (let ((files (directory-files default-directory t "\\.el\\'" t))
-              info)
-          (while files
-            (with-temp-buffer
-              (insert-file-contents (pop files))
-              (when (setq info (ignore-errors (package-buffer-info)))
-                (setq files nil)
-                (setf (package-desc-kind info) 'dir))))
-          (unless info
-            (error "No .el files with package headers in `%s'" default-directory))
-          info)))))
+          (let ((files (directory-files default-directory t "\\.el\\'" t))
+                info)
+            (while files
+              (with-temp-buffer
+                (insert-file-contents (pop files))
+                (when (setq info (ignore-errors (package-buffer-info)))
+                  (setq files nil)
+                  (setf (package-desc-kind info) 'dir))))
+            (unless info
+              (error "No .el files with package headers in `%s'" default-directory))
+            info))))))
 
 (declare-function eldev--cross-project-internal-eval "eldev" (project-dir form &optional use-caching))
 

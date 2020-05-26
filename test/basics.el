@@ -36,6 +36,25 @@
     (should (= exit-code 1))))
 
 
+(ert-deftest eldev-unreadable-locks-1 ()
+  ;; Test that Eldev doesn't faint just because something in Emacs is
+  ;; not saved.  Note that the error is not always reproducible: it
+  ;; depends on unspecified order of result of `directory-files'
+  ;; function.
+  (let* ((eldev--test-project "project-a")
+         (el-file             (expand-file-name "project-a.el" (eldev--test-project-dir))))
+    (with-temp-buffer
+      (insert-file-contents el-file t)
+      (set-visited-file-name el-file t)
+      (should (file-locked-p el-file))
+      (unwind-protect
+          (eldev--test-run nil ("eval" "1")
+            (should (string= stdout "1\n"))
+            (should (= exit-code 0)))
+        (restore-buffer-modified-p nil)
+        (should (not (file-locked-p el-file)))))))
+
+
 (defmacro eldev--test-no-littering (command-line &rest body)
   (declare (indent 1))
   `(let ((eldev--test-project "empty-project"))
