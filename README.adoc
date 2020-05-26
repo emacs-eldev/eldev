@@ -10,6 +10,8 @@ ifdef::env-github[]
 :tip-caption: :bulb:
 endif::[]
 :uri-search-github: https://github.com/search?utf8=%E2%9C%93&q=filename%3AEldev+language%3A%22Emacs+Lisp%22&type=Code&ref=advsearch&l=Emacs+Lisp&l=
+:uri-flycheck: https://www.flycheck.org/
+:uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
 :uri-ert-sel: https://www.gnu.org/software/emacs/manual/html_node/ert/Test-Selectors.html
 :uri-buttercup: https://github.com/jorgenschaefer/emacs-buttercup
@@ -81,6 +83,11 @@ Drawbacks:
 * Eldev is a recent development and is {uri-search-github}[not widely
   used], so there can be bugs.  However, Eldev contains a reasonably
   large regression test collection, so it is not completely untested.
+
+TIP: If you are using {uri-flycheck}[Flycheck], check out
+{uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
+between Flycheck and Eldev, allowing the former to automatically use
+proper dependencies in Eldev projects.
 
 === Example projects
 
