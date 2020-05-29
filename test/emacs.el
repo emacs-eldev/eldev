@@ -44,5 +44,15 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
+(ert-deftest eldev-emacs-project-isolation-1 ()
+  (eldev--test-run "trivial-project" ("emacs" "--batch" "--eval" ` (princ user-emacs-directory))
+    (should (eldev--test-within-p (string-trim stdout) (eldev--test-project-dir)))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-emacs-project-isolation-2 ()
+  (eldev--test-run "trivial-project" ("emacs" "--batch" "--eval" `(progn (require 'package) (princ package-user-dir)))
+    (should (eldev--test-within-p (string-trim stdout) (eldev--test-project-dir)))
+    (should (= exit-code 0))))
+
 
 (provide 'test/emacs)

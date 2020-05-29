@@ -3149,6 +3149,9 @@ obligations."
 (defvar eldev-emacs-default-command-line '("--no-init-file" "--no-site-file" "--no-site-lisp" "--no-splash")
   "Options added to Emacs command line by default.")
 
+(defvar eldev-emacs-forward-variables '(user-emacs-directory package-archives package-archive-priorities)
+  "Variables to forward to Emacs launched by `emacs' command.")
+
 (defvar eldev-emacs-required-features :default
   "Features that spawned Emacs processes require automatically.
 See `eldev-default-required-features' for value description.
@@ -3167,33 +3170,44 @@ like this:
     changed in file `Eldev' or elsewhere, these disable all
     configuration files and the splash screen);
 
+  - `setf' form to forward values of variables listed in
+    `eldev-emacs-forward-variables';
+
   - Elisp `require' forms to load `eldev-emacs-required-features'
     (which default to project name);
 
   - COMMAND-LINE as passed to this command.
 
 However, if COMMAND-LINE has `--' at the first position, Eldev
-passes the rest of it to Emacs without adding anything on its
-own.  Be advised that in this case you will likely need to
-specify at least `-q' (`--no-init-file') option to be passed to
-Emacs, else it will most likely fail."
+passes the rest of it to Emacs without adding anything on its own
+with the exception of still forwarding variables enumerated in
+`eldev-emacs-forward-variables' list.  Be advised that you will
+likely need to specify at least `-q' (`--no-init-file') option to
+be passed to Emacs, else it will most likely fail."
   :parameters     "[--] [COMMAND-LINE...]"
   :custom-parsing t
   (eldev-load-project-dependencies 'emacs)
-  (let* ((command-line        (if (string= (car parameters) "--")
-                                  (cdr parameters)
-                                (append eldev-emacs-default-command-line
-                                        (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
-                                                                (eldev-required-features eldev-emacs-required-features)))
-                                        parameters)))
-         (effective-load-path (mapconcat #'identity load-path path-separator))
-         (process-environment `(,(format "EMACSLOADPATH=%s" effective-load-path) ,@process-environment)))
-    (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line eldev-emacs-executable command-line))
-    (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
-    (eldev-call-process eldev-emacs-executable command-line
-      (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")
-      (unless (= exit-code 0)
-        (signal 'eldev-error `("Child Emacs process exited with error code %d" ,exit-code))))))
+  (let (forwarding)
+    (dolist (variable eldev-emacs-forward-variables)
+      (when (boundp variable)
+        (push variable forwarding)
+        (push (eldev-macroexp-quote (symbol-value variable)) forwarding)))
+    (let* ((value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
+           (command-line        (if (string= (car parameters) "--")
+                                    (append value-forwarding (cdr parameters))
+                                  (append eldev-emacs-default-command-line
+                                          value-forwarding
+                                          (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
+                                                                  (eldev-required-features eldev-emacs-required-features)))
+                                          parameters)))
+           (effective-load-path (mapconcat #'identity load-path path-separator))
+           (process-environment `(,(format "EMACSLOADPATH=%s" effective-load-path) ,@process-environment)))
+      (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line eldev-emacs-executable command-line))
+      (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
+      (eldev-call-process eldev-emacs-executable command-line
+        (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")
+        (unless (= exit-code 0)
+          (signal 'eldev-error `("Child Emacs process exited with error code %d" ,exit-code)))))))
 
 
 
