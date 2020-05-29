@@ -192,9 +192,30 @@ that as a precaution.")
 (defvar eldev-print-backtrace-on-abort nil
   "If Eldev is aborted with C-c, print a backtrace.")
 
+(defvar eldev-setup-first-forms nil
+  "Forms executed as the first step of Eldev setup.
+In particular, these forms are evaluated before reading `Eldev'
+or `Eldev-local'.
+
+Since 0.5")
+
 (defvar eldev-setup-forms nil
   "Forms executed as the last step of Eldev setup.
 Should normally be specified only via command line.")
+
+(defvar eldev-skip-project-config nil
+  "Whether to skip both files `Eldev' and `Eldev-local'.
+Occasionally useful to some external tools. Not exposed through
+normal interface, but can be set in a `--setup-first' form.
+
+Since 0.5")
+
+(defvar eldev-skip-local-project-config nil
+  "Whether to skip file `Eldev-local'.
+Occasionally useful to some external tools. Not exposed through
+normal interface, but can be set in a `--setup-first' form.
+
+Since 0.5")
 
 
 (defvar eldev-force-override nil
@@ -492,6 +513,14 @@ This is only a wrapper over `eldev-defoption'."
                                   ((string= mode "never")                   nil)
                                   (t (signal 'eldev-wrong-option-usage `("argument must be `always', `auto' or `never'"))))))
 
+;; Not advertised, this is mostly for external tools.
+(eldev-defoption eldev-setup-first-form (form)
+  "Evaluate FORM as the first step of the setup"
+  :options        --setup-first
+  :value          FORM
+  :hidden-if      t
+  (push (eldev-read-wholly form "setup form") eldev-setup-first-forms))
+
 (eldev-defoption eldev-setup-form (form)
   "Evaluate FORM as the final step of the setup"
   :options        (-S --setup)
@@ -708,21 +737,32 @@ Since 0.2."
 (declare-function file-name-case-insensitive-p nil (filename))
 
 (defun eldev--set-up ()
-  (dolist (config `((,eldev-user-config-file . "No file `%s', not applying user-specific configuration")
-                    (,eldev-file             . "No file `%s', project building uses only defaults")
-                    (,eldev-local-file       . "No file `%s', not customizing build")))
-    (let ((file (locate-file (car config) (list eldev-project-dir))))
-      (if file
-          ;; See issue 9: this is for Mac OS.
-          (if (and (equal (car config) "Eldev")
-                   (or (not (fboundp 'file-name-case-insensitive-p)) (file-name-case-insensitive-p file))
-                   (with-temp-buffer
-                     (insert-file-contents file nil 0 100)
-                     (looking-at (rx "#!"))))
-              (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
-            (progn (eldev-trace "Loading file `%s'..." (car config))
-                   (load file nil t t)))
-        (eldev-verbose (cdr config) (car config)))))
+  (dolist (form (reverse eldev-setup-first-forms))
+    (eldev-trace "Evaluating form `%S' specified on the command line..." form)
+    (eval form t))
+  (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
+                    (eldev-file             . "No file `%s', project building uses only defaults")
+                    (eldev-local-file       . "No file `%s', not customizing build")))
+    (let* ((symbol           (car config))
+           (filename         (symbol-value symbol))
+           (file             (locate-file filename (list eldev-project-dir)))
+           (skipping-because (or (when (and eldev-skip-project-config (memq symbol '(eldev-file eldev-local-file)))
+                                   'eldev-skip-project-config)
+                                 (when (and eldev-skip-local-project-config (eq symbol 'eldev-local-file))
+                                   'eldev-skip-local-project-config))))
+      (if skipping-because
+          (eldev-verbose "Skipping file `%s' because of `%s'" filename skipping-because)
+        (if file
+            ;; See issue 9: this is for Mac OS.
+            (if (and (equal filename "Eldev")
+                     (or (not (fboundp 'file-name-case-insensitive-p)) (file-name-case-insensitive-p file))
+                     (with-temp-buffer
+                       (insert-file-contents file nil 0 100)
+                       (looking-at (rx "#!"))))
+                (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
+              (progn (eldev-trace "Loading file `%s'..." filename)
+                     (load file nil t t)))
+          (eldev-verbose (cdr config) filename)))))
   (dolist (form (reverse eldev-setup-forms))
     (eldev-trace "Evaluating form `%S' specified on the command line..." form)
     (eval form t)))

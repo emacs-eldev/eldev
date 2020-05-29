@@ -35,6 +35,21 @@
     (should (string-match-p (rx "fail!") stderr))
     (should (= exit-code 1))))
 
+(ert-deftest eldev-setup-first-1 ()
+  (eldev--test-run "project-a" ("--setup-first" `(progn (when package-archives (error "not first!")) (setf i-was-executed t))
+                                "--setup" `(unless package-archives (error "expected some archives!"))
+                                "--setup" `(unless i-was-executed (error "--setup-first had no effect!"))
+                                "exec" `(ignore))
+    (should (string= stdout ""))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-skip-project-config-1 ()
+  (eldev--test-run "project-a" ("--setup-first" `(setf eldev-skip-project-config t)
+                                "--setup" `(when package-archives (error "fail!"))
+                                "exec" "--dont-load" `(ignore))
+    (should (string= stdout ""))
+    (should (= exit-code 0))))
+
 
 (ert-deftest eldev-unreadable-locks-1 ()
   ;; Test that Eldev doesn't faint just because something in Emacs is
