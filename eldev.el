@@ -189,6 +189,10 @@ that as a precaution.")
 (defvar eldev-project-loading-mode nil
   "Project loading mode, `as-is' if not specified.")
 
+(defvar eldev-prefer-stable-archives t
+  "Prefer stable archives (e.g. MELPA Stable) whenever possible.
+Since 0.5.")
+
 (defvar eldev-print-backtrace-on-abort nil
   "If Eldev is aborted with C-c, print a backtrace.")
 
@@ -526,6 +530,13 @@ This is only a wrapper over `eldev-defoption'."
   :options        (-S --setup)
   :value          FORM
   (push (eldev-read-wholly form "setup form") eldev-setup-forms))
+
+(eldev-defbooloptions eldev-prefer-stable-archives eldev-prefer-unstable-archives eldev-prefer-stable-archives
+  ("Prefer stable archives (e.g. MELPA Stable: stable.melpa.org)"
+   :options       --stable
+   :hidden-if     :default)
+  ("Prefer bleeding-edge archives (e.g. MELPA [Unstable]: melpa.org)"
+   :options       --unstable))
 
 
 
@@ -933,7 +944,14 @@ the data."
 
 (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
                                         (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
-                                        (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)))
+                                        (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
+                                        (melpa          (:stable melpa-stable :unstable melpa-unstable))))
+
+;; Initial value means that even if `melpa-stable' and `melpa-unstable' are added
+;; separately, they will be swappable with relevant options.  For other archives calling
+;; `eldev-use-package-archive' with a stable/unstable pair is required.
+(defvar eldev--stable/unstable-archives (eval-when-compile `((,(cdr   (cadr (assq 'melpa-stable   eldev--known-package-archives)))
+                                                              . ,(cdr (cadr (assq 'melpa-unstable eldev--known-package-archives)))))))
 
 ;; This variable is used only on early Emacses: archive priorities are important at least
 ;; for our tests.  But let's not define `package-archive-priorities' variable to avoid
@@ -962,15 +980,70 @@ Standard archives:
   - melpa-stable   (https://stable.melpa.org/packages/)
   - melpa-unstable (https://melpa.org/packages/)
 
+Since 0.5 an archive can also be a plist with properties
+`:stable' and `:unstable'.  Standard archives of this type:
+
+  - melpa          (:stable melpa-stable :unstable melpa-unstable)
+
 If PRIORITY is non-nil, ARCHIVE is given this priority (see
 `package-archive-priorities').  Standard archives get priorities
 300, 200 and 100 in the order they are listed above, unless you
-specify something explicitly."
-  (unless priority
-    (setf priority (nth 2 (assq archive eldev--known-package-archives))))
-  (setf archive (eldev--resolve-package-archive archive))
+specify something explicitly.
+
+If archive is stable/unstable plist, given PRIORITY is used for
+the unstable variant, stable receives priority 100 higher (these
+values can be swapped by using `--unstable' option on the command
+line).  You can also specify a cons cell of two integers for the
+two variants."
+  (setf archive (eldev--resolve-package-archive archive nil))
+  (if (eldev--stable/unstable-archive-p archive)
+      (let ((stable   (plist-get archive :stable))
+            (unstable (plist-get archive :unstable)))
+        (eldev--do-use-package-archive stable   (if (consp priority)
+                                                    (car priority)
+                                                  (when (or priority (not (eldev-any-p (unless (eldev--stable/unstable-archive-p (nth 1 it))
+                                                                                         (string= (cdr stable) (cdr (nth 1 it))))
+                                                                                       eldev--known-package-archives)))
+                                                    (+ (or priority 0) 100))))
+        (eldev--do-use-package-archive unstable (if (consp priority) (cdr priority) priority))
+        (add-to-list 'eldev--stable/unstable-archives `(,(cdr stable) . ,(cdr unstable))))
+    (eldev--do-use-package-archive archive priority)))
+
+(defun eldev--resolve-package-archive (archive &optional only-simple)
+  (let ((standard (assq archive eldev--known-package-archives)))
+    (when standard
+      (setf archive (nth 1 standard))))
+  (cond ((and (consp archive) (stringp (car archive)) (stringp (cdr archive)))
+         archive)
+        ((and (not only-simple) (eldev--stable/unstable-archive-p archive))
+         `(:stable   ,(eldev--resolve-package-archive (plist-get archive :stable)   t)
+           :unstable ,(eldev--resolve-package-archive (plist-get archive :unstable) t)))
+        (t
+         (error "Unknown package archive `%S'" archive))))
+
+(defun eldev--find-simple-archive (archives name)
+  (catch 'found
+    (dolist (archive archives)
+      (if (eldev--stable/unstable-archive-p archive)
+          (let ((stable   (plist-get archive :stable))
+                (unstable (plist-get archive :unstable)))
+            (when (string= (car stable) name)
+              (throw 'found stable))
+            (when (string= (car unstable) name)
+              (throw 'found unstable)))
+        (when (string= (car archive) name)
+          (throw 'found archive))))))
+
+(defun eldev--stable/unstable-archive-p (archive)
+  (and (listp archive) (plist-get archive :stable) (plist-get archive :unstable)))
+
+(defun eldev--do-use-package-archive (archive priority)
   (when (string= (car archive) eldev--internal-pseudoarchive)
     (error "Package archive name `%s' is reserved for internal use" eldev--internal-pseudoarchive))
+  (unless priority
+    (dolist (standard eldev--known-package-archives)
+      (when (and (not (eldev--stable/unstable-archive-p (nth 1 standard))) (string= (cdr archive) (cdr (nth 1 standard))))
+        (setf priority (nth 2 standard)))))
   (eldev-verbose "Using package archive `%s' at `%s' with %s"
                  (car archive) (cdr archive) (if priority (format "priority %s" priority) "default priority"))
   (push archive package-archives)
@@ -978,13 +1051,38 @@ specify something explicitly."
     (push (cons (car archive) priority)
           (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities))))
 
-(defun eldev--resolve-package-archive (archive)
-  (cond ((assq archive eldev--known-package-archives)
-         (nth 1 (assq archive eldev--known-package-archives)))
-        ((and (consp archive) (stringp (car archive)) (stringp (cdr archive)))
-         archive)
-        (t
-         (error "Unknown package archive `%S'" archive))))
+(defun eldev--stable/unstable-preferred-archive (archive)
+  (if (eldev--stable/unstable-archive-counterpart archive)
+      (eq (null (rassoc (cdr archive) eldev--stable/unstable-archives))
+          (when eldev-prefer-stable-archives t))
+    ;; Archives without stable/unstable counterpart are always "preferred".
+    t))
+
+(defun eldev--stable/unstable-archive-counterpart (archive)
+  (let ((match (or (cdr (assoc  (cdr archive) eldev--stable/unstable-archives))
+                   (car (rassoc (cdr archive) eldev--stable/unstable-archives)))))
+    (when match
+      (catch 'counterpart
+        (dolist (candidate package-archives)
+          (when (string= (cdr candidate) match)
+            (throw 'counterpart (car candidate))))))))
+
+(defun eldev--adjust-stable/unstable-archive-priorities ()
+  (let ((priorities (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities)))
+    (dolist (archive package-archives)
+      (let ((name        (car archive))
+            (counterpart (eldev--stable/unstable-archive-counterpart archive)))
+        (when (and counterpart (eldev--stable/unstable-preferred-archive archive))
+          (let ((priority1 (cdr (assoc name        priorities)))
+                (priority2 (cdr (assoc counterpart priorities))))
+            (cond ((and priority1 priority2)
+                   (setf (cdr (assoc name        priorities)) (max priority1 priority2)
+                         (cdr (assoc counterpart priorities)) (min priority1 priority2)))
+                  ((and priority1 (< priority1 0))
+                   (setf (car (assoc name        priorities)) counterpart))
+                  ((and priority2 (> priority2 0))
+                   (setf (car (assoc counterpart priorities)) name)))))))))
+
 
 (defun eldev-use-local-dependency (dir &optional loading-mode)
   "Use local dependency found in DIR.
@@ -1229,8 +1327,13 @@ Since Eldev 0.2.")
 (defvar eldev-upgrade-dry-run-mode nil
   "Don't upgrade if non-nil, just pretend to do so.")
 
-(defvar eldev-upgrade-self-from-stable t
-  "Use Melpa Stable when upgrading Eldev.")
+(defvar eldev-upgrade-downgrade-mode nil
+  "Downgrade installed packages if necessary.
+E.g. if an unstable package has been installed at some point and
+you execute `upgrade' command in this mode, the package will be
+replaced with a stable version even if it is older.
+
+Since 0.5.")
 
 (defvar eldev--upgrade-self-from-forced-pa nil
   "Should remain unset; used for testing.")
@@ -1296,15 +1399,15 @@ sources will be replaced with a package downloaded from MELPA."
   (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) eldev-dir)))
     (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t)))
 
-(eldev-defbooloptions eldev-upgrade-self-from-stable eldev-upgrade-self-from-unstable eldev-upgrade-self-from-stable
-  ("Use MELPA Stable (stable.melpa.org)"
-   :options       (-s --stable))
-  ("Use MELPA Unstable (melpa.org)"
-   :options       --unstable)
-  :for-command    upgrade-self)
+(eldev-defbooloptions eldev-upgrade-downgrade-mode eldev-upgrade-keep-installed-mode eldev-upgrade-downgrade-mode
+  ("Downgrade installed packages if necessary to use a higher priority archive"
+   :options       (-d --downgrade))
+  ("Keep installed packages if no higher version is available"
+   :options       (-k --keep-installed))
+  :for-command    (upgrade upgrade-self))
 
 (eldev-defbooloptions eldev-upgrade-dry-run-mode eldev-upgrade-do-upgrade-mode eldev-upgrade-dry-run-mode
-  ("Don't actually upgrade anything, just print what would be performed"
+  ("Don't actually install anything, just print what would be performed"
    :options       (-n --dry-run))
   ("Do upgrade requested packages"
    :options       --do-upgrade
@@ -1422,6 +1525,7 @@ Since 0.2."
 ;; local dependencies that can change unpredictably and also requirement that certain
 ;; dependencies are installed only from certain archives.  Roll our own.
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
+  (eldev--adjust-stable/unstable-archive-priorities)
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
          (self                              (eq core 'eldev))
@@ -1437,7 +1541,7 @@ Since 0.2."
     (if self
         (setf package-archives `(,(if eldev--upgrade-self-from-forced-pa
                                       `("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa))
-                                    (eldev--resolve-package-archive (if eldev-upgrade-self-from-stable 'melpa-stable 'melpa-unstable))))
+                                    (eldev--resolve-package-archive (if eldev-prefer-stable-archives 'melpa-stable 'melpa-unstable))))
               all-packages     '((:package eldev)))
       (eldev--create-internal-pseudoarchive-descriptor)
       (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
@@ -1510,7 +1614,9 @@ Since 0.2."
               (eldev--load-local-dependency dependency)
             (setf dependency-index (1+ dependency-index))
             (if previous-version
-                (eldev-print :stderr "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'..."
+                (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
+                                         "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
+                                       "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
                              dependency-index non-local-plan-size
                              (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
                              (package-desc-archive dependency))
@@ -1536,7 +1642,10 @@ Since 0.2."
                 (num-deleted     0))
             (dolist (dependency planned-packages)
               (unless (or (null (cdr dependency)) (and (not self) (eldev--loading-mode (car dependency))))
-                (package-delete (cdr dependency))
+                ;; Argument FORCE was added only in 25.x.  Always force package deletion,
+                ;; otherwise package manager won't let us downgrade dependencies when we
+                ;; choose to do so.
+                (apply #'package-delete (cdr dependency) (when (>= emacs-major-version 25) '(t)))
                 (setf num-deleted (1+ num-deleted))))
             (when (> num-deleted 0)
               (eldev-verbose "Deleted %s" (eldev-message-plural num-deleted (if self "obsolete package version" "obsolete dependency version"))))))
@@ -1642,7 +1751,8 @@ Since 0.2."
                (archives                  (eldev--package-plist-get-archives package-plist t)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
-            (let* ((best-version     already-installed-version)
+            (let* ((best-version     (unless eldev-upgrade-downgrade-mode already-installed-version))
+                   (best-preferred   nil)
                    (best-priority    most-negative-fixnum)
                    (built-in-version (eldev-find-built-in-version package-name))
                    (available        (cdr (assq package-name package-archive-contents)))
@@ -1652,13 +1762,14 @@ Since 0.2."
               (while available
                 (let* ((candidate (pop available))
                        (archive   (package-desc-archive candidate))
-                       (priority  (eldev-package-archive-priority archive))
                        (version   (package-desc-version candidate))
+                       (preferred (eldev--stable/unstable-preferred-archive (eldev--find-simple-archive archives archive)))
+                       (priority  (eldev-package-archive-priority archive))
                        (disabled  (package-disabled-p package-name version)))
                   ;; Make sure we don't install a package from a wrong archive.
                   (when (if local
                             (string= archive eldev--internal-pseudoarchive)
-                          (or (null archives) (assoc archive archives)))
+                          (or (null archives) (eldev--find-simple-archive archives archive)))
                     (cond ((version-list-< version required-version)
                            (when (version-list-< best-version version)
                              (setf best-version version)))
@@ -1670,12 +1781,19 @@ Since 0.2."
                                                       `("Dependency `%s' is disabled" ,package-name)))))
                           ;; On Emacs 24 candidates are not sorted by archive priority, so
                           ;; the comparison must not assume any particular order.
-                          ((or (< best-priority priority)
+                          ;;
+                          ;; Conditions:
+                          ;; - use preferred (stable or unstable, as requested) archives if possible;
+                          ;; - use higher priority archives among preferred ones;
+                          ;; - use the highest available version from archives determined as above.
+                          ((or (and preferred (not best-preferred))
+                               (< best-priority priority)
                                (and (= best-priority priority) (version-list-< best-version version)))
-                           (setf package       candidate
-                                 best-version  version
-                                 best-priority priority))))))
-              (unless (version-list-< already-installed-version best-version)
+                           (setf package        candidate
+                                 best-version   version
+                                 best-priority  priority
+                                 best-preferred preferred))))))
+              (unless (or (and eldev-upgrade-downgrade-mode best-version) (version-list-< already-installed-version best-version))
                 (setf package already-installed))
               (unless package
                 (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
@@ -2109,6 +2227,7 @@ project's `Eldev' file."
   :aliases        arch
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
+  (eldev--adjust-stable/unstable-archive-priorities)
   (if package-archives
       (dolist (archive (sort package-archives (lambda (a b) (> (eldev-package-archive-priority (car a))
                                                                (eldev-package-archive-priority (car b))))))
@@ -2347,7 +2466,7 @@ Should normally be specified only from command line.")
                                                                               (eldev-test-ert-save-results)))))
                                       (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
                                                     (features             . buttercup)
-                                                    (packages             . ((:package buttercup :archive melpa-stable)))
+                                                    (packages             . ((:package buttercup :archive melpa)))
                                                     (require              . eldev-buttercup)
                                                     (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
                                                     (run-tests            . (lambda (selectors _runner environment)
@@ -2943,7 +3062,7 @@ least one warning."
   "Check package metadata, e.g. correctness of its dependencies."
   :aliases        (package-lint pack)
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
-  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa-stable gnu)))
+  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa gnu)))
   (eldev-load-extra-dependencies 'runtime)
   (require 'package-lint)
   (dolist (file (eldev-lint-find-files "*.el"))

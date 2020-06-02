@@ -56,5 +56,34 @@
       (should (string-prefix-p "None specified" stdout))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-archives-stable/unstable-1 ()
+  (eldev--test-run "project-h" ("archives")
+    (should (string= stdout (eldev--test-lines (format "archive-a: %s  (priority: 100)"
+                                                       (expand-file-name "test/package-archive-a" eldev-project-dir))
+                                               (format "archive-b: %s  (priority: 0, defaulted)"
+                                                       (expand-file-name "test/package-archive-b" eldev-project-dir)))))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-archives-stable/unstable-2 ()
+  (eldev--test-run "project-h" ("--unstable" "archives")
+    (should (string= stdout (eldev--test-lines (format "archive-b: %s  (priority: 100)"
+                                                       (expand-file-name "test/package-archive-b" eldev-project-dir))
+                                               (format "archive-a: %s  (priority: 0, defaulted)"
+                                                       (expand-file-name "test/package-archive-a" eldev-project-dir)))))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-archives-stable/unstable-3 ()
+  ;; It's fine to use MELPA here, as nothing will get downloaded anyway.
+  (eldev--test-run "trivial-project" ("--setup" `(eldev-use-package-archive 'melpa) "archives")
+    (should (string= stdout (eldev--test-lines "melpa-stable: https://stable.melpa.org/packages/  (priority: 200)"
+                                               "melpa-unstable: https://melpa.org/packages/  (priority: 100)")))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-archives-stable/unstable-4 ()
+  (eldev--test-run "trivial-project" ("--setup" `(eldev-use-package-archive 'melpa) "--unstable" "archives")
+    (should (string= stdout (eldev--test-lines "melpa-unstable: https://melpa.org/packages/  (priority: 200)"
+                                               "melpa-stable: https://stable.melpa.org/packages/  (priority: 100)")))
+    (should (= exit-code 0))))
+
 
 (provide 'test/archives)

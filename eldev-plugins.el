@@ -218,7 +218,7 @@ plugin documentation for more information."
                ;; Current stable version is 0.6.1, but we need certain things committed
                ;; after that.  As of yet, no stable version after 0.6.1 exists, and we
                ;; will fetch an unstable version if that's still the case.
-               (eldev-add-extra-dependencies 'runtime '(:package undercover :version "0.6.2" :archives (melpa-stable melpa-unstable)))
+               (eldev-add-extra-dependencies 'runtime '(:package undercover :version "0.6.2" :archives melpa))
                (eldev-load-extra-dependencies 'runtime)
                (require 'undercover)
                (setf undercover-force-coverage (not (eq mode 'auto)))
