@@ -49,7 +49,7 @@ $ELDEV_EMACS --batch --no-site-file --no-site-lisp                              
   (require '\''package)
   (package-initialize t)
   (let ((package-archives '\''(("melpa-stable" . "http://stable.melpa.org/packages/")))
-        (archive-name      "Melpa stable")
+        (archive-name      "MELPA Stable")
         (inhibit-message  t)
         (eldev-local      (getenv "ELDEV_LOCAL"))
         eldev-pkg

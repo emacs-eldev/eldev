@@ -44,7 +44,7 @@ endif::[]
 
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
 image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
-image:http://stable.melpa.org/packages/eldev-badge.svg[Melpa Stable, link=http://stable.melpa.org/#/eldev]
+image:http://stable.melpa.org/packages/eldev-badge.svg[MELPA Stable, link=http://stable.melpa.org/#/eldev]
 image:https://api.travis-ci.com/doublep/eldev.svg[Build status, link=https://travis-ci.com/doublep/eldev]
 
 Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
@@ -155,7 +155,7 @@ up if anyone interested has access to such old versions.
 There are several ways to install Eldev.
 
 [discrete]
-==== Bootstrapping from Melpa: if you have a catch-all directory for executables
+==== Bootstrapping from MELPA: if you have a catch-all directory for executables
 
 . From this directory (e.g. `~/bin`) execute:
 +
@@ -170,7 +170,7 @@ No further steps necessary — Eldev will bootstrap itself as needed on
 first invocation.
 
 [discrete]
-==== Bootstrapping from Melpa: general case
+==== Bootstrapping from MELPA: general case
 
 . Execute:
 +
@@ -406,7 +406,7 @@ Eldev provides a more flexible approach to this problem called _local
 dependencies_.  Let’s assume you develop project `foo` in directory
 `~/foo` and also a library called `barlib` in `~/barlib`.  And `foo`
 uses the library.  To have Eldev use your local copy of `barlib`
-instead of downloading it e.g. from Melpa, add the following form in
+instead of downloading it e.g. from MELPA, add the following form in
 file `~/foo/Eldev-local`:
 
 [source]
@@ -425,7 +425,7 @@ itself.  Those will be discussed <<loading-modes,later>>.
 Eldev correctly handles situations with changing definitions of local
 dependencies.  I.e. by simply commenting out or uncommenting
 `eldev-use-local-dependency` call, you can quickly test your project
-both with a Melpa-provided package and with a local dependency — Eldev
+both with a MELPA-provided package and with a local dependency — Eldev
 will adapt without any additional work from you.
 
 [#additional-dependencies]
@@ -545,7 +545,7 @@ your project (or local dependency), then install and activate it using
 Emacs’ packaging system.  This is quite a bit slower than `as-is`,
 because it involves several preparation steps.  However, this is
 almost exactly the way normal users will use your project after
-e.g. installing it from Melpa.  For this reason, this mode is
+e.g. installing it from MELPA.  For this reason, this mode is
 recommended for <<continuous-integration,continuous integration>> and
 other forms of automated testing.
 
@@ -727,7 +727,7 @@ needed, you can override this using `--output-dir` option.
 
 By default, Eldev will use package’s self-reported version, i.e. value
 of “Version” header in its main `.el` file.  If you need to give the
-package a different version, use option `--force-version`.  E.g. Melpa
+package a different version, use option `--force-version`.  E.g. MELPA
 would do this if it used Eldev.
 
 Finally, if you are invoking Eldev from a different tool, you might be
@@ -2035,7 +2035,7 @@ A few environment variables can affect Eldev’s behavior.
 `ELDEV_LOCAL`::
 
     Load Eldev Elisp code from given directory (usually a Git clone of
-    source tree) instead of the normal bootstrapping from Melpa.
+    source tree) instead of the normal bootstrapping from MELPA.
     Should not be needed normally, only when developing Eldev itself.
 
 `ELDEV_DIR`::

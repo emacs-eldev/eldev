@@ -22,7 +22,7 @@ files/
 
 package-archive-*/
 
-    Used to look up dependencies for tests projects and not ping Melpa
+    Used to look up dependencies for tests projects and not ping MELPA
     or something like that all the time.  Not having to look up real
     packages in the internet speeds testing up considerably and also
     makes results more predictable, because real packages in real

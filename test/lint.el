@@ -3,7 +3,7 @@
 
 ;; We don't test built-in linters since that would make Eldev tests
 ;; unstable (i.e. could break just because a linter is changed
-;; upstream) and slow (would need to download packages from Melpa or
+;; upstream) and slow (would need to download packages from MELPA or
 ;; GNU ELPA).
 
 (eval-and-compile
