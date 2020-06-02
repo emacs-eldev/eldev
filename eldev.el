@@ -942,10 +942,11 @@ the data."
 (defvar eldev--local-dependencies nil)
 (defvar eldev--local-dependency-packages nil)
 
-(defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
-                                        (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
-                                        (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
-                                        (melpa          (:stable melpa-stable :unstable melpa-unstable))))
+(eval-and-compile
+  (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
+                                          (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
+                                          (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
+                                          (melpa          (:stable melpa-stable :unstable melpa-unstable)))))
 
 ;; Initial value means that even if `melpa-stable' and `melpa-unstable' are added
 ;; separately, they will be swappable with relevant options.  For other archives calling
