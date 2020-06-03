@@ -1794,7 +1794,8 @@ Since 0.2."
                                  best-version   version
                                  best-priority  priority
                                  best-preferred preferred))))))
-              (unless (or (and eldev-upgrade-downgrade-mode best-version) (version-list-< already-installed-version best-version))
+              (unless (or (version-list-< already-installed-version best-version)
+                          (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
                 (setf package already-installed))
               (unless package
                 (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)

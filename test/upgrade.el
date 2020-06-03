@@ -200,4 +200,16 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-upgrade-downgrade-1 ()
+  (let ((eldev--test-project "project-h"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("version" "dependency-a")
+      (should (string= stdout "dependency-a 1.0\n"))
+      (should (= exit-code 0)))
+    ;; Make sure that it doesn't change anything.
+    (eldev--test-run nil ("upgrade" "--downgrade")
+      (should (string= stdout "All dependencies are up-to-date\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/upgrade)
