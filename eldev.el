@@ -1141,7 +1141,7 @@ as-is.  Otherwise, it is formatted with `prin1-to-string'."
   (with-temp-buffer
     (insert-file-contents source)
     (eldev-substitute-in-buffer open-string close-string)
-    (write-region (point-min) (point-max) target nil 'no-message)))
+    (write-region nil nil target nil 'no-message)))
 
 (defun eldev-substitute-in-buffer (&optional open-string close-string)
   "Substitute Elisp expressions in the current buffer.
@@ -1513,7 +1513,7 @@ Since 0.2."
                   (when buffer
                     (make-directory (file-name-directory cache-path) t)
                     (with-current-buffer buffer
-                      (write-region nil nil cache-path))
+                      (write-region nil nil cache-path nil 'no-message))
                     ;; Discard any cached signatures.
                     (unless (string-suffix-p ".sig" filename)
                       (ignore-errors (delete-file (concat cache-path ".sig")))))
