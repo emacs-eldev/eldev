@@ -26,9 +26,6 @@
 (defun eldev--test-project-cache-dir (&optional test-project)
   (expand-file-name eldev-cache-dir (eldev--test-project-dir test-project)))
 
-(defun eldev--test-within-p (file dir)
-  (not (eldev-external-or-absolute-filename (file-relative-name (expand-file-name file) dir))))
-
 (defun eldev--test-delete-cache (&optional test-project)
   (let ((dir (eldev--test-project-cache-dir)))
     (when (file-exists-p dir)
