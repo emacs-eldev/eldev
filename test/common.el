@@ -33,17 +33,23 @@
 
 (defmacro eldev--test-call-process (program-name executable command-line &rest body)
   (declare (indent 3) (debug (sexp body)))
-  (let ((prepared-command-line (make-symbol "$prepared-command-line"))
-        (no-errors             (make-symbol "$no-errors"))
+  (let ((no-errors             (make-symbol "$no-errors"))
+        process-input-form
         important-files)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
-        (:important-files (setf important-files (eldev-listify (pop body))))))
+        (:process-input   (setf process-input-form (pop body)))
+        (:important-files (setf important-files    (eldev-listify (pop body))))))
     `(with-temp-buffer
-       (let ((stderr-file (make-temp-file "eldev-stderr-")))
+       (let* ((process-input      ,process-input-form)
+              (process-input-file (when process-input (make-temp-file "eldev-test")))
+              (stderr-file        (make-temp-file "eldev-stderr-")))
+         (when process-input-file
+           (with-temp-file process-input-file
+             (insert process-input)))
          (unwind-protect
              (let* ((prepared-command-line (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) (list ,@command-line)))
-                    (exit-code             (apply #'call-process ,executable nil (list (current-buffer) stderr-file) nil prepared-command-line))
+                    (exit-code             (apply #'call-process ,executable process-input-file (list (current-buffer) stderr-file) nil prepared-command-line))
                     (stdout                (buffer-string))
                     (stderr                (with-temp-buffer
                                              (insert-file-contents stderr-file)
@@ -55,6 +61,8 @@
                      (setf ,no-errors t))
                  (unless ,no-errors
                    (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (mapconcat #'eldev-quote-sh-string (cons ,executable prepared-command-line) " ") default-directory)
+                   (when process-input-file
+                     (eldev-warn "Process input:\n%s" (eldev-colorize process-input 'verbose)))
                    (eldev-warn "Stdout contents:\n%s" (eldev-colorize stdout 'verbose))
                    (unless (string= stderr "")
                      (eldev-warn "Stderr contents:\n%s" (eldev-colorize stderr 'verbose)))
@@ -65,7 +73,9 @@
                                              (lambda (a b) (< (if (cdr a) (float-time (cdr a)) 0) (if (cdr b) (float-time (cdr b)) 0)))))
                            ;; Not using `current-time-string' as not precise enough.
                            (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing"))))))))
-           (delete-file stderr-file))))))
+           (when process-input-file
+             (ignore-errors (delete-file process-input-file)))
+           (ignore-errors (delete-file stderr-file)))))))
 
 (defmacro eldev--test-run (test-project command-line &rest body)
   "Execute child Eldev process.
@@ -100,6 +110,11 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
      (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
        ,@body)))
 
+
+(defun eldev--test-file-contents (test-project file)
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name file (eldev--test-project-dir test-project)))
+    (buffer-string)))
 
 (defmacro eldev--test-capture-output (&rest body)
   `(with-temp-buffer

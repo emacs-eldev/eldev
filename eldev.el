@@ -1059,14 +1059,15 @@ two variants."
     ;; Archives without stable/unstable counterpart are always "preferred".
     t))
 
-(defun eldev--stable/unstable-archive-counterpart (archive)
+(defun eldev--stable/unstable-archive-counterpart (archive &optional value-if-not-used)
   (let ((match (or (cdr (assoc  (cdr archive) eldev--stable/unstable-archives))
                    (car (rassoc (cdr archive) eldev--stable/unstable-archives)))))
     (when match
       (catch 'counterpart
         (dolist (candidate package-archives)
           (when (string= (cdr candidate) match)
-            (throw 'counterpart (car candidate))))))))
+            (throw 'counterpart (car candidate))))
+        value-if-not-used))))
 
 (defun eldev--adjust-stable/unstable-archive-priorities ()
   (let ((priorities (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities)))
@@ -4493,11 +4494,22 @@ will fail if the project already has file named `Eldev'."
                 (progn
                   (eldev-print "Please wait, this might take a while...")
                   (dolist (archive eldev--known-package-archives)
-                    (eldev-use-package-archive (car archive)))
-                  (let ((archive-options (eldev--init-all-archive-combinations (mapcar #'car eldev--known-package-archives))))
+                    (unless (eldev--stable/unstable-archive-p (cadr archive))
+                      (eldev-use-package-archive (car archive))))
+                  (let ((archive-options (eldev--init-all-archive-combinations
+                                          (mapcar #'car (eldev-filter (or (eldev--stable/unstable-archive-p (cadr it))
+                                                                          (null (eldev--stable/unstable-archive-counterpart (cadr it))))
+                                                                      eldev--known-package-archives)))))
                     (while archive-options
-                      (let ((archives (pop archive-options)))
-                        (if (let ((package-archives (mapcar (lambda (archive) (nth 1 (assq archive eldev--known-package-archives))) archives)))
+                      (let ((archives (pop archive-options))
+                            simple)
+                        (dolist (archive archives)
+                          (let ((entry (eldev--resolve-package-archive archive)))
+                            (if (eldev--stable/unstable-archive-p entry)
+                                (progn (push (plist-get entry :stable)   simple)
+                                       (push (plist-get entry :unstable) simple))
+                              (push entry simple))))
+                        (if (let ((package-archives (eldev-filter (memq it simple) package-archives)))
                               (eldev--fetch-archive-contents)
                               (package-read-all-archive-contents)
                               (package-load-all-descriptors)
@@ -4524,11 +4536,11 @@ will fail if the project already has file named `Eldev'."
       (insert "; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-\n\n")
       (cond ((eq archives-to-use t)
              (eldev-trace "Adding a few commented-out calls to `eldev-use-package-archive' to `%s'" eldev-file)
-             (insert ";; Uncomment some calls below as needed for your project.  It is not\n"
-                     ";; recommended to use `melpa-unstable' unless some dependencies simply\n"
-                     ";; cannot be downloaded from another archive.\n")
+             (insert ";; Uncomment some calls below as needed for your project.\n")
              (dolist (archive eldev--known-package-archives)
-               (insert (format ";(eldev-use-package-archive '%s)\n" (car archive)))))
+               (when (or (eldev--stable/unstable-archive-p (cadr archive))
+                         (null (eldev--stable/unstable-archive-counterpart (cadr archive) t)))
+                 (insert (format ";(eldev-use-package-archive '%s)\n" (car archive))))))
             (archives-to-use
              (eldev-trace "Adding the autodetermined package archives to `%s'" eldev-file)
              (insert ";; Autodetermined by `eldev init'.\n")
