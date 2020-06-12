@@ -26,10 +26,12 @@ jobs:
     - os: linux
       env: EMACS_CI=emacs-snapshot
 
-    - os: osx
-      env: EMACS_CI=emacs-26-3
-    - os: osx
-      env: EMACS_CI=emacs-snapshot
+    # Disabled for now as Nix doesn't really work on macOS version
+    # that is on Travis (as of 11.06.2020 at least).
+    # - os: osx
+    #   env: EMACS_CI=emacs-26-3
+    # - os: osx
+    #   env: EMACS_CI=emacs-snapshot
 
   allow_failures:
     - env: EMACS_CI=emacs-snapshot
