@@ -3092,6 +3092,10 @@ least one warning."
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
   (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa gnu)))
   (eldev-load-extra-dependencies 'runtime)
+  ;; This linter needs access to package archive contents, so at least fetch all archives
+  ;; we have never fetched yet.
+  (let ((eldev-global-cache-archive-contents-max-age nil))
+    (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch)))
   (require 'package-lint)
   (dolist (file (eldev-lint-find-files "*.el"))
     (eldev-lint-linting-file file
