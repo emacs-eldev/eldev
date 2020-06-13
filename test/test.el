@@ -38,6 +38,11 @@
   (eldev--test-run "project-c" ("test")
     (should (= exit-code 0))))
 
+(ert-deftest eldev-test-project-g-1 ()
+  ;; One passing test.  This project uses a loading root for its tests.
+  (eldev--test-run "project-g" ("test")
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-test-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.

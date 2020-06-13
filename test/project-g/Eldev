@@ -1,0 +1,2 @@
+;; This project deliberately uses additional loading root for its tests.
+(eldev-add-loading-roots 'test "test")

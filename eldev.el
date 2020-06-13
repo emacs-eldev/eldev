@@ -941,6 +941,7 @@ the data."
 (defvar eldev--extra-dependencies nil)
 (defvar eldev--local-dependencies nil)
 (defvar eldev--local-dependency-packages nil)
+(defvar eldev--loading-roots nil)
 
 (eval-and-compile
   (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
@@ -1112,6 +1113,27 @@ for details."
     (let ((set-dependencies (or (assq set eldev--extra-dependencies) (car (push `(,set . nil) eldev--extra-dependencies)))))
       (dolist (dependency dependencies)
         (push (if (symbolp dependency) (list dependency) dependency) (cdr set-dependencies))))))
+
+(defun eldev-add-loading-roots (sets &rest roots)
+  "Additionally use loading ROOTS for given SETS.
+This would typically be used for `test' command in case your
+project has `require' forms in its test files that expect to load
+features from test directory without using qualified names
+relative to project root.  E.g. like this:
+
+    (eldev-add-loading-roots 'test \"test\")
+
+Since 0.5."
+  (dolist (set (eldev-listify sets))
+    (let ((set-roots (or (assq set eldev--loading-roots) (car (push `(,set . nil) eldev--loading-roots)))))
+      (dolist (root roots)
+        (push root (cdr set-roots))))))
+
+(defun eldev--inject-loading-roots (sets)
+  (dolist (set (eldev-listify sets))
+    (dolist (loading-root (cdr (assq set eldev--loading-roots)))
+      (add-to-list 'load-path (file-name-as-directory (expand-file-name loading-root eldev-project-dir))))))
+
 
 (defvar eldev--know-installed-runtime-dependencies nil)
 
@@ -1670,6 +1692,8 @@ Since 0.2."
             (eldev-print "Upgraded or installed %s" (eldev-message-plural non-local-plan-size (if self "package" "dependency package")))
           (eldev-print (if self "Eldev is up-to-date" "All dependencies are up-to-date"))))
       (when activate
+        ;; Also add the additional loading roots here.
+        (eldev--inject-loading-roots additional-sets)
         (let (recursing-for)
           (eldev-advised (#'package-activate-1
                           :around (lambda (original dependency &rest rest)
@@ -3515,6 +3539,8 @@ information past the list of sources.  For this, use function
 `eldev-get-target-dependencies'."
   (when (or (null standard-filesets) (memq 'all standard-filesets))
     (setf standard-filesets (mapcar #'car eldev-filesets)))
+  (when (memq 'test standard-filesets)
+    (eldev--inject-loading-roots 'test))
   (let ((new-filesets (eldev-filter (not (memq it eldev--targets-prepared-for)) standard-filesets)))
     (when new-filesets
       (setf new-filesets (nreverse new-filesets))
@@ -3859,6 +3885,8 @@ Also see commands `compile' and `package'."
   ;; can involve compiling or packaging.
   (run-hooks 'eldev-build-system-hook)
   (let ((eldev-project-loading-mode 'as-is))
+    (when (memq 'test eldev-build-sets)
+      (eldev--inject-loading-roots 'test))
     (eldev-load-project-dependencies 'build))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))
         target-list

@@ -54,6 +54,20 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-compile-test-files-1 ()
+  (eldev--test-without-files "project-a" ("test/project-a.elc")
+    (eldev--test-run nil ("compile" "--set" "test")
+      (eldev--test-assert-files project-dir preexisting-files "test/project-a.elc")
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-compile-test-files-2 ()
+  ;; This project has an additional loading root for tests.
+  (eldev--test-without-files "project-g" ("test/test-g-1.elc" "test/test-g-util.elc")
+    (eldev--test-run nil ("compile" "--set" "test")
+      (eldev--test-assert-files project-dir preexisting-files "test/test-g-1.elc" "test/test-g-util.elc")
+      (should (= exit-code 0)))))
+
+
 (ert-deftest eldev-compile-doesnt-load-when-not-asked-1 ()
   ;; `project-e-misc.el' is somewhat broken in that it cannot be
   ;; compiled before being loaded.  Make sure that Eldev doesn't load

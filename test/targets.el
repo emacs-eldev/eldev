@@ -192,7 +192,14 @@
     "    dist/project-g-1.0.entry  [repeated, see `dist/project-g-1.0.tar' above]"))
 
 (defvar eldev--test-targets-project-g-test
-  '(":default"))
+  '(":default"
+    ":compile"
+    "    test/test-g-1.elc  [ELC]"
+    "        test/test-g-1.el"
+    "        [inh] test/test-g-util.elc"
+    "    test/test-g-util.elc  [ELC]"
+    "        test/test-g-util.el"
+    "        [inh] project-g.elc"))
 
 
 (defmacro eldev--test-project-dependencies (test-project sets &rest targets)
