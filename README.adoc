@@ -1062,6 +1062,43 @@ Things that won’t work with Buttercup at the moment:
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
 
+=== Loading test files
+
+{since-0-5} There appears to be two common ways of using tests: 1)
+they are loaded from project root; 2) subdirectory `test/` (or
+similar) in the project is added to `load-path`.  Eldev supports both.
+First one is the default, since it doesn’t require anything in
+addition.
+
+To better understand the second way, imagine your project structure is
+like this:
+
+....
+    tests/
+        test-helper.el
+        test-my-project.el
+....
+
+and file `test-my-project.el` includes a form `(require
+'test-helper)`.  Naturally, this setup will work only if subdirectory
+`tests/` is in `load-path` by the point tests are executed.  To
+instruct Eldev that your project needs this, add the following to file
+`Eldev`:
+
+[source]
+----
+(eldev-add-loading-roots 'test "tests")
+----
+
+where `'test` is the command name and `"tests"` is the name of the
+subdirectory that should serve as additional loading root.  In
+principle, loading roots can also be used for other commands too, just
+like <<additional-dependencies,extra dependencies>>.
+
+If you want to switch to the first way and avoid special forms in file
+`Eldev`, replace `(require 'test-helper)` with `(require
+'tests/test-helper)`.
+
 [#test-results]
 === Reusing previous test results
 
