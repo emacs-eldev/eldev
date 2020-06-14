@@ -39,6 +39,7 @@ endif::[]
 :since-0-3: image:https://img.shields.io/badge/since-0.3-8be[Since 0.3,float=right]
 :since-0-3-2: image:https://img.shields.io/badge/since-0.3.2-8be[Since 0.3.2,float=right]
 :since-0-4: image:https://img.shields.io/badge/since-0.4-8be[Since 0.4,float=right]
+:since-0-5: image:https://img.shields.io/badge/since-0.5-8be[Since 0.5,float=right]
 
 = Eldev
 
@@ -225,6 +226,24 @@ Now each time Eldev is executed, it will use the sources at
 `$ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
 immediately.
 
+=== Upgrading Eldev
+
+Eldev bootstraps itself when needed, but won’t automatically fetch new
+versions.  To upgrade it later, explicitly run (from any directory):
+
+    $ eldev upgrade-self
+
+By default it uses MELPA Stable.  If you want to test or use some not
+yet officially released version, try:
+
+    $ eldev --unstable upgrade-self
+
+This will make it use MELPA Unstable for upgrading.  If you want to
+switch back to the latest stable version (as recommended), supply `-d`
+(`--downgrade`) option to the command:
+
+    $ eldev upgrade-self -d
+
 
 == Safety concerns
 
@@ -389,21 +408,28 @@ init`).  For example:
 
 [source]
 ----
-(eldev-use-package-archive 'melpa-stable)
+(eldev-use-package-archive 'melpa)
 ----
 
-Eldev knows about three “standard” archives, which should cover most
-of your needs: `gnu`, `melpa-stable` and `melpa-unstable`.  Note that
-`https://melpa.org` is called `melpa-unstable`.  This is to emphasize
-that you shouldn’t use it if `melpa-stable` is enough, because you
-wouldn’t want your tests fail only because a dependency in an unstable
-version has a bug.
+Eldev knows about two “standard” archives, which should cover most of
+your needs: `gnu` and `melpa`.  When using MELPA, you can also
+explicitly choose `melpa-stable` or `melpa-unstable` instead.
+
+{since-0-5} A better way is provided by two global options: `--stable`
+(the default) and `--unstable`.  Normally, Eldev will try to install
+everything from MELPA Stable (you wouldn’t want your tests fail only
+because a dependency in an unstable version has a bug).  However, if a
+package is not available (at all or in the required version) from the
+stable archive, unstable will be used automatically.  If you specify
+`--unstable` on the command line, Eldev will behave in the opposite
+way: prefer the unstable archive and use the stable only as a
+fallback.
 
 Emacs 25 and up supports package archive priorities.  Eldev backports
 this to Emacs 24 and utilizes the feature to assign the standard
-archives it knows about priorities 300, 200 and 100 in the order they
-are listed above.  A dependency from a package with a lower priority
-is installed only if there are no other options.
+archives it knows about priorities 300 (for GNU ELPA), 200 and 100
+(for MELPA Stable/Unstable).  A dependency from a package with a lower
+priority is installed only if there are no other options.
 
 If dependencies for your project are only available from some other
 archive, you can still use the same function.  Just substite the
@@ -525,6 +551,30 @@ You can also check what Eldev would upgrade without actually upgrading
 anything:
 
     $ eldev upgrade --dry-run
+
+{since-0-5} If you use MELPA for looking up dependencies, you can
+switch between Stable and Unstable using global options with the same
+name, i.e.:
+
+    $ eldev --unstable upgrade
+
+Because of the incompatible version numbers that MELPA Unstable
+supplies, you cannot directly “upgrade” from an unstable version back
+to a stable one.  But you can specify option `-d` (`--downgrade`) to
+the command:
+
+    $ eldev --stable upgrade -d
+
+In this case Eldev will downgrade dependencies if this allows it to
+use more preferable package archive.  (Since `--stable` is the
+default, specifying it in the command above is not really needed, it’s
+only mentioned for clarity.)
+
+To install unstable version of only a specific dependency, while
+leaving all others at stable versions, combine `--unstable` with
+listing package names after the command, e.g.:
+
+    $ eldev --unstable upgrade dash
 
 [#global-cache]
 === Global package archive cache
@@ -1036,6 +1086,43 @@ Things that won’t work with Buttercup at the moment:
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
+
+=== Loading test files
+
+{since-0-5} There appears to be two common ways of using tests: 1)
+they are loaded from project root; 2) subdirectory `test/` (or
+similar) in the project is added to `load-path`.  Eldev supports both.
+First one is the default, since it doesn’t require anything in
+addition.
+
+To better understand the second way, imagine your project structure is
+like this:
+
+....
+    tests/
+        test-helper.el
+        test-my-project.el
+....
+
+and file `test-my-project.el` includes a form `(require
+'test-helper)`.  Naturally, this setup will work only if subdirectory
+`tests/` is in `load-path` by the point tests are executed.  To
+instruct Eldev that your project needs this, add the following to file
+`Eldev`:
+
+[source]
+----
+(eldev-add-loading-roots 'test "tests")
+----
+
+where `'test` is the command name and `"tests"` is the name of the
+subdirectory that should serve as additional loading root.  In
+principle, loading roots can also be used for other commands too, just
+like <<additional-dependencies,extra dependencies>>.
+
+If you want to switch to the first way and avoid special forms in file
+`Eldev`, replace `(require 'test-helper)` with `(require
+'tests/test-helper)`.
 
 [#test-results]
 === Reusing previous test results
