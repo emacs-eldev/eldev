@@ -9,7 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
-:uri-search-github: https://github.com/search?utf8=%E2%9C%93&q=filename%3AEldev+language%3A%22Emacs+Lisp%22&type=Code&ref=advsearch&l=Emacs+Lisp&l=
+:uri-search-github: https://github.com/search?q=filename%3AEldev+language%3A%22Emacs+Lisp%22+path%3A%2F
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
@@ -224,6 +224,31 @@ but make sure you have permissions first.
 Now each time Eldev is executed, it will use the sources at
 `$ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
 immediately.
+
+
+== Safety concerns
+
+TIP: In general, it is not recommended to execute Eldev, GNU Make,
+Scons, any other build tool or anything based on one in a directory
+that contains untrusted code.
+
+Like many (if not most) other development tools, Eldev is unsafe when
+executed on untrusted code.  For example, simply running `eldev` in a
+project you have just downloaded from `hackerden.org` can result in
+anything, including emptied home directory.  For that matter, running
+`make` or `gradle` is not better in this regard.  Eldev is perhaps _a
+bit_ more dangerous, because even `eldev help` reads file `Eldev`,
+thus executing arbitrary code.
+
+Even seemingly harmless things, like opening a `.el` file in Emacs can
+lead to unforeseen consequences.  If you e.g. have
+{uri-flycheck}[Flycheck] enabled everywhere, this will result in
+byte-compiling said file, which also can execute arbitrary code, for
+example using `(eval-when-compile ...)` form.  The same holds for
+installing (not even using!) Elisp packages.
+
+Only use build tools on code that you trust.  Better yet, don’t even
+touch code that you don’t plan running.
 
 
 == Getting started
