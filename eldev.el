@@ -748,35 +748,42 @@ Since 0.2."
 (declare-function file-name-case-insensitive-p nil (filename))
 
 (defun eldev--set-up ()
-  (dolist (form (reverse eldev-setup-first-forms))
-    (eldev-trace "Evaluating form `%S' specified on the command line..." form)
-    (eval form t))
-  (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
-                    (eldev-file             . "No file `%s', project building uses only defaults")
-                    (eldev-local-file       . "No file `%s', not customizing build")))
-    (let* ((symbol           (car config))
-           (filename         (symbol-value symbol))
-           (file             (locate-file filename (list eldev-project-dir)))
-           (skipping-because (or (when (and eldev-skip-project-config (memq symbol '(eldev-file eldev-local-file)))
-                                   'eldev-skip-project-config)
-                                 (when (and eldev-skip-local-project-config (eq symbol 'eldev-local-file))
-                                   'eldev-skip-local-project-config))))
-      (if skipping-because
-          (eldev-verbose "Skipping file `%s' because of `%s'" filename skipping-because)
-        (if file
-            ;; See issue 9: this is for Mac OS.
-            (if (and (equal filename "Eldev")
-                     (or (not (fboundp 'file-name-case-insensitive-p)) (file-name-case-insensitive-p file))
-                     (with-temp-buffer
-                       (insert-file-contents file nil 0 100)
-                       (looking-at (rx "#!"))))
-                (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
-              (progn (eldev-trace "Loading file `%s'..." filename)
-                     (load file nil t t)))
-          (eldev-verbose (cdr config) filename)))))
-  (dolist (form (reverse eldev-setup-forms))
-    (eldev-trace "Evaluating form `%S' specified on the command line..." form)
-    (eval form t)))
+  (let (loaded-project-config)
+    (dolist (form (reverse eldev-setup-first-forms))
+      (eldev-trace "Evaluating form `%S' specified on the command line..." form)
+      (eval form t))
+    (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
+                      (eldev-file             . "No file `%s', project building uses only defaults")
+                      (eldev-local-file       . "No file `%s', not customizing build")))
+      (let* ((symbol           (car config))
+             (filename         (symbol-value symbol))
+             (file             (locate-file filename (list eldev-project-dir)))
+             (skipping-because (or (when (and eldev-skip-project-config (memq symbol '(eldev-file eldev-local-file)))
+                                     'eldev-skip-project-config)
+                                   (when (and eldev-skip-local-project-config (eq symbol 'eldev-local-file))
+                                     'eldev-skip-local-project-config))))
+        (if skipping-because
+            (eldev-verbose "Skipping file `%s' because of `%s'" filename skipping-because)
+          (if file
+              ;; See issue 9: this is for Mac OS.
+              (if (and (equal filename "Eldev")
+                       (or (not (fboundp 'file-name-case-insensitive-p)) (file-name-case-insensitive-p file))
+                       (with-temp-buffer
+                         (insert-file-contents file nil 0 100)
+                         (looking-at (rx "#!"))))
+                  (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
+                (progn (eldev-trace "Loading file `%s'..." filename)
+                       (load file nil t t)
+                       (when (memq symbol '(eldev-file eldev-local-file))
+                         (setf loaded-project-config t))))
+            (eldev-verbose (cdr config) filename)))))
+    (dolist (form (reverse eldev-setup-forms))
+      (eldev-trace "Evaluating form `%S' specified on the command line..." form)
+      (eval form t))
+    (when loaded-project-config
+      ;; This is an undocumented flag file indicating that `Eldev' or `Eldev-local' have
+      ;; been loaded at least once in this project.
+      (with-temp-file (expand-file-name "ever-initialized" (eldev-cache-dir nil t))))))
 
 (defun eldev-usage ()
   "Print Eldev usage message."
