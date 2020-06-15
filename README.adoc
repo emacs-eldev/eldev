@@ -364,6 +364,7 @@ be used often, mostly in cases where you run Eldev on a use-once
 project checkout, e.g. on a <<continuous-integration,continuous
 integration>> server.
 
+[#project-isolation]
 === Project isolation
 
 Eldev tries to create a self-contained environment for building and
@@ -1305,16 +1306,20 @@ See `emacs --help` for what you can specify on the command line.
 When issued as shown above, command `emacs` will pass the rest of the
 command line to Emacs, but also add a few things on its own.  First,
 it adds everything from the list `eldev-emacs-default-command-line`,
-which disables `~/.emacs` loading and similar things.  Second, it adds
+which disables `~/.emacs` loading and similar things.  Second, it
+transfers variables listed in `eldev-emacs-forward-variables` to the
+child process (this is done in order to keep
+<<project-isolation,project isolation>> promises).  Third, adds
 `--eval` arguments to require the features as described above.  And
 only after that comes the actual command line you specified.
 
 Occasionally you might not want this behavior.  In this case, prepend
 `--` to the command line — then Eldev will pass everything after it to
-the spawned Emacs as-is.  Remember that you will likely need to pass
-at least `-q` (`--no-init-file`) option to Emacs, otherwise it will
-probably fail on your `~/.emacs` since it will not see your usual
-packages.  To illustrate:
+the spawned Emacs as-is (with the exception of still transferring
+variables listed in `eldev-emacs-forward-variables`).  Remember that
+you will likely need to pass at least `-q` (`--no-init-file`) option
+to Emacs, otherwise it will probably fail on your `~/.emacs` since it
+will not see your usual packages.  To illustrate:
 
     $ eldev emacs -- -q foo.bar
 
