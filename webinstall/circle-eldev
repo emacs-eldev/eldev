@@ -1,0 +1,21 @@
+#! /bin/sh
+
+# This script downloads Eldev startup script as `~/.eldev/bin/eldev'
+# for CircleCI.
+#
+# In your `.circleci/config.yml' add this:
+#
+# - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/circle-eldev > x.sh && source ./x.sh
+
+set -e
+
+
+ELDEV_BIN_DIR=~/.eldev/bin
+
+export PATH="$ELDEV_BIN_DIR:$PATH"
+
+mkdir -p $ELDEV_BIN_DIR
+curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
+chmod a+x $ELDEV_BIN_DIR/eldev
+
+echo "export PATH=$PATH" >> $BASH_ENV
