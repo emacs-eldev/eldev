@@ -119,7 +119,7 @@ think real-world usage provides better models.
     it do nothing even if specified) one option provided by Eldev,
     because of what seems like a bug in Emacs 24.
 
-{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]; its file {uri-datetime}/blob/master/.travis.yml[`.travis.yml`]::
+{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]; its file {uri-datetime}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
     A library with a fairly complicated file `Eldev`.  The main reason
     for complexity are two included Java programs that are used for 1)
