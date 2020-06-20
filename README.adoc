@@ -46,7 +46,7 @@ endif::[]
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
 image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
 image:http://stable.melpa.org/packages/eldev-badge.svg[MELPA Stable, link=http://stable.melpa.org/#/eldev]
-image:https://api.travis-ci.com/doublep/eldev.svg[Build status, link=https://travis-ci.com/doublep/eldev]
+image:https://github.com/doublep/eldev/workflows/CI/badge.svg[CI, link=https://github.com/doublep/eldev/actions?query=workflow%3ACI]
 
 Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
 solely at Elisp projects.  It is an alternative to Cask.  Unlike Cask,
