@@ -3156,6 +3156,27 @@ least one warning."
         (relint-file file)))))
 
 
+(declare-function elisp-lint-file "elisp-lint")
+
+(eldev-deflinter eldev-linter-elisp ()
+  "Find various problems in Elisp code.  By default this linter
+also runs `package-lint', so you either shouldn't run both or
+change `elisp-lint's configuration."
+  :aliases        (elisp-lint el)
+  ;; Need GNU ELPA for `let-alist' on older Emacs versions.
+  (eldev-add-extra-dependencies 'runtime '(:package elisp-lint :archives (melpa gnu)))
+  ;; This linter might need access to package dependencies for byte-compilation.
+  (eldev-load-project-dependencies 'runtime)
+  (require 'elisp-lint)
+  ;; I don't see a better way than just replacing its output function completely.
+  (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)
+                                                 (eval `(eldev-warn ,format-string ,@arguments) t)
+                                                 (eldev-lint-note-warning)))
+    (dolist (file (eldev-lint-find-files "*.el"))
+      (eldev-lint-linting-file file
+        (elisp-lint-file file)))))
+
+
 (defun eldev-lint-fileset ()
   ;; Target set is hardcoded for now.
   (eldev-standard-fileset 'main))

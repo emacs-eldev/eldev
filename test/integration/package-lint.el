@@ -7,7 +7,7 @@
 
 (ert-deftest eldev-package-lint-project-b-1 ()
   ;; E.g. some headers don't follow linter's suggestions.
-  (eldev--test-run "project-b" ("lint" "doc")
+  (eldev--test-run "project-b" ("lint" "package")
     (should (= exit-code 1))))
 
 
