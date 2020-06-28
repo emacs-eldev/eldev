@@ -803,9 +803,18 @@ return the descriptor of the project being built."
                            (if eldev-project-main-file
                                (progn (insert-file-contents (expand-file-name eldev-project-main-file project-dir))
                                       (package-buffer-info))
-                             (let ((default-directory project-dir))
+                             ;; FIXME: Maybe use `abbreviate-file-name', but make sure it is really safe first.
+                             (let ((default-directory (expand-file-name project-dir)))
                                (dired-mode)
-                               (eldev--package-dir-info))))))
+                               (condition-case error
+                                   (eldev--package-dir-info)
+                                 (error (let ((message (error-message-string error)))
+                                          (if (string-match-p "package headers" message)
+                                              ;; This message is quite confusing.  Add some hinting (though
+                                              ;; this way you lose the option to use `-d'...).
+                                              (signal 'eldev-error `(:hint "Headers in the project's main file are likely corrupt or incomplete
+Try evaluating `(package-buffer-info)' in a buffer with the file" "%s" ,message))
+                                            (signal (car error) (cdr error)))))))))))
       (unless skip-cache
         (push (cons project-dir descriptor) eldev--package-descriptors)))
     (when (string= project-dir eldev-project-dir)
