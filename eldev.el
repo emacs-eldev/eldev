@@ -3148,16 +3148,20 @@ least one warning."
 (eldev-deflinter eldev-linter-re ()
   "Find errors, deprecated syntax etc. in regular expressions."
   :aliases        (relint regex regexp)
-  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu :version "1.13"))
+  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu :version "1.18"))
   (eldev-load-extra-dependencies 'runtime)
   (require 'relint)
   ;; I see no way to avoid diving into internals.
-  (eldev-advised ('relint--report :around (lambda (original &rest arguments)
-                                            (eldev-lint-printing-warning :warning
-                                              (apply original arguments))))
-    (dolist (file (eldev-lint-find-files "*.el"))
-      (eldev-lint-linting-file file
-        (relint-file file)))))
+  (eldev-advised ('relint--output-report :around (lambda (original error-buffer file complaint &rest etc)
+                                                   (eldev-lint-printing-warning (if (eq (nth 5 complaint) 'error) :error :warning)
+                                                     (apply original error-buffer file complaint etc))))
+    ;; Suppress totals from `relint' as we print them ourselves.
+    (eldev-advised ('relint--finish :around (lambda (original &rest arguments)
+                                              (let ((inhibit-message t))
+                                                (apply original arguments))))
+      (dolist (file (eldev-lint-find-files "*.el"))
+        (eldev-lint-linting-file file
+          (relint-file file))))))
 
 
 (declare-function elisp-lint-file "elisp-lint")
