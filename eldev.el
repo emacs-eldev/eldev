@@ -2896,7 +2896,7 @@ error.")
 (defvar eldev--linters nil)
 (defvar eldev--linter-aliases nil)
 
-(defvar eldev--lint-have-warnings)
+(defvar eldev--lint-num-warnings)
 
 
 ;; Internal helper for `eldev-deflinter'.
@@ -2968,7 +2968,7 @@ least one warning."
       (setf linters (eldev-filter (not (memq it eldev-lint-disabled)) (mapcar #'car eldev--linters))))
     (setf linters (nreverse linters))
     (if linters
-        (let (eldev--lint-have-warnings)
+        (let ((eldev--lint-num-warnings 0))
           (eldev-trace "Going to run the following %s" (eldev-message-enumerate '("linter:" "linters:") linters))
           (catch 'eldev--lint-stop
             (dolist (linter linters)
@@ -2982,10 +2982,10 @@ least one warning."
                   (eldev-missing-dependency (if eldev-lint-optional
                                                 (eldev-warn "%s; skipping linter `%s'" (eldev-extract-error-message error) linter)
                                               (signal 'eldev-error `("%s; cannot use linter `%s'" ,(eldev-extract-error-message error) ,linter)))))
-                (when (and (eq eldev-lint-stop-mode 'linter) eldev--lint-have-warnings)
+                (when (and (eq eldev-lint-stop-mode 'linter) (> eldev--lint-num-warnings 0))
                   (eldev-trace "Stopping after the linter that issued warnings")
                   (throw 'eldev--lint-stop nil)))))
-          (if eldev--lint-have-warnings
+          (if (> eldev--lint-num-warnings 0)
               (signal 'eldev-error `("Linting produced warnings"))
             (eldev-print (if (cdr linters) "Linters have no complaints" "Linter has no complaints"))))
       (eldev-print "Nothing to do"))))
@@ -3074,19 +3074,23 @@ least one warning."
 
 (defmacro eldev-lint-linting-file (file &rest body)
   (declare (indent 1) (debug (body)))
-  `(progn
+  (let ((num-warnings (make-symbol "$num-warnings")))
+  `(let ((,num-warnings eldev--lint-num-warnings))
      (eldev-verbose "Linting file `%s'" ,file)
      ,@body
-     (eldev-lint-note-file-finished)))
+     (if (= eldev--lint-num-warnings ,num-warnings)
+         (eldev-print "File `%s': no warnings" ,file)
+       (eldev-warn "Found %s in file `%s'" (eldev-message-plural (- eldev--lint-num-warnings ,num-warnings) "warning") ,file))
+     (eldev-lint-note-file-finished))))
 
 (defun eldev-lint-note-warning ()
-  (setf eldev--lint-have-warnings t)
+  (setf eldev--lint-num-warnings (1+ eldev--lint-num-warnings))
   (when (eq eldev-lint-stop-mode 'warning)
     (eldev-trace "Stopping after the first linter warning")
     (throw 'eldev--lint-stop nil)))
 
 (defun eldev-lint-note-file-finished ()
-  (when (and (eq eldev-lint-stop-mode 'file) eldev--lint-have-warnings)
+  (when (and (eq eldev-lint-stop-mode 'file) (> eldev--lint-num-warnings 0))
     (eldev-trace "Stopping after the first file with linter warnings")
     (throw 'eldev--lint-stop nil)))
 
