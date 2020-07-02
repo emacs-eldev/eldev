@@ -3534,6 +3534,10 @@ This is mostly for interfacing with other tools.")
 (defvar eldev--build-plan nil)
 (defvar eldev--build-results nil)
 
+(defvar eldev-targets-list-sources t
+  "Whether to print target sources.
+In addition to t or nil, can also be symbol `concise'.")
+
 (defvar eldev-targets-list-dependencies nil
   "Whether to print known target dependencies.")
 
@@ -3818,6 +3822,12 @@ its `Eldev' file.
 Every project will also have virtual target `:default', possibly
 empty.
 
+Targets that additionally serve as sources to other targets are
+always shown.  Other sources (e.g. `.el' files) can be shown or
+not, depending on `--sources', `--concise' and `--no-sources'
+options.  In concise mode, if a target has several sources, at
+most three of them are listed in one line.
+
 In case `--dependencies' option is specified, lines starting with
 [...] show target dependencies:
 
@@ -3854,6 +3864,27 @@ recompilation of seemingly unrelated `.elc'."
             (eldev--do-targets toplevel 0 all-targets (make-hash-table :test #'eq))))
       (eldev-print "There are no targets for %s" (if (> (length parameters) 1) "these filesets" "this fileset")))))
 
+(eldev-defoption eldev-targets-list-sources ()
+  "List all target sources"
+  :options        (-s --sources)
+  :for-command    targets
+  :if-default     (and eldev-targets-list-sources (not (eq eldev-targets-list-sources 'concise)))
+  (setf eldev-targets-list-sources t))
+
+(eldev-defoption eldev-targets-list-sources-concise ()
+  "List target sources in one line, even if they are many"
+  :options        (-c --concise)
+  :for-command    targets
+  :if-default     (eq eldev-targets-list-sources 'concise)
+  (setf eldev-targets-list-sources 'concise))
+
+(eldev-defoption eldev-targets-omit-sources ()
+  "Don't list target sources at all"
+  :options        (-n --no-sources)
+  :for-command    targets
+  :if-default     (not eldev-targets-list-sources)
+  (setf eldev-targets-list-sources nil))
+
 (eldev-defbooloptions eldev-targets-list-dependencies eldev-targets-omit-dependencies eldev-targets-list-dependencies
   ("List known target dependencies"
    :options       (-d --dependencies))
@@ -3865,7 +3896,8 @@ recompilation of seemingly unrelated `.elc'."
 (defun eldev--do-targets (level-targets level all-targets printed-target-entries)
   (when level-targets
     (let ((indentation   (make-string (* level 4) ? ))
-          (level-targets (copy-sequence level-targets)))
+          (level-targets (copy-sequence level-targets))
+          level-sources)
       (setf level-targets (sort level-targets #'string<))
       (dolist (prioritized-target '(":package" ":default"))
         (when (member prioritized-target level-targets)
@@ -3876,24 +3908,34 @@ recompilation of seemingly unrelated `.elc'."
                (builder     (cdr (assq 'builder entry)))
                (sources     (cdr (assq 'sources entry)))
                (target-name (eldev-colorize target (cond ((eldev-virtual-target-p target) 'section) (sources 'name)) target)))
-          (cond ((and repeated builder)
-                 (eldev-output "%s%s  [%s]" indentation target-name
-                               (eldev-colorize (if (equal repeated target) "repeated, see above" (eldev-format-message "repeated, see `%s' above" repeated)) 'details)))
-                ((and builder (eldev-unless-quiet t))
-                 (eldev-output "%s%s  [%s]" indentation target-name (or (eldev-get (cdr (assq builder eldev--builders)) :short-name) builder)))
-                (t
-                 (eldev-output "%s%s" indentation target-name)))
-          (unless repeated
-            (puthash entry target printed-target-entries)
-            (eldev--do-targets sources (1+ level) all-targets printed-target-entries)
-            (when eldev-targets-list-dependencies
-              (dolist (dependency (sort (copy-sequence (eldev-get-target-dependencies target)) (lambda (a b) (string< (car a) (car b)))))
-                (eldev-output "%s    %s %s" indentation
-                              (eldev-colorize (eldev-pcase-exhaustive (car dependency)
-                                                (`depends-on "[dep]")
-                                                (`inherits   "[inh]"))
-                                              'details)
-                              (cadr dependency))))))))))
+          (cond ((and (null sources) (eq eldev-targets-list-sources 'concise))
+                 (push target level-sources))
+                ((or sources eldev-targets-list-sources (eldev-virtual-target-p target))
+                 (cond ((and repeated builder)
+                        (eldev-output "%s%s  [%s]" indentation target-name
+                                      (eldev-colorize (if (equal repeated target) "repeated, see above" (eldev-format-message "repeated, see `%s' above" repeated)) 'details)))
+                       ((and builder (eldev-unless-quiet t))
+                        (eldev-output "%s%s  [%s]" indentation target-name (or (eldev-get (cdr (assq builder eldev--builders)) :short-name) builder)))
+                       (t
+                        (eldev-output "%s%s" indentation target-name)))
+                 (unless repeated
+                   (puthash entry target printed-target-entries)
+                   (eldev--do-targets sources (1+ level) all-targets printed-target-entries)
+                   (when eldev-targets-list-dependencies
+                     (dolist (dependency (sort (copy-sequence (eldev-get-target-dependencies target)) (lambda (a b) (string< (car a) (car b)))))
+                       (eldev-output "%s    %s %s" indentation
+                                     (eldev-colorize (eldev-pcase-exhaustive (car dependency)
+                                                       (`depends-on "[dep]")
+                                                       (`inherits   "[inh]"))
+                                                     'details)
+                                     (cadr dependency)))))))))
+      (when level-sources
+        (setf level-sources (nreverse level-sources))
+        (let ((num (length level-sources)))
+          (when (> num 3)
+            (setf (nthcdr 3 level-sources) nil))
+          (eldev-output "%s%s%s" indentation (mapconcat #'identity level-sources (eldev-colorize ", " 'details))
+                        (if (> num 3) (eldev-colorize (eldev-format-message " + %d more" (- num 3)) 'details) "")))))))
 
 
 (eldev-defcommand eldev-build (&rest parameters)

@@ -208,6 +208,12 @@
      (eldev--test-run nil ("targets" ,@sets "--no-dependencies")
        (should (string= stdout (eldev--test-lines (eldev-filter (not (string-match-p (rx "[" (or "dep" "inh") "]") it)) expected))))
        (should (= exit-code 0)))
+     (eldev--test-run nil ("targets" ,@sets "--no-dependencies" "--no-sources")
+       (should (string= stdout (eldev--test-lines (eldev-filter (and (not (string-match-p (rx "[" (or "dep" "inh") "]") it))
+                                                                     (string-match-p (rx (or ":" "[")) it))
+                                                                expected))))
+       (should (= exit-code 0)))
+     ;; FIXME: Also test `concise' mode.
      ;; Otherwise we could fail when trying to compile tests in
      ;; "projects" that have no tests.
      (when (eldev-any-p (member ":compile" it) (list ,@targets))
