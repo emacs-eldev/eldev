@@ -4614,45 +4614,56 @@ will fail if the project already has file named `Eldev'."
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (when (file-exists-p eldev-file)
     (signal 'eldev-error `("File `%s' already exists in this project" ,eldev-file)))
-  (let ((archives-to-use t)
-        .gitignore)
+  (let* ((package         (ignore-errors (eldev-package-descriptor)))
+         (requirements    (when package (package-desc-reqs package)))
+         (archives-to-use t)
+         .gitignore)
     (if eldev-init-interactive
-        (when (eldev-y-or-n-p "Try to automatically select package archive for dependency lookup? ")
-          (let ((requirements (package-desc-reqs (eldev-package-descriptor))))
-            (if requirements
-                (progn
-                  (eldev-print "Please wait, this might take a while...")
-                  (dolist (archive eldev--known-package-archives)
-                    (unless (eldev--stable/unstable-archive-p (cadr archive))
-                      (eldev-use-package-archive (car archive))))
-                  (let ((archive-options (eldev--init-all-archive-combinations
-                                          (mapcar #'car (eldev-filter (or (eldev--stable/unstable-archive-p (cadr it))
-                                                                          (null (eldev--stable/unstable-archive-counterpart (cadr it))))
-                                                                      eldev--known-package-archives)))))
-                    (while archive-options
-                      (let ((archives (pop archive-options))
-                            simple)
-                        (dolist (archive archives)
-                          (let ((entry (eldev--resolve-package-archive archive)))
-                            (if (eldev--stable/unstable-archive-p entry)
-                                (progn (push (plist-get entry :stable)   simple)
-                                       (push (plist-get entry :unstable) simple))
-                              (push entry simple))))
-                        (if (let ((package-archives (eldev-filter (memq it simple) package-archives)))
-                              (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch))
-                              (package-read-all-archive-contents)
-                              (package-load-all-descriptors)
-                              (ignore-errors
-                                (let ((inhibit-message t))
-                                  (package-compute-transaction nil requirements))))
-                            (progn (eldev-print "Autoguessed the following %s" (eldev-message-enumerate '("package archive:" "package archives:") archives))
-                                   (setf archives-to-use archives
-                                         archive-options nil))
-                          (eldev-verbose "Cannot fetch project dependencies from %s" (eldev-message-enumerate "package archive" archives))))))
-                  (when (eq archives-to-use t)
-                    (eldev-warn "Failed to autoguess needed package archives; please edit `%s' as appropriate later" eldev-file)))
-              (eldev-print "This project has no dependencies"))))
-      (eldev-trace "Not in interactive mode, not autodetermining package archives to use"))
+        (cond (requirements
+               (when (eldev-y-or-n-p "Try to automatically select package archive(s) for dependency lookup? ")
+                 (eldev-print "Please wait, this might take a while...")
+                 (dolist (archive eldev--known-package-archives)
+                   (unless (eldev--stable/unstable-archive-p (cadr archive))
+                     (eldev-use-package-archive (car archive))))
+                 (let ((archive-options (eldev--init-all-archive-combinations
+                                         (mapcar #'car (eldev-filter (or (eldev--stable/unstable-archive-p (cadr it))
+                                                                         (null (eldev--stable/unstable-archive-counterpart (cadr it))))
+                                                                     eldev--known-package-archives)))))
+                   (while archive-options
+                     (let ((archives (pop archive-options))
+                           simple)
+                       (dolist (archive archives)
+                         (let ((entry (eldev--resolve-package-archive archive)))
+                           (if (eldev--stable/unstable-archive-p entry)
+                               (progn (push (plist-get entry :stable)   simple)
+                                      (push (plist-get entry :unstable) simple))
+                             (push entry simple))))
+                       (if (let ((package-archives (eldev-filter (memq it simple) package-archives)))
+                             (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch))
+                             (package-read-all-archive-contents)
+                             (package-load-all-descriptors)
+                             (ignore-errors
+                               (let ((inhibit-message t))
+                                 (package-compute-transaction nil requirements))))
+                           (progn (eldev-print "Autoguessed the following %s" (eldev-message-enumerate '("package archive:" "package archives:") archives))
+                                  (setf archives-to-use archives
+                                        archive-options nil))
+                         (eldev-verbose "Cannot fetch project dependencies from %s" (eldev-message-enumerate "package archive" archives))))))
+                 (when (eq archives-to-use t)
+                   (eldev-warn "Failed to autoguess needed package archives; please edit `%s' as appropriate later" eldev-file))))
+              (package
+               (eldev-print "This project has no dependencies (yet)")))
+      (eldev-trace (cond (requirements
+                          "Not in interactive mode, not autodetermining package archives to use")
+                         (package
+                          "This project has no dependencies (yet)"))))
+    (unless package
+      (eldev-warn "This directory doesn't seem to contain a valid Elisp package (yet)")
+      (eldev-print "If it does have main `.el' file, headers in it are likely corrupt or incomplete
+Try evaluating `(package-buffer-info)' in a buffer with the file")
+      ;; In non-interactive mode we continue anyway; in interactive we ask first.
+      (when (and eldev-init-interactive (not (eldev-y-or-n-p "Continue anyway? ")))
+        (signal 'eldev-quit 1)))
     (cond ((file-directory-p ".git")
            (eldev-trace "Detected `.git' subdirectory, assuming a Git repository")
            (setf .gitignore (if eldev-init-interactive

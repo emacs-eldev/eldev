@@ -85,5 +85,30 @@
 "))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-init-6 ()
+  ;; This directory doesn't contain an Elisp package file.
+  (eldev--test-without-files "uninitialized-e" "Eldev"
+    (eldev--test-run nil ("init" "--interactive")
+      :process-input "n\n"
+      (should (string-match-p "Continue anyway\\?" stdout))
+      (should (not (file-exists-p (expand-file-name "Eldev" (eldev--test-project-dir)))))
+      (should (= exit-code 1)))))
+
+(ert-deftest eldev-init-7 ()
+  ;; However, it should still be possible to initialize it.
+  (eldev--test-without-files "uninitialized-e" "Eldev"
+    (eldev--test-run nil ("init" "--interactive")
+      :process-input "y\n"
+      (should (string-match-p "Continue anyway\\?" stdout))
+      (should (string-match-p (eldev-format-message "Created file `%s' for this project" eldev-file) stdout))
+      (should (string= (eldev--test-file-contents nil "Eldev") "\
+; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+
+;; Uncomment some calls below as needed for your project.
+;(eldev-use-package-archive 'gnu)
+;(eldev-use-package-archive 'melpa)
+"))
+      (should (= exit-code 0)))))
+
 
 (provide 'test/init)
