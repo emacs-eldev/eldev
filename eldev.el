@@ -512,9 +512,9 @@ This is only a wrapper over `eldev-defoption'."
   :optional-value WHEN
   :default-value  (if eldev-coloring-mode (if (eq eldev-coloring-mode 'auto) "auto" "always") "never")
   (setf mode                (when mode (downcase mode))
-        eldev-coloring-mode (cond ((or (null mode) (string= mode "always")) t)
-                                  ((string= mode "auto")                    'auto)
-                                  ((string= mode "never")                   nil)
+        eldev-coloring-mode (cond ((or (null mode) (member mode '("always" "on"))) t)
+                                  ((string= mode "auto")                           'auto)
+                                  ((member mode '("never" "off"))                   nil)
                                   (t (signal 'eldev-wrong-option-usage `("argument must be `always', `auto' or `never'"))))))
 
 ;; Not advertised, this is mostly for external tools.
