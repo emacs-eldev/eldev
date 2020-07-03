@@ -806,7 +806,7 @@ return the descriptor of the project being built."
                              ;; FIXME: Maybe use `abbreviate-file-name', but make sure it is really safe first.
                              (let ((default-directory (expand-file-name project-dir)))
                                (dired-mode)
-                               (condition-case error
+                               (condition-case-unless-debug error
                                    (eldev--package-dir-info)
                                  (error (let ((message (error-message-string error)))
                                           (if (string-match-p "package headers" message)
