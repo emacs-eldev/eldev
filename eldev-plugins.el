@@ -110,7 +110,8 @@ out-of-date."
                                                               (push file filtered)))
                                                           (nreverse filtered))
                                                       files))))
-        (let ((inhibit-message t))
+        (let ((inhibit-message   t)
+              (make-backup-files nil))
           (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) eldev-project-dir)
           (when building-to-load-now
             (eldev--load-autoloads-file (expand-file-name target eldev-project-dir))))))

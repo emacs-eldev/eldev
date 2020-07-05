@@ -44,4 +44,11 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-autoloads-no-backup-1 ()
+  (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j-autoloads.el~")
+    (eldev--test-run nil ("build")
+      (eldev--test-assert-files project-dir preexisting-files "project-j-autoloads.el")
+      (should (= exit-code 0)))))
+
+
 (provide 'test/autoloads)
