@@ -1346,14 +1346,21 @@ If COMMAND is nil, list global options instead."
 
 ;; Loading dependencies; eldev prepare, eldev upgrade, eldev upgrade-self
 
+(defvar eldev-before-loading-dependencies-hook nil
+  "Hook executed before dependencies are loaded.
+See `eldev-load-dependencies-hook' for details.  Since 0.6.")
+
 (defvar eldev-load-dependencies-hook nil
   "Hook executed whenever dependencies are loaded.
-Functions are called with arguments NORMAL-DEPENDENCIES and
-ADDITIONAL-SETS.  The first is nil only if invoked from
-`eldev-load-extra-dependencies'.  The second is a list of
-additional dependency sets (see `eldev-add-extra-dependencies').
+Functions are called with arguments TYPE and ADDITIONAL-SETS.
+TYPE is either t if the project is being loaded for actual use,
+symbol `load-only' if it is loaded only for side effect (e.g. to
+build a tree of its dependencies), and nil if invoked from
+`eldev-load-extra-dependencies' (i.e. if the project is not being
+loaded at all: only some additional sets).  The second is a list
+of additional dependency sets (see `eldev-add-extra-dependencies').
 
-Since Eldev 0.2.")
+Since Eldev 0.2.  `load-only' is since 0.6.")
 
 (defvar eldev-upgrade-dry-run-mode nil
   "Don't upgrade if non-nil, just pretend to do so.")
@@ -1400,7 +1407,7 @@ ADDITIONAL-SETs can be used to install extra dependencies added
 to those sets (see function `eldev-add-extra-dependencies')."
   :aliases        prep
   :parameters     "[ADDITIONAL-SET...]"
-  (eldev-load-project-dependencies (mapcar #'intern parameters)))
+  (eldev-load-project-dependencies (mapcar #'intern parameters) nil t))
 
 (eldev-defcommand eldev-upgrade (&rest parameters)
   "Upgrade project dependencies.  If specific packages are not
@@ -1446,7 +1453,7 @@ sources will be replaced with a package downloaded from MELPA."
   :for-command    (upgrade upgrade-self))
 
 
-(defun eldev-load-project-dependencies (&optional additional-sets no-error-if-missing)
+(defun eldev-load-project-dependencies (&optional additional-sets no-error-if-missing load-only)
   "Load dependencies of the project.
 Remember that Eldev command functions get invoked with
 dependencies not having been loaded yet, because not all commands
@@ -1459,13 +1466,19 @@ dependencies.
 
 Normally, if any dependency cannot be loaded, an error is
 signalled.  However, this can be disabled using
-NO-ERROR-IF-MISSING."
+NO-ERROR-IF-MISSING.
+
+If LOAD-ONLY (since 0.6) is non-nil, project is being loaded for
+side-effects only, e.g. to build a tree of its dependencies.
+Otherwise it is assumed that some code of the project is going to
+be executed."
   ;; Certain commands may sometimes work on too old Eldev, but then decide to load project
   ;; dependencies, which of course fails.
   (when eldev-too-old
     (signal 'eldev-too-old eldev-too-old))
+  (run-hook-with-args 'eldev-before-loading-dependencies-hook (if load-only 'load-only t) additional-sets)
   (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing)
-  (run-hook-with-args 'eldev-load-dependencies-hook t additional-sets))
+  (run-hook-with-args 'eldev-load-dependencies-hook (if load-only 'load-only t) additional-sets))
 
 (defun eldev-load-extra-dependencies (sets &optional no-error-if-missing)
   "Load extra dependencies, but without normal project's dependencies.
@@ -1474,6 +1487,7 @@ that the project itself and its normal dependencies are not
 loaded.  Mostly useful to load runtime dependencies.
 
 Since 0.2."
+  (run-hook-with-args 'eldev-before-loading-dependencies-hook nil sets)
   (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing)
   (run-hook-with-args 'eldev-load-dependencies-hook nil sets))
 
@@ -1722,13 +1736,21 @@ Since 0.2."
                                              (dolist (requirement (package-desc-reqs dependency))
                                                (unless (package-activate (car requirement))
                                                  (throw 'exit nil)))
-                                             (push (if (eq dependency-name package-name)
-                                                       eldev-project-dir
-                                                     ;; 2 and 3 stand for directory name and its absolute path.
-                                                     (eldev-trace "Activating local dependency `%s' in directory `%s'"
-                                                                  dependency-name (nth 2 (assq dependency-name eldev--local-dependencies)))
-                                                     (nth 3 (assq dependency-name eldev--local-dependencies)))
-                                                   load-path)
+                                             (let* ((load-path-before load-path)
+                                                    (package-dir      (if (eq dependency-name package-name)
+                                                                          eldev-project-dir
+                                                                        ;; 2 and 3 stand for directory name and its absolute path.
+                                                                        (eldev-trace "Activating local dependency `%s' in directory `%s'"
+                                                                                     dependency-name (nth 2 (assq dependency-name eldev--local-dependencies)))
+                                                                        (nth 3 (assq dependency-name eldev--local-dependencies)))))
+                                               ;; Use package's autoloads file if it is present.  At this
+                                               ;; stage we never generate anything: only use existing files.
+                                               (eldev--load-autoloads-file (expand-file-name (format "%s-autoloads.el" dependency-name) package-dir))
+                                               ;; For non-ancient packages, autoloads file is supposed to
+                                               ;; modify `load-path'.  But if there is no such file, or it
+                                               ;; doesn't do that for whatever reason, do it ourselves.
+                                               (when (and (eq load-path load-path-before) (not (member package-dir load-path)))
+                                                 (push package-dir load-path)))
                                              (push dependency-name package-activated-list)
                                              t)
                                             (`packaged
@@ -1960,6 +1982,12 @@ descriptor."
             (or (nth 4 entry) 'as-is)
           (unless (or (symbolp dependency) (not (string= (package-desc-archive dependency) eldev--internal-pseudoarchive)))
             (error "Unexpected local dependency `%s'" dependency-name)))))))
+
+(defun eldev--load-autoloads-file (file)
+  (when (file-exists-p file)
+    (eldev-trace "Loading file `%s'" (file-relative-name file eldev-project-dir))
+    (with-demoted-errors "Error loading autoloads: %s"
+      (load file nil t))))
 
 (defun eldev--load-local-dependency (dependency)
   (let* ((dependency-name (package-desc-name dependency))
@@ -2342,7 +2370,7 @@ or evaluating (`eval') registered in the project's `Eldev' file."
   :aliases        (dtree deptree requirement-tree rtree reqtree)
   :parameters     "[ADDITIONAL-SET...]"
   (let ((additional-sets (mapcar #'intern parameters)))
-    (eldev-load-project-dependencies additional-sets t)
+    (eldev-load-project-dependencies additional-sets t t)
     (let ((package (eldev-package-descriptor))
           (listed  (make-hash-table :test #'equal)))
       (eldev--do-dependency-tree (package-desc-name package) (package-desc-version package) package 0 listed)
@@ -2415,7 +2443,7 @@ mode output is restricted to just the version."
     ;; be queried even if there are unavailable dependencies.
     (when (eldev-any-p (not (or (eq it 'emacs) (eq it this-package-name) (eldev-find-package-descriptor it nil t))) packages)
       (eldev--load-installed-runtime-dependencies)
-      (eldev-load-project-dependencies (mapcar #'car eldev--extra-dependencies)))
+      (eldev-load-project-dependencies (mapcar #'car eldev--extra-dependencies) nil t))
     (dolist (package packages)
       (let ((version (if (eq package 'emacs)
                          emacs-version
@@ -3174,7 +3202,7 @@ change `elisp-lint's configuration."
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
   (eldev-add-extra-dependencies 'runtime '(:package elisp-lint :archives (melpa gnu)))
   ;; This linter might need access to package dependencies for byte-compilation.
-  (eldev-load-project-dependencies 'runtime)
+  (eldev-load-project-dependencies 'runtime nil t)
   (require 'elisp-lint)
   ;; I don't see a better way than just replacing its output function completely.
   (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)
@@ -3965,7 +3993,7 @@ Also see commands `compile' and `package'."
   (let ((eldev-project-loading-mode 'as-is))
     (when (memq 'test eldev-build-sets)
       (eldev--inject-loading-roots 'test))
-    (eldev-load-project-dependencies 'build))
+    (eldev-load-project-dependencies 'build nil t))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))
         target-list
         target-fileset
