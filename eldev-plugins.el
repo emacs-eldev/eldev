@@ -20,6 +20,10 @@
 (require 'eldev)
 
 
+;; To silence byte-compilation warnings on Emacs 24-25 and also make code in
+;; `eldev-output-reroute-messages' work.
+(defvar inhibit-message)
+
 (defvar eldev--active-plugin-documentation nil)
 
 
