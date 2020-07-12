@@ -1391,6 +1391,8 @@ numbers mean to never use cache for `archive-contents'.  If the
 value is nil, never redownload the file (except for `upgrade' or
 `upgrade-self' command).")
 
+(defvar eldev--loaded-autoloads-files nil)
+
 
 (eldev-defcommand eldev-prepare (&rest parameters)
   "Explicitly install project dependencies.
@@ -1987,7 +1989,8 @@ descriptor."
   (when (file-exists-p file)
     (eldev-trace "Loading file `%s'" (file-relative-name file eldev-project-dir))
     (with-demoted-errors "Error loading autoloads: %s"
-      (load file nil t))))
+      (load file nil t)
+      (push file eldev--loaded-autoloads-files))))
 
 (defun eldev--load-local-dependency (dependency)
   (let* ((dependency-name (package-desc-name dependency))
@@ -3471,10 +3474,12 @@ be passed to Emacs, else it will most likely fail."
       (when (boundp variable)
         (push variable forwarding)
         (push (eldev-macroexp-quote (symbol-value variable)) forwarding)))
-    (let* ((value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
+    (let* ((autoloads           (apply #'nconc (mapcar (lambda (file) `("--load" ,file)) eldev--loaded-autoloads-files)))
+           (value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
            (command-line        (if (string= (car parameters) "--")
-                                    (append value-forwarding (cdr parameters))
+                                    (append autoloads value-forwarding (cdr parameters))
                                   (append eldev-emacs-default-command-line
+                                          autoloads
                                           value-forwarding
                                           (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
                                                                   (eldev-required-features eldev-emacs-required-features)))
