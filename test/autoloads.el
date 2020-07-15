@@ -51,4 +51,10 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-autoloads-compile-1 ()
+  (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j.elc")
+    (eldev--test-run nil ("compile" "project-j.el" "--warnings-as-errors")
+      (should (= exit-code 0)))))
+
+
 (provide 'test/autoloads)

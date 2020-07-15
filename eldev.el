@@ -3743,11 +3743,16 @@ information past the list of sources.  For this, use function
           (setf entry-targets (list virtual-target)))))))
 
 
-(defun eldev-get-target-dependencies (target)
+(defun eldev-get-target-dependencies (target &optional finder)
   "Get TARGET's dependencies.
 Usually, this function should be of no interest: custom builders
 should normally use only `eldev-set-target-dependencies'.
 However, it is allowed to use this function as described below.
+
+By default, list of all dependencies, i.e. across all possible
+dependency finders, is returned.  However, if argument FINDER is
+specified, returned list includes dependencies only for that
+finder.
 
 Returned list's elements look like (TYPE DEPENDENCY [...]).
 Following types (symbols) are currently defined:
@@ -3768,22 +3773,43 @@ Returned list must not be modified.  Instead, use function
 
 This function may only be called while inside the body of a
 `eldev-with-target-dependencies' macro."
-  (gethash target eldev--target-dependencies))
+  (unless eldev--target-dependencies
+    (error "May only be called inside `eldev-with-target-dependencies' macro"))
+  (let ((dependencies (gethash target eldev--target-dependencies)))
+    (if finder
+        (assq finder dependencies)
+      (let (all-dependencies)
+        (dolist (entry dependencies)
+          (dolist (dependency (cdr entry))
+            ;; FIXME: O(N*N), but probably doesn't matter, as we don't
+            ;;        expect large lists here.
+            (unless (member dependency all-dependencies)
+              (push dependency all-dependencies))))
+        all-dependencies))))
 
-(defun eldev-set-target-dependencies (target dependencies)
-  "Set the list of TARGET's dependencies.
+(defun eldev-set-target-dependencies (target finder dependencies)
+  "Set the list of TARGET's DEPENDENCIES according to given FINDER.
+FINDER should be a unique symbol, e.g. caller function name.  The
+purpose of it is that when function is called for the same target
+and finder again, it replaces previous dependencies, but only
+those found by the same finder.  This way several finders can
+cooperate to find exhaustive dependency list without even knowing
+of each other.
+
 See documentation of `eldev-get-target-dependencies' for list's
 elements description.
 
-Evaluates to non-nil if dependencies are changed, to nil if they
-are exactly the same as before (possibly in different order).
+Evaluates to non-nil if FINDER's dependencies are changed, to nil
+if they are exactly the same as before (possibly in different
+order).  In some cases, even if return value is non-nil, final
+dependencies can remain the same because of different finders.
 
 This function may only be called while inside the body of a
 `eldev-with-target-dependencies' macro."
-  (let ((current-dependencies (eldev-get-target-dependencies dependencies)))
+  (let ((current-dependencies (eldev-get-target-dependencies dependencies finder)))
     (unless (equal (sort (copy-sequence dependencies)         (lambda (a b) (string< (car a) (car b))))
                    (sort (copy-sequence current-dependencies) (lambda (a b) (string< (car a) (car b)))))
-      (puthash target (copy-sequence dependencies) eldev--target-dependencies)
+      (eldev--assq-set finder (copy-sequence dependencies) (gethash target eldev--target-dependencies) #'equal)
       (setf eldev--target-dependencies-need-saving t))))
 
 (defmacro eldev-with-target-dependencies (&rest body)
@@ -3795,14 +3821,14 @@ This function may only be called while inside the body of a
             (eldev--save-target-dependencies))))
 
 (defun eldev--load-target-dependencies ()
-  (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 1
+  (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
     (setf eldev--target-dependencies (cdr (assq 'dependencies contents))))
   (unless eldev--target-dependencies
     (setf eldev--target-dependencies (make-hash-table :test #'equal))))
 
 (defun eldev--save-target-dependencies ()
   (if eldev--target-dependencies-need-saving
-      (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 1
+      (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
         `((dependencies . ,eldev--target-dependencies)))
     (eldev-trace "Target dependency information is up-to-date, not saving...")))
 
@@ -4441,8 +4467,9 @@ possible to build arbitrary targets this way."
                      (puthash feature source eldev--feature-providers)
                      (setf inherited-targets (delete `(,feature . ,source) inherited-targets)
                            provided-feature  t))))
-                (eldev-set-target-dependencies target (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
-                                                              inherited-targets))))))))))
+                (eldev-set-target-dependencies target 'eldev-builder-byte-compile-.el
+                                               (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
+                                                       inherited-targets))))))))))
 
 (defun eldev--trigger-early-byte-compilation (file)
   (when (stringp file)

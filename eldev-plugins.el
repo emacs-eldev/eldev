@@ -57,6 +57,13 @@ Since 0.3."
 
 ;; Autoloads.
 
+(defvar eldev--collect-autoloads-from
+  '(:and eldev-main-fileset
+         ;; Have to duplicate `autoload' logic here.  I have no idea why it discards files
+         ;; with `=' at the front, but we need to do the same to remain compatible with
+         ;; installed packages.
+         ("./*.el" "./*.el.gz" "!./.*" "!./=*")))
+
 (defun eldev--autoloads-plugin (_configuration)
   "Plugin that enables processing of autoload cookies, generating
 and updating file `PROJECT-autoloads.el' automatically.  Eldev
@@ -83,48 +90,46 @@ specify loading mode `built' (or `built-and-compiled',
 
 Otherwise, autoloads file for the dependency may become
 out-of-date."
-  (let (building-to-load-now)
-    (eldev-defbuilder eldev-builder-autoloads (sources target)
-      :type           many-to-one
-      :short-name     "AUTOLOADS"
-      :message        target
-      :source-files   (:and eldev-main-fileset
-                            ;; Have to duplicate `autoload' logic here.  I have no idea why
-                            ;; it discards files with `=' at the front, but we need to do
-                            ;; the same to remain compatible with installed packages.
-                            ("./*.el" "./*.el.gz" "!./.*" "!./=*"))
-      :targets        (lambda (_sources)
-                        (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
-      :define-cleaner (eldev-cleaner-autoloads
-                       "Delete the generated package autoloads files."
-                       :default t)
-      :collect        (":default" ":autoloads")
-      ;; To make sure that `update-directory-autoloads' doesn't grab files it shouldn't,
-      ;; override `directory-files' temporarily.
-      (eldev-advised (#'directory-files :around (lambda (original directory &rest arguments)
-                                                  (let ((files (apply original directory arguments)))
-                                                    (if (file-equal-p directory eldev-project-dir)
-                                                        (let (filtered)
-                                                          (dolist (file files)
-                                                            (when (eldev-any-p (file-equal-p file it) sources)
-                                                              (push file filtered)))
-                                                          (nreverse filtered))
-                                                      files))))
-        (let ((inhibit-message   t)
-              (make-backup-files nil))
-          (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) eldev-project-dir)
-          (when building-to-load-now
-            (eldev--load-autoloads-file (expand-file-name target eldev-project-dir))))))
-    (add-hook 'eldev-before-loading-dependencies-hook (lambda (type _additional-sets)
-                                                        (when (and type (not (eq type 'load-only)))
-                                                          (let ((eldev-verbosity-level 'quiet))
-                                                            ;; If we are building now, we need to also load the file,
-                                                            ;; as for the normal loading place it will be too late.
-                                                            (setf building-to-load-now t)
-                                                            (unwind-protect
-                                                                (eldev-build ":autoloads")
-                                                              (setf building-to-load-now nil)))))))
-  (setf eldev-standard-excludes `(:or ,eldev-standard-excludes ,(format "./%s-autoloads.el" (package-desc-name (eldev-package-descriptor)))))
+  (eldev-defbuilder eldev-builder-autoloads (sources target)
+    :type           many-to-one
+    :short-name     "AUTOLOADS"
+    :message        target
+    :source-files   eldev--collect-autoloads-from
+    :targets        (lambda (_sources)
+                      (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
+    :define-cleaner (eldev-cleaner-autoloads
+                     "Delete the generated package autoloads files."
+                     :default t)
+    :collect        (":default" ":autoloads")
+    ;; To make sure that `update-directory-autoloads' doesn't grab files it shouldn't,
+    ;; override `directory-files' temporarily.
+    (eldev-advised (#'directory-files :around (lambda (original directory &rest arguments)
+                                                (let ((files (apply original directory arguments)))
+                                                  (if (file-equal-p directory eldev-project-dir)
+                                                      (let (filtered)
+                                                        (dolist (file files)
+                                                          (when (eldev-any-p (file-equal-p file it) sources)
+                                                            (push file filtered)))
+                                                        (nreverse filtered))
+                                                    files))))
+      (let ((inhibit-message   t)
+            (make-backup-files nil))
+        (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) eldev-project-dir)
+        ;; Always load the generated file.  Maybe there are cases when we don't need that,
+        ;; but most of the time we do.
+        (eldev--load-autoloads-file (expand-file-name target eldev-project-dir)))))
+  (add-hook 'eldev-before-loading-dependencies-hook (lambda (type _additional-sets)
+                                                      (when (and type (not (eq type 'load-only)))
+                                                        (let ((eldev-verbosity-level 'quiet))
+                                                          (eldev-build ":autoloads")))))
+  (let* ((autoloads-el    (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
+         (as-dependencies `((depends-on ,autoloads-el))))
+    (setf eldev-standard-excludes `(:or ,eldev-standard-excludes ,(format "./%s" autoloads-el)))
+    ;; FIXME: Or maybe make this optional?  However, if autoloads file is already present,
+    ;;        Eldev will use it, probably making this too confusing.
+    (eldev-with-target-dependencies
+      (dolist (el-file (eldev-find-files `(:and ,eldev--collect-autoloads-from "*.el")))
+        (eldev-set-target-dependencies (concat el-file "c") 'eldev--autoloads-plugin as-dependencies))))
   (eldev-documentation 'eldev--autoloads-plugin))
 
 

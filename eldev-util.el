@@ -53,7 +53,7 @@
       "Same as `pcase-exhaustive', needed for compatibility."
       `(pcase ,value
          ,@cases
-         (value  (error "No clause matching `%S'" value)))))
+         (value (error "No clause matching `%S'" value)))))
 
   (if (fboundp 'macroexp-quote)
       (defalias 'eldev-macroexp-quote 'macroexp-quote
@@ -185,8 +185,8 @@ Needed for compatibility."
             (value    ,value)
             ;; Emacs 24 doesn't support arbitrary comparators.
             (existing ,(eldev-pcase-exhaustive (or comparator #'eq)
-                         (`eq    `(assq  key ,place))
-                         (`equal `(assoc key ,place)))))
+                         ((or `eq    `(function eq))    `(assq  key ,place))
+                         ((or `equal `(function equal)) `(assoc key ,place)))))
        (if existing
            (setf (cdr existing) value)
          (push (cons key value) ,place)
