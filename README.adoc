@@ -41,6 +41,7 @@ endif::[]
 :since-0-3-2: image:https://img.shields.io/badge/since-0.3.2-8be[Since 0.3.2,float=right]
 :since-0-4: image:https://img.shields.io/badge/since-0.4-8be[Since 0.4,float=right]
 :since-0-5: image:https://img.shields.io/badge/since-0.5-8be[Since 0.5,float=right]
+:since-0-6: image:https://img.shields.io/badge/since-0.6-8be[Since 0.6,float=right]
 
 = Eldev
 
@@ -110,8 +111,8 @@ think real-world usage provides better models.
     Another simple project with no dependencies.  However, it uses its
     file `Eldev` to define a custom option that activates
     project-specific development assistance code.  Additionally, it
-    enables <<undercover>> plugin to collect test code coverage
-    statistics.
+    enables <<undercover-plugin,undercover>> plugin to collect test
+    code coverage statistics.
 
 {uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.travis.yml[`.travis.yml`]::
 
@@ -667,6 +668,34 @@ You can always ask Eldev for a full list:
 
     $ eldev --list-modes
 
+=== Autoloads
+
+{since-0-6} Autoloaded functions of installed Elisp packages can be
+accessed without a `require` form.  To simplify development, Eldev
+provides the same functionality for projects regardless of loading
+mode, as long as file `PACKAGE-autoloads.el` exists.  This might look
+like an unwieldy requirement, but luckily there is
+<<autoloads-plugin,a plugin>> for building the file and keeping it
+up-to-date as necessary.  The reason this is not enabled by default is
+that many projects — especially those not providing user-visible
+functionality, or those that consist of a single file — don’t have any
+autoloading functions or other forms.
+
+Local dependencies also have their autoloads activated regardless of
+loading mode.  However, in order for the autoloads file to be built
+automatically, you need to load them in one of the “built” mode:
+`built`, `built-and-compiled` or `built-source`.  (Or `packaged` —
+this, of course, also works.)  Otherwise, the autoloads file may be
+out-of-date or not generated at all.
+
+So, when adding a local dependency that uses the `autoloads` plugin,
+you need to specify it like this:
+
+[source]
+----
+(eldev-use-local-dependency "~/barlib" 'built)
+----
+
 
 == Build system
 
@@ -1207,9 +1236,9 @@ Currently, Eldev knows and uses the following linters:
   metadata, missing dependencies and much more.
 * {uri-relint}[`relint`] that can detects errors in regular expression
   strings in your source code.
-* {uri-elisp-lint}[`elisp-lint`] that checks Elisp code for various
-  errors — it is even more versatile than `package-lint` and actually
-  optionally includes it.
+* {since-0-6} {uri-elisp-lint}[`elisp-lint`] that checks Elisp code
+  for various errors — it is even more versatile than `package-lint`
+  and actually optionally includes it.
 
 In future, more linters can gain special treatmeant from Eldev (you
 can also leave a feature request in the issue tracker).  The full list
@@ -1538,14 +1567,14 @@ trivial — just add line:
 
 [source]
 ----
-(eldev-use-package-archive 'PLUGIN-NAME)
+(eldev-use-plugin 'PLUGIN-NAME)
 ----
 
 to file `Eldev` of your project.  For example:
 
 [source]
 ----
-(eldev-use-package-archive 'undercover)
+(eldev-use-plugin 'autoloads)
 ----
 
 As for other configuration, you can also do it in `Eldev-local` or
@@ -1553,7 +1582,7 @@ As for other configuration, you can also do it in `Eldev-local` or
 
 In future, plugins may become externally-managed and “detached” from
 Eldev itself (create an issue if you are interested).  For now,
-however, Eldev provides a single built-in plugin.
+however, Eldev provides two built-in plugins.
 
 You can check if a project has any plugins activated — and
 documentation for those plugins:
@@ -1569,12 +1598,53 @@ Remember that if a project activates a plugin in a non-standard way,
 for example from <<hooks,a hook>>, command `plugins` will not see it.
 
 There is currently no way to list all available plugins.  However, as
-of yet there is only one plugin anyway.
+of yet there are only two plugins anyway.
 
-[#undercover]
+[#autoloads-plugin]
+=== autoloads
+
+{since-0-6} A plugin that enables automatic collection of functions
+and other forms marked with `;;;###autoload` cookie in project’s `.el`
+files.  It tries to behave exactly the same as for installed Elisp
+packages, so that there are no differences between development and
+installed versions of the project.
+
+The plugin is not on by default because many projects don’t use
+autoloading functionality at all and having file
+`PACKAGE-autoloads.el` magically appear all the time in them would be
+annoying.
+
+To have autoloads automatically collected in your project, just
+activate the plugin: add form `(eldev-use-plugin 'autoloads)` to the
+project’s file `Eldev`.  You don’t need any additional steps to
+instruct Eldev how to use the generated file.  In fact, it is able to
+do this even without the plugin: the plugin only takes cares to build
+and update the file as necessary.
+
+If the plugin is activated, you can see new target `:autoloads` in the
+output of `targets` command.  In addition to being built by default,
+this file is also generated whenever Eldev needs to load the project:
+for commands `test`, `eval`, `exec` and `emacs`.  Finally, the file is
+also registered as a dependency to all `.elc` targets in the project;
+this way, byte-compiling always has access to up-to-date list of
+autoloaded functions.
+
+If you use a project with this plugin as a local dependency, you will
+need to load it in `built`, `built-and-compiled`, `built-source` or
+`packaged` mode.  Otherwise file `DEPENDENCY-autoloads.el` may be
+out-of-date or not generated at all.
+
+For example:
+
+[source]
+----
+(eldev-use-local-dependency "~/mylib" 'built-and-compiled)
+----
+
+[#undercover-plugin]
 === undercover
 
-This built-in plugin provides integration with
+{since-0-3} This built-in plugin provides integration with
 {uri-undercover}[undercover] tool that generates coverage reports for
 your tests.  It is active only for <<testing,command `test`>>.  By
 default, behavior of the tool is unaltered (with the exception that
@@ -1788,12 +1858,18 @@ added later).
 {since-0-2} `eldev-load-dependencies-hook`::
 
     Executed after successfully loading dependencies.  Functions are
-    called with arguments `NORMAL-DEPENDENCIES` and `ADDITIONAL-SETS`.
-    The first is non-nil when invoked from
-    `eldev-load-project-dependencies` and nil if from
-    `eldev-load-extra-dependencies`.  The second specifies which
-    <<additional-dependencies,sets of additional dependencies>> have
-    been loaded.
+    called with arguments `TYPE` and `ADDITIONAL-SETS`.  `TYPE` is
+    either t if the project is being loaded for actual use, symbol
+    `load-only` if it is loaded only for side effect (e.g. to build a
+    tree of its dependencies), and nil if invoked from
+    `eldev-load-extra-dependencies` (i.e. if the project is not being
+    loaded at all: only some additional sets).  The second is a list
+    of <<additional-dependencies,additional dependency sets>>.
+
+{since-0-6} `eldev-before-loading-dependencies-hook`::
+
+    Similar to the previous hook, but called _before_ dependencies are
+    loaded.  Function arguments are the same.
 
 {since-0-1-1} `eldev-build-system-hook`::
 
@@ -2192,6 +2268,6 @@ Elisp code:
   <<github-workflows,continuous integration>> among other things.
 * {uri-coveralls}[Coveralls] — web service to help you track your
   code coverage over time; can be integrated with Eldev using
-  <<undercover,a plugin>>;
+  <<undercover-plugin,a plugin>>;
 * {uri-undercover}[undercover] — a tool for generating test coverage
   reports for Elisp code; also see Coveralls above.
