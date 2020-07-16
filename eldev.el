@@ -1615,7 +1615,7 @@ Since 0.2."
                     (let ((eldev-verbosity-level nil))
                       ;; Adding archives like this to benefit from default priorities.
                       (eldev-use-package-archive archive))))))))))
-    (let ((archives-to-fetch    (eldev--determine-archives-to-fetch to-be-upgraded))
+    (let ((archives-to-fetch    (eldev--determine-archives-to-fetch to-be-upgraded t))
           (all-package-archives package-archives))
       (package-load-all-descriptors)
       (unless self
@@ -1625,12 +1625,11 @@ Since 0.2."
         ;; packages to our pseudoarchive.  This doesn't quite feel right, but I don't see
         ;; a better way.
         (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
-      (unless to-be-upgraded
-        ;; First iteration will be performed without fetching anything.
-        (push nil archives-to-fetch))
       ;; Retry for as long as we have archives to fetch contents of.
       (while archives-to-fetch
         (let ((to-fetch (pop archives-to-fetch)))
+          ;; `eldev--determine-archives-to-fetch' can add nil to its return value meaning
+          ;; "try without fetching".
           (when to-fetch
             (eldev--fetch-archive-contents `(,to-fetch) to-be-upgraded)))
         (when to-be-upgraded
@@ -1907,7 +1906,7 @@ Since 0.2."
              (current-buffer))
       (insert "\n"))))
 
-(defun eldev--determine-archives-to-fetch (&optional refetch-contents)
+(defun eldev--determine-archives-to-fetch (&optional refetch-contents nil-means-try-as-is)
   ;; I don't see a way to find if package archive contents is fetched
   ;; already without going into internals.
   (let ((archive-dir (expand-file-name "archives" package-user-dir))
@@ -1922,8 +1921,13 @@ Since 0.2."
                 (progn (eldev-trace "Will refetch contents of package archive `%s' in case it has changed" (car archive))
                        (push archive unfetched-archives))
               (eldev-trace "Contents of package archive `%s' has been fetched already" (car archive)))
-          (push archive unfetched-archives))))
-    (nreverse unfetched-archives)))
+          (push archive unfetched-archives))
+        ;; When the most prioritized archive has its contents already fetched, we add nil
+        ;; to the returned list if requested.
+        (when (and nil-means-try-as-is (null unfetched-archives))
+          (push nil unfetched-archives))))
+    (or (nreverse unfetched-archives)
+        (when nil-means-try-as-is '(nil)))))
 
 (defun eldev--fetch-archive-contents (archives &optional refetch-contents)
   (when archives

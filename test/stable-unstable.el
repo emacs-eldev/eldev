@@ -37,6 +37,26 @@
       (should (string= stdout "dependency-a 1.1\n"))
       (should (= exit-code 0)))))
 
+;; Real-world failure description: a project uses `melpa-unstable' archive and Buttercup
+;; tests.  Before a fix got applied, Buttercup would also be installed from
+;; `melpa-unstable', because that archive had been fetched already, so Eldev would try
+;; with what it had, even if more prioritized `melpa-stable' had not been available.
+(ert-deftest eldev-stable/unstable-5 ()
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '("archive-b" . ,(expand-file-name "../package-archive-b")))
+                          "prepare")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '(:stable   ("archive-a" . ,(expand-file-name "../package-archive-a"))
+                                                                  :unstable ("archive-b" . ,(expand-file-name "../package-archive-b"))))
+                          "--setup" `(eldev-add-extra-dependencies 'eval 'dependency-b)
+                          "eval" 1)
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'eval 'dependency-b)
+                          "version" "dependency-b")
+      (should (string= stdout "dependency-b 1.0\n"))
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-stable/unstable-upgrade-1 ()
   (let ((eldev--test-project "project-h"))
