@@ -1816,7 +1816,8 @@ Since 0.2."
         (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
                (already-installed         (unless local (eldev-find-package-descriptor package-name required-version nil)))
                (already-installed-version (when already-installed (package-desc-version already-installed)))
-               (package                   (unless (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)) already-installed))
+               (upgrading                 (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)))
+               (package                   (unless upgrading already-installed))
                (archives                  (eldev--package-plist-get-archives package-plist t)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
@@ -1862,9 +1863,12 @@ Since 0.2."
                                  best-version   version
                                  best-priority  priority
                                  best-preferred preferred))))))
-              (when (and fail-if-too-new (version-list-< best-version already-installed-version))
+              (when (and already-installed-version fail-if-too-new (version-list-< best-version already-installed-version))
                 ;; This error should be caught at an upper level.
                 (signal 'eldev-missing-dependency `("Installed version of dependency `%s' is suspiciously new" ,package-name)))
+              (when (and upgrading (null best-version) already-installed-version)
+                ;; Should be caught at an upper level, unless the package archive is gone.
+                (signal 'eldev-missing-dependency `("Dependency `%s' was once installed, but is not available anymore" ,package-name)))
               (unless (or (version-list-< already-installed-version best-version)
                           (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
                 (setf package already-installed))

@@ -211,6 +211,34 @@
       (should (string= stdout "All dependencies are up-to-date\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-upgrade-downgrade-2 ()
+  (let ((eldev--test-project "project-h"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--unstable" "version" "dependency-a")
+      (should (string= stdout "dependency-a 1.1\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("upgrade" "--downgrade")
+      (should (string= stdout "Upgraded or installed 1 dependency package\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("version" "dependency-a")
+      (should (string= stdout "dependency-a 1.0\n"))
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-upgrade-downgrade-3 ()
+  (let ((eldev--test-project "project-h"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--unstable" "version" "dependency-a")
+      (should (string= stdout "dependency-a 1.1\n"))
+      (should (= exit-code 0)))
+    ;; Make sure that it is not confused by (unused) archive with a higher priority.
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '("archive-d" . ,(expand-file-name "../package-archive-d")) 300)
+                          "upgrade" "--downgrade")
+      (should (string= stdout "Upgraded or installed 1 dependency package\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("version" "dependency-a")
+      (should (string= stdout "dependency-a 1.0\n"))
+      (should (= exit-code 0)))))
+
 
 ;; This is for e.g. upgrading Buttercup used for testing.
 (ert-deftest eldev-upgrade-runtime-dependencies-1 ()
