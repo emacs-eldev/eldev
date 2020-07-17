@@ -1049,16 +1049,25 @@ two variants."
 (defun eldev--do-use-package-archive (archive priority)
   (when (string= (car archive) eldev--internal-pseudoarchive)
     (error "Package archive name `%s' is reserved for internal use" eldev--internal-pseudoarchive))
-  (unless priority
-    (dolist (standard eldev--known-package-archives)
-      (when (and (not (eldev--stable/unstable-archive-p (nth 1 standard))) (string= (cdr archive) (cdr (nth 1 standard))))
-        (setf priority (nth 2 standard)))))
-  (eldev-verbose "Using package archive `%s' at `%s' with %s"
-                 (car archive) (cdr archive) (if priority (format "priority %s" priority) "default priority"))
-  (push archive package-archives)
-  (when priority
-    (push (cons (car archive) priority)
-          (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities))))
+  (let ((existing (assoc (car archive) package-archives)))
+    (if existing
+        (progn
+          (unless (equal (cdr archive) (cdr existing))
+            (error "Conflicting URLs for package archive `%s': `%s' and `%s'" (car archive) (cdr existing) (cdr archive)))
+          (when priority
+            (eldev--assq-set (car archive) priority
+                             (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities)
+                             #'equal)))
+      (unless priority
+        (dolist (standard eldev--known-package-archives)
+          (when (and (not (eldev--stable/unstable-archive-p (nth 1 standard))) (string= (cdr archive) (cdr (nth 1 standard))))
+            (setf priority (nth 2 standard)))))
+      (eldev-verbose "Using package archive `%s' at `%s' with %s"
+                     (car archive) (cdr archive) (if priority (format "priority %s" priority) "default priority"))
+      (push archive package-archives)
+      (when priority
+        (push (cons (car archive) priority)
+              (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities))))))
 
 (defun eldev--stable/unstable-preferred-archive (archive)
   (if (eldev--stable/unstable-archive-counterpart archive)
@@ -1607,16 +1616,10 @@ Since 0.2."
                                                       (eldev-format-message "%s %s" (plist-get plist :package) (eldev-message-version (plist-get plist :version))))
                                                     t))
             (setf all-packages (append all-packages extra-dependencies))
-            (dolist (plist extra-dependencies)
-              (dolist (archive (eldev--package-plist-get-archives plist))
-                (let* ((resolved (eldev--resolve-package-archive archive))
-                       (existing (assoc (car resolved) package-archives)))
-                  (if existing
-                      (unless (equal (cdr resolved) (cdr existing))
-                        (error "Conflicting URLs for package archive `%s': `%s' and `%s'" (car archive) (cdr existing) (cdr archive)))
-                    (let ((eldev-verbosity-level nil))
-                      ;; Adding archives like this to benefit from default priorities.
-                      (eldev-use-package-archive archive))))))))))
+            (let ((eldev-verbosity-level nil))
+              (dolist (plist extra-dependencies)
+                (dolist (archive (eldev--package-plist-get-archives plist))
+                  (eldev-use-package-archive archive))))))))
     (eldev--adjust-stable/unstable-archive-priorities)
     (let ((archives-to-fetch    (eldev--determine-archives-to-fetch to-be-upgraded t))
           (all-package-archives package-archives))
