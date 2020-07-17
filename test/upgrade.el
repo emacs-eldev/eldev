@@ -212,4 +212,21 @@
       (should (= exit-code 0)))))
 
 
+;; This is for e.g. upgrading Buttercup used for testing.
+(ert-deftest eldev-upgrade-runtime-dependencies-1 ()
+  (let ((eldev--test-project "project-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'runtime 'dependency-b) "--setup" (eldev-load-extra-dependencies 'runtime)
+                          "version" "dependency-b")
+      (should (string= stdout "dependency-b 1.0\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-b" . ,(expand-file-name "../package-archive-b")) 0)
+                          "upgrade" "dependency-b")
+      (should (string= stdout "Upgraded or installed 1 dependency package\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("version" "dependency-b")
+      (should (string= stdout "dependency-b 1.1\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/upgrade)

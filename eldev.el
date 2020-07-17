@@ -1413,10 +1413,12 @@ to those sets (see function `eldev-add-extra-dependencies')."
 
 (eldev-defcommand eldev-upgrade (&rest parameters)
   "Upgrade project dependencies.  If specific packages are not
-specified, all project dependencies and those registered with
-`eldev-add-extra-dependencies' are upgraded.  However, you can
-list names of packages to be upgraded.  Requirements of these
-package will be upgraded if needed too.
+requested, all project dependencies, those registered with
+`eldev-add-extra-dependencies' and all additional tools used
+during development (e.g. `buttercup' and various linters) are
+upgraded.  However, you can list names of packages to be
+upgraded.  Requirements of these package will be upgraded if
+needed too.
 
 Note that local dependencies are never installed or upgraded from
 remote package archives.  If you sometimes use an “official”
@@ -1425,6 +1427,7 @@ remote copy to be upgraded, make it non-local first (e.g. by
 commenting out `eldev-use-local-dependency' in `Eldev-local')
 before upgrading."
   :parameters     "[PACKAGE...]"
+  (eldev--load-installed-runtime-dependencies)
   (eldev--install-or-upgrade-dependencies 'project (mapcar #'car eldev--extra-dependencies) (or (mapcar #'intern parameters) t) eldev-upgrade-dry-run-mode nil t))
 
 (eldev-defcommand eldev-upgrade-self (&rest parameters)
@@ -1572,7 +1575,6 @@ Since 0.2."
 ;; local dependencies that can change unpredictably and also requirement that certain
 ;; dependencies are installed only from certain archives.  Roll our own.
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
-  (eldev--adjust-stable/unstable-archive-priorities)
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
          (self                              (eq core 'eldev))
@@ -1615,6 +1617,7 @@ Since 0.2."
                     (let ((eldev-verbosity-level nil))
                       ;; Adding archives like this to benefit from default priorities.
                       (eldev-use-package-archive archive))))))))))
+    (eldev--adjust-stable/unstable-archive-priorities)
     (let ((archives-to-fetch    (eldev--determine-archives-to-fetch to-be-upgraded t))
           (all-package-archives package-archives))
       (package-load-all-descriptors)
@@ -2429,9 +2432,10 @@ Eldev itself is displayed.
 You can also specify name of the package(s) you are interested in
 on the command line.  These may include the project being built,
 any of its dependencies, any dependencies of those (recursively),
-anything registered with `eldev-add-extra-dependencies', `eldev'
-itself or `emacs'.  If multiple versions are requested, each is
-printed on a separate line.
+anything registered with `eldev-add-extra-dependencies', tools
+used in your project during development (e.g. `buttercup' or
+various linters), `eldev' itself or `emacs'.  If multiple
+versions are requested, each is printed on a separate line.
 
 If command line parameters include project dependencies, they are
 installed first if needed.
