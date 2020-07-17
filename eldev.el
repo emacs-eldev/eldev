@@ -1621,7 +1621,7 @@ Since 0.2."
                 (dolist (archive (eldev--package-plist-get-archives plist))
                   (eldev-use-package-archive archive))))))))
     (eldev--adjust-stable/unstable-archive-priorities)
-    (let ((archives-to-fetch    (eldev--determine-archives-to-fetch to-be-upgraded t))
+    (let ((archive-statuses     (or (eldev--determine-archives-to-fetch to-be-upgraded t) '((nil . t))))
           (all-package-archives package-archives))
       (package-load-all-descriptors)
       (unless self
@@ -1632,29 +1632,26 @@ Since 0.2."
         ;; a better way.
         (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
       ;; Retry for as long as we have archives to fetch contents of.
-      (while archives-to-fetch
-        (let ((to-fetch (pop archives-to-fetch)))
-          ;; `eldev--determine-archives-to-fetch' can add nil to its return value meaning
-          ;; "try without fetching".
-          (when to-fetch
-            (eldev--fetch-archive-contents `(,to-fetch) to-be-upgraded)))
-        (when to-be-upgraded
+      (while archive-statuses
+        (let ((next-archive (pop archive-statuses)))
+          (unless (cdr next-archive)
+            (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded))
           ;; Don't use archives we haven't fetched yet.
-          (setf package-archives (eldev-filter (not (memq it archives-to-fetch)) all-package-archives)))
-        (package-read-all-archive-contents)
-        (setf plan (cons nil nil))
-        (condition-case error
-            (let ((visited (make-hash-table :test #'eq)))
-              (dolist (package-plist all-packages)
-                (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan (and archives-to-fetch (not eldev-upgrade-downgrade-mode)) visited))
-              (when archives-to-fetch
-                (eldev-trace "Not fetching contents of other archive(s) as redundant")
-                (setf archives-to-fetch nil)))
-          (eldev-error (unless archives-to-fetch
-                         ;; If we don't have anything more to fetch, give up.
-                         (if no-error-if-missing
-                             (eldev-verbose "%s" (error-message-string error))
-                           (signal (car error) (cdr error))))))))
+          (setf package-archives (eldev-filter (not (assoc it archive-statuses)) all-package-archives))
+          (package-read-all-archive-contents)
+          (setf plan (cons nil nil))
+          (condition-case error
+              (let ((visited (make-hash-table :test #'eq)))
+                (dolist (package-plist all-packages)
+                  (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan (and archive-statuses (not eldev-upgrade-downgrade-mode)) visited))
+                (when archive-statuses
+                  (eldev-trace "Not fetching contents of other archive(s) as redundant")
+                  (setf archive-statuses nil)))
+            (eldev-error (unless archive-statuses
+                           ;; If we don't have anything more to fetch, give up.
+                           (if no-error-if-missing
+                               (eldev-verbose "%s" (error-message-string error))
+                             (signal (car error) (cdr error)))))))))
     (let ((planned-packages    (nreverse (car plan)))
           (up-to-date-packages (cdr plan))
           (non-local-plan-size 0)
@@ -1912,28 +1909,30 @@ Since 0.2."
              (current-buffer))
       (insert "\n"))))
 
-(defun eldev--determine-archives-to-fetch (&optional refetch-contents nil-means-try-as-is)
-  ;; I don't see a way to find if package archive contents is fetched
-  ;; already without going into internals.
+(defun eldev--determine-archives-to-fetch (&optional refetch-contents return-all)
+  "Return a list of archives that need to be (re)fetched.
+If RETURN-ALL is non-nil, return a list of (ARCHIVE . UP-TO-DATE)
+for all archives instead."
   (let ((archive-dir (expand-file-name "archives" package-user-dir))
-        unfetched-archives)
+        result)
     (dolist (archive (sort (copy-sequence package-archives)
                            (lambda (a b) (or (and (eldev--stable/unstable-preferred-archive a)
                                                   (not (eldev--stable/unstable-preferred-archive b)))
                                              (> (eldev-package-archive-priority (car a)) (eldev-package-archive-priority (car b)))))))
       (unless (string= (car archive) eldev--internal-pseudoarchive)
-        (if (file-exists-p (expand-file-name "archive-contents" (expand-file-name (car archive) archive-dir)))
+        (let (up-to-date)
+          ;; I don't see a way to find if package archive contents is fetched already
+          ;; without going into internals.
+          (when (file-exists-p (expand-file-name "archive-contents" (expand-file-name (car archive) archive-dir)))
             (if refetch-contents
-                (progn (eldev-trace "Will refetch contents of package archive `%s' in case it has changed" (car archive))
-                       (push archive unfetched-archives))
-              (eldev-trace "Contents of package archive `%s' has been fetched already" (car archive)))
-          (push archive unfetched-archives))
-        ;; When the most prioritized archive has its contents already fetched, we add nil
-        ;; to the returned list if requested.
-        (when (and nil-means-try-as-is (null unfetched-archives))
-          (push nil unfetched-archives))))
-    (or (nreverse unfetched-archives)
-        (when nil-means-try-as-is '(nil)))))
+                (eldev-trace "Will refetch contents of package archive `%s' in case it has changed" (car archive))
+              (setf up-to-date t)
+              (eldev-trace "Contents of package archive `%s' has been fetched already" (car archive))))
+          (if return-all
+              (push `(,archive . ,up-to-date) result)
+            (unless up-to-date
+              (push archive result))))))
+    (nreverse result)))
 
 (defun eldev--fetch-archive-contents (archives &optional refetch-contents)
   (when archives

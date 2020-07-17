@@ -57,6 +57,26 @@
       (should (string= stdout "dependency-b 1.0\n"))
       (should (= exit-code 0)))))
 
+;; Like the previous test, but with one more archive.  In real use this would be GNU ELPA.
+(ert-deftest eldev-stable/unstable-6 ()
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '("archive-d" . ,(expand-file-name "../package-archive-d")) 300)
+                          "--setup" `(eldev-use-package-archive '("archive-b" . ,(expand-file-name "../package-archive-b")) 100)
+                          "prepare")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '("archive-d" . ,(expand-file-name "../package-archive-d")) 300)
+                          "--setup" `(eldev-use-package-archive '(:stable   ("archive-a" . ,(expand-file-name "../package-archive-a"))
+                                                                  :unstable ("archive-b" . ,(expand-file-name "../package-archive-b")))
+                                                                100)
+                          "--setup" `(eldev-add-extra-dependencies 'eval 'dependency-b)
+                          "eval" 1)
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'eval 'dependency-b)
+                          "version" "dependency-b")
+      (should (string= stdout "dependency-b 1.0\n"))
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-stable/unstable-upgrade-1 ()
   (let ((eldev--test-project "project-h"))
