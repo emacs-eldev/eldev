@@ -579,6 +579,26 @@ listing package names after the command, e.g.:
 
     $ eldev --unstable upgrade dash
 
+==== Upgrading development tools
+
+{since-0-6} Command `upgrade` works not only with package
+dependencies, but also with common development tools used by the
+project during development, for example <<buttercup,Buttercup>> or
+<<linting,various linters>>.  This works exactly the same as for
+project dependencies, with the only exception that the tool must be
+installed first.  E.g, for Buttercup you need to <<testing,test>> your
+project at least once, so that Eldev knows about the need for this
+tool.
+
+Development tools are installed from package archives hardcoded inside
+Eldev, regardless of which archives you have configured for your
+project.  For example, even if you use `melpa-unstable` archive,
+Buttercup will still be installed from MELPA Stable (unless, of
+course, you use `--unstable` global option).  If you need, you can
+switch to unstable version of the tool later:
+
+    $ eldev --unstable upgrade buttercup
+
 [#global-cache]
 === Global package archive cache
 
@@ -1211,6 +1231,7 @@ If you dislike these simplifications, set `eldev-dwim` to nil in
 `~/.eldev/config`.
 
 
+[#linting]
 == Linting
 
 {since-0-2} It might be useful to ensure that your source code follows
