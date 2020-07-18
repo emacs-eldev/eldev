@@ -120,10 +120,11 @@ out-of-date."
         ;; Always load the generated file.  Maybe there are cases when we don't need that,
         ;; but most of the time we do.
         (eldev--load-autoloads-file (expand-file-name target eldev-project-dir)))))
-  (add-hook 'eldev-before-loading-dependencies-hook (lambda (type _additional-sets)
-                                                      (when (and type (not (eq type 'load-only)))
-                                                        (let ((eldev-verbosity-level 'quiet))
-                                                          (eldev-build ":autoloads")))))
+  (add-hook 'eldev-before-loading-dependencies-hook
+            (lambda (type _additional-sets)
+              (when (and type (not (eq type 'load-only)))
+                (eldev-with-verbosity-level-except 'quiet (#'eldev-load-project-dependencies #'eldev-load-extra-dependencies)
+                  (eldev-build ":autoloads")))))
   (let* ((autoloads-el    (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
          (as-dependencies `((depends-on ,autoloads-el))))
     (setf eldev-standard-excludes `(:or ,eldev-standard-excludes ,(format "./%s" autoloads-el)))
@@ -135,10 +136,11 @@ out-of-date."
     ;; `elisp-lint' can generate autoloads itself.  Replace that with what we do.  As
     ;; always, there seems to be no other way than diving into internals.
     (with-eval-after-load 'elisp-lint
-      (advice-add 'elisp-lint--generate-autoloads :override (lambda (&rest _etc)
-                                                              (let ((eldev-verbosity-level 'quiet))
-                                                                (eldev-build ":autoloads"))
-                                                              (setf elisp-lint--autoloads-filename autoloads-el)))))
+      (advice-add 'elisp-lint--generate-autoloads :override
+                  (lambda (&rest _etc)
+                    (eldev-with-verbosity-level-except 'quiet (#'eldev-load-project-dependencies #'eldev-load-extra-dependencies)
+                      (eldev-build ":autoloads"))
+                    (setf elisp-lint--autoloads-filename autoloads-el)))))
   (eldev-documentation 'eldev--autoloads-plugin))
 
 (defun eldev--autoloads-used-p ()

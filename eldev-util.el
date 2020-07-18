@@ -530,6 +530,25 @@ Since 0.2."
   `(eldev-when-tracing ,(eldev--output-wrapper nil 'trace format-string arguments)))
 
 
+(defmacro eldev-with-verbosity-level-except (level functions-with-original-level &rest body)
+  "Execute BODY with given LEVEL of verbosity.
+However, if any of exception functions are called, restore
+current level for it.
+
+Since 0.6.1."
+  (declare (indent 2) (debug (symbol sexp body)))
+  (let ((original-verbosity-level (make-symbol "$original-verbosity-level"))
+        (verbosity-level-restorer (make-symbol "$verbosity-level-restorer")))
+    (dolist (exception (eldev-listify functions-with-original-level))
+      (setf body `((eldev-advised (,exception :around ,verbosity-level-restorer) ,@body))))
+    `(let* ((,original-verbosity-level eldev-verbosity-level)
+            (eldev-verbosity-level    ,level)
+            (,verbosity-level-restorer (lambda (original &rest arguments)
+                                         (let ((eldev-verbosity-level ,original-verbosity-level))
+                                           (apply original arguments)))))
+       ,@body)))
+
+
 (defun eldev-read-wholly (string &optional description)
   "Read STRING as Elisp expression.
 This is basically a wrapper over `read-from-string', but issues
