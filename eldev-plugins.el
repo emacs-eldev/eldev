@@ -64,6 +64,8 @@ Since 0.3."
          ;; installed packages.
          ("./*.el" "./*.el.gz" "!./.*" "!./=*")))
 
+(defvar elisp-lint--autoloads-filename)
+
 (defun eldev--autoloads-plugin (_configuration)
   "Plugin that enables processing of autoload cookies, generating
 and updating file `PROJECT-autoloads.el' automatically.  Eldev
@@ -129,7 +131,14 @@ out-of-date."
     ;;        Eldev will use it, probably making this too confusing.
     (eldev-with-target-dependencies
       (dolist (el-file (eldev-find-files `(:and ,eldev--collect-autoloads-from "*.el")))
-        (eldev-set-target-dependencies (concat el-file "c") 'eldev--autoloads-plugin as-dependencies))))
+        (eldev-set-target-dependencies (concat el-file "c") 'eldev--autoloads-plugin as-dependencies)))
+    ;; `elisp-lint' can generate autoloads itself.  Replace that with what we do.  As
+    ;; always, there seems to be no other way than diving into internals.
+    (with-eval-after-load 'elisp-lint
+      (advice-add 'elisp-lint--generate-autoloads :override (lambda (&rest _etc)
+                                                              (let ((eldev-verbosity-level 'quiet))
+                                                                (eldev-build ":autoloads"))
+                                                              (setf elisp-lint--autoloads-filename autoloads-el)))))
   (eldev-documentation 'eldev--autoloads-plugin))
 
 
