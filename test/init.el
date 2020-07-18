@@ -110,5 +110,20 @@
 "))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-init-8 ()
+  (eldev--test-without-files "uninitialized-f" "Eldev"
+    (eldev--test-run nil ("init" "--non-interactive")
+      (should (string= stdout (eldev-format-message "Created file `%s' for this project\n" eldev-file)))
+      (should (string= (eldev--test-file-contents nil "Eldev") "\
+; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+
+;; Uncomment some calls below as needed for your project.
+;(eldev-use-package-archive 'gnu)
+;(eldev-use-package-archive 'melpa)
+
+(eldev-use-plugin 'autoloads)
+"))
+      (should (= exit-code 0)))))
+
 
 (provide 'test/init)

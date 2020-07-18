@@ -4687,6 +4687,8 @@ documentation."
 
 (defvar eldev-init-interactive t)
 
+(declare-function eldev--autoloads-used-p 'eldev-plugins)
+
 (eldev-defcommand eldev-init (&rest parameters)
   "Initialize project in this directory to use Eldev.  This command
 will fail if the project already has file named `Eldev'."
@@ -4697,6 +4699,7 @@ will fail if the project already has file named `Eldev'."
   (let* ((package         (ignore-errors (eldev-package-descriptor)))
          (requirements    (when package (package-desc-reqs package)))
          (archives-to-use t)
+         autoloads
          .gitignore)
     (if eldev-init-interactive
         (cond (requirements
@@ -4744,6 +4747,13 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
       ;; In non-interactive mode we continue anyway; in interactive we ask first.
       (when (and eldev-init-interactive (not (eldev-y-or-n-p "Continue anyway? ")))
         (signal 'eldev-quit 1)))
+    (require 'eldev-plugins)
+    (when (eldev--autoloads-used-p)
+      (eldev-trace "Detected autoload cookies in project `.el' files")
+      (setf autoloads (if eldev-init-interactive
+                          (eldev-y-or-n-p (eldev-format-message "Autoload cookies (`;;;###autoload') detected; enable plugin `autoloads'? "))
+                        (eldev-trace "Not in interactive mode, will enable plugin `autoloads' by default")
+                        t)))
     (cond ((file-directory-p ".git")
            (eldev-trace "Detected `.git' subdirectory, assuming a Git repository")
            (setf .gitignore (if eldev-init-interactive
@@ -4767,7 +4777,9 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
              (dolist (archive archives-to-use)
                (insert (format "(eldev-use-package-archive '%s)\n" archive))))
             (t
-             (insert ";; Calls to `eldev-use-package-archive' are not needed: no dependencies\n"))))
+             (insert ";; Calls to `eldev-use-package-archive' are not needed: no dependencies\n")))
+      (when autoloads
+        (insert "\n(eldev-use-plugin 'autoloads)\n")))
     (eldev-print "Created file `%s' for this project" eldev-file)
     (cond (.gitignore
            (when (eldev-git-executable 'warn)

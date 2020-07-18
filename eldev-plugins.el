@@ -141,6 +141,13 @@ out-of-date."
                                                               (setf elisp-lint--autoloads-filename autoloads-el)))))
   (eldev-documentation 'eldev--autoloads-plugin))
 
+(defun eldev--autoloads-used-p ()
+  (eldev-any-p (with-temp-buffer
+                 (insert-file-contents it)
+                 (let ((case-fold-search nil))
+                   (re-search-forward (rx bol (0+ space) ";;;###autoload" (0+ space) eol) nil t)))
+               (eldev-find-files eldev--collect-autoloads-from)))
+
 
 
 ;; Undercover.
