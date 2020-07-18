@@ -3175,7 +3175,8 @@ least one warning."
   ;; This linter needs access to package archive contents, so at least fetch all archives
   ;; we have never fetched yet.
   (let ((eldev-global-cache-archive-contents-max-age nil))
-    (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch)))
+    (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch))
+    (package-read-all-archive-contents))
   (require 'package-lint)
   (dolist (file (eldev-lint-find-files "*.el"))
     (eldev-lint-linting-file file
@@ -3220,6 +3221,11 @@ change `elisp-lint's configuration."
   (eldev-add-extra-dependencies 'runtime '(:package elisp-lint :archives (melpa gnu)))
   ;; This linter might need access to package dependencies for byte-compilation.
   (eldev-load-project-dependencies 'runtime nil t)
+  ;; This linter might invoke `package-lint' that needs access to package archive
+  ;; contents.  Need to make sure that all archive contents is loaded
+  ;; (`eldev--install-or-upgrade-dependencies' loads as few archives as required to
+  ;; install the runtime dependencies).
+  (package-read-all-archive-contents)
   (require 'elisp-lint)
   ;; I don't see a better way than just replacing its output function completely.
   (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)
