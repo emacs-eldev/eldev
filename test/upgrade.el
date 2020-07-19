@@ -244,7 +244,7 @@
 (ert-deftest eldev-upgrade-runtime-dependencies-1 ()
   (let ((eldev--test-project "project-a"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'runtime 'dependency-b) "--setup" (eldev-load-extra-dependencies 'runtime)
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'runtime 'dependency-b)
                           "version" "dependency-b")
       (should (string= stdout "dependency-b 1.0\n"))
       (should (= exit-code 0)))
