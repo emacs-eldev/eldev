@@ -868,6 +868,9 @@ Try evaluating `(package-buffer-info)' in a buffer with the file" "%s" ,message)
   "Install given FILE as a package, suppressing messages.
 Compilation warnings are not suppressed unless `inhibit-message'
 is non-nil when this function is called."
+  ;; Work around a bug in Emacs: without this `package--list-loaded-files'
+  ;; doesn't produce correct result because it needs `find-library-name'.
+  (require 'find-func)
   (let* ((original-warning-function         (when (boundp 'byte-compile-log-warning-function) byte-compile-log-warning-function))
          (byte-compile-log-warning-function (if (and (boundp 'inhibit-message) inhibit-message)
                                                 original-warning-function
@@ -875,7 +878,71 @@ is non-nil when this function is called."
                                                 (let ((inhibit-message nil))
                                                   (apply original-warning-function arguments)))))
          (inhibit-message                   t))
-    (package-install-file file)))
+    (eldev-advised (#'package-unpack :after
+                                     (lambda (pkg-desc &rest _etc)
+                                       (when (< emacs-major-version 25)
+                                         ;; Emacs 24.x wouldn't reload package files.  See
+                                         ;; `package--load-files-for-activation' in newer versions.
+                                         (let ((pkg-dir (expand-file-name (package-desc-full-name pkg-desc) package-user-dir)))
+                                           (eldev--package--load-files-for-activation (package-load-descriptor pkg-dir) :reload)))))
+      (package-install-file file))))
+
+
+;; The following four functions are copied over from Emacs source.  They appeared in 25.1.
+;; We use the copies to make 24.x behave more similarly.
+
+(defun eldev--package--load-files-for-activation (pkg-desc reload)
+  (let* ((loaded-files-list
+          (when reload
+            (eldev--package--list-loaded-files (package-desc-dir pkg-desc)))))
+    (eldev--package--activate-autoloads-and-load-path pkg-desc)
+    (with-demoted-errors "Error in package--load-files-for-activation: %s"
+      (mapc (lambda (feature) (load feature nil t))
+            (remove (file-truename (eldev--package--autoloads-file-name pkg-desc))
+                    loaded-files-list)))))
+
+(defun eldev--package--list-loaded-files (dir)
+  (let* ((history (delq nil
+                        (mapcar (lambda (x)
+                                  (let ((f (car x)))
+                                    (and (stringp f)
+                                         (file-name-sans-extension f))))
+                                load-history)))
+         (dir (file-truename dir))
+         (list-of-conflicts
+          (delq
+           nil
+           (mapcar
+               (lambda (x) (let* ((file (file-relative-name x dir))
+                             (previous
+                              (ignore-errors
+                                (file-name-sans-extension
+                                 (file-truename (find-library-name file)))))
+                             (pos (when previous (member previous history))))
+                        (when pos
+                          (cons (file-name-sans-extension file) (length pos)))))
+               ;; Upstream uses `directory-files-recursively', but that is too new for Emacs 24.
+               (eldev-find-files '("*.el" "!.*") t dir)))))
+    (let ((default-directory (file-name-as-directory dir)))
+      (mapcar (lambda (x) (file-truename (car x)))
+        (sort list-of-conflicts
+              (lambda (x y) (< (cdr x) (cdr y))))))))
+
+(defun eldev--package--activate-autoloads-and-load-path (pkg-desc)
+  (let* ((old-lp load-path)
+         (pkg-dir (package-desc-dir pkg-desc))
+         (pkg-dir-dir (file-name-as-directory pkg-dir)))
+    (with-demoted-errors "Error loading autoloads: %s"
+      (load (eldev--package--autoloads-file-name pkg-desc) nil t))
+    (when (and (eq old-lp load-path)
+               (not (or (member pkg-dir load-path)
+                        (member pkg-dir-dir load-path))))
+      (push pkg-dir load-path))))
+
+(defun eldev--package--autoloads-file-name (pkg-desc)
+  (expand-file-name
+   (format "%s-autoloads" (package-desc-name pkg-desc))
+   (package-desc-dir pkg-desc)))
 
 
 
