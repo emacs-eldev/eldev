@@ -901,6 +901,8 @@ is non-nil when this function is called."
             (remove (file-truename (eldev--package--autoloads-file-name pkg-desc))
                     loaded-files-list)))))
 
+(declare-function find-library-name "find-func")
+
 (defun eldev--package--list-loaded-files (dir)
   (let* ((history (delq nil
                         (mapcar (lambda (x)
