@@ -1402,6 +1402,8 @@ value is nil, never redownload the file (except for `upgrade' or
 
 (defvar eldev--loaded-autoloads-files nil)
 
+(defvar eldev--package-load-paths nil)
+
 
 (eldev-defcommand eldev-prepare (&rest parameters)
   "Explicitly install project dependencies.
@@ -1754,7 +1756,8 @@ Since 0.2."
                                                ;; modify `load-path'.  But if there is no such file, or it
                                                ;; doesn't do that for whatever reason, do it ourselves.
                                                (when (and (eq load-path load-path-before) (not (member package-dir load-path)))
-                                                 (push package-dir load-path)))
+                                                 (push package-dir load-path))
+                                               (eldev--assq-set dependency-name package-dir eldev--package-load-paths))
                                              (push dependency-name package-activated-list)
                                              t)
                                             (`packaged
@@ -2047,6 +2050,16 @@ descriptor."
                                          `("Child Eldev process for exited with error code %d" ,exit-code)
                                        `("Child Eldev process for local dependency `%s' exited with error code %d" ,dependency-name ,exit-code))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
+
+;; This is a hackish function only working for packages loaded in `as-is' and similar
+;; mode.  See how `eldev--package-load-paths' is filled.
+(defun eldev--unload-package (package-name)
+  (unless (eq package-name 'eldev)
+    (let ((load-path-element (cdr (assq package-name eldev--package-load-paths))))
+      (unless load-path-element
+        (error "Unable to unload package `%s'" package-name))
+      (setf load-path              (delete load-path-element load-path)
+            package-activated-list (delq package-name package-activated-list)))))
 
 (defmacro eldev-autoinstalling-implicit-dependencies (enabled &rest body)
   "Evaluate BODY, autoinstalling implicit dependencies when needed.
@@ -4087,6 +4100,13 @@ Also see commands `compile' and `package'."
         (when (= (hash-table-count eldev--build-results) 0)
           (eldev-print "Nothing to do"))
         (maphash (lambda (_target status) (unless (eq status 'built) (setf anything-failed t))) eldev--build-results)
+        ;; See e.g. test `eldev-loading-modes-3'.  Basically, once we load the main
+        ;; project's package (in `as-is' mode), it would never get reloaded later, which
+        ;; would be problematic if this build process was not the main invocation,
+        ;; e.g. was only invoked from `autoloads' plugin.  For now, simply always "unload"
+        ;; the main package: in the main invocation simply nothing would happen afterwards
+        ;; anyway.
+        (eldev--unload-package (package-desc-name (eldev-package-descriptor)))
         (when anything-failed
           (signal 'eldev-error `("Build failed")))))))
 
