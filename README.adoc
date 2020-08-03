@@ -27,6 +27,8 @@ endif::[]
 :uri-elisp-lint: https://github.com/gonewest818/elisp-lint/
 :uri-travis: https://travis-ci.org/
 :uri-github-wflows: https://help.github.com/en/actions
+:uri-circle: https://circleci.com/
+:uri-docker: https://www.docker.com/
 :uri-coveralls: https://coveralls.io/
 :uri-setup-emacs: https://github.com/purcell/setup-emacs
 :uri-undercover: https://github.com/undercover-el/undercover.el
@@ -46,7 +48,7 @@ endif::[]
 = Eldev
 
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
-image:https://img.shields.io/github/release/doublep/eldev.svg?maxAge=86400[Lateset release, link=https://github.com/doublep/eldev/releases]
+image:https://img.shields.io/github/release/doublep/eldev.svg[Latest release, link=https://github.com/doublep/eldev/releases]
 image:http://stable.melpa.org/packages/eldev-badge.svg[MELPA Stable, link=http://stable.melpa.org/#/eldev]
 image:https://github.com/doublep/eldev/workflows/CI/badge.svg[CI, link=https://github.com/doublep/eldev/actions?query=workflow%3ACI]
 
@@ -1549,6 +1551,27 @@ Eldev’s terminal autorecognition doesn’t work on GitHub machines
 (unlike e.g. on Travis CI).  If you want colored output from Eldev,
 you need to explicitly enable it using `-C` (`--color`) global option.
 
+[#circle-ci]
+=== CircleCI
+
+Another frequently used service is {uri-circle}[CircleCI].  I don’t
+know that much about it, presumably {uri-nix-emacs}[nix-emacs-ci] can
+be used to install Emacs on it.  Some projects successfully use
+{uri-docker}[Docker] images.
+
+Regardless of how you install Emacs, adding Eldev is yet another
+one-liner.  It is handy to use, because propagating `$PATH`
+modifications between different commands on CircleCI is somewhat
+non-obvious.  To use it, add the following lines in the relevant place
+in file `.circleci/config.yml`:
+
+....
+    ...
+    - run:
+        name: Install Eldev
+        command: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/circle-eldev > x.sh && source ./x.sh
+....
+
 === Script commands
 
 Once you have Emacs with Eldev set up on the continuous integration
@@ -2287,6 +2310,8 @@ Elisp code:
 * {uri-github-wflows}[GitHub workflows] — a part of GitHub available
   to any hosted project, which can be used for
   <<github-workflows,continuous integration>> among other things.
+* {uri-circle}[CircleCI] — another continuous integration service;
+  Eldev provides <<circle-ci,a special installation script>> for it.
 * {uri-coveralls}[Coveralls] — web service to help you track your
   code coverage over time; can be integrated with Eldev using
   <<undercover-plugin,a plugin>>;
