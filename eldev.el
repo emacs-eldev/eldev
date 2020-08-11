@@ -2093,7 +2093,7 @@ See `eldev-filesets'.  Default (nil) means to clean everything.")
     (eldev-pcase-exhaustive (pop keywords)
       (:aliases
        (eldev-register-cleaner-aliases name (pop keywords)))
-      ((and (or :briefdoc :default :superseded-by) keyword)
+      ((and (or :briefdoc :default :only-explicit :superseded-by) keyword)
        (eldev-put cleaner keyword (pop keywords)))))
   (eldev--assq-set name cleaner eldev--cleaners))
 
@@ -2139,6 +2139,11 @@ BODY can contain the following keywords:
         Whether the cleaner should be invoked by default,
         i.e. when `eldev clean' is issued without further
         command-line arguments.
+
+    :only-explicit VALUE
+
+        If non-nil, this cleaner is not invoked by `clean all',
+        i.e. it must be explicitly named.
 
     :superseded-by CLEANERS
 
@@ -2187,11 +2192,11 @@ be used on the command line."
             (unless (or (assq name eldev--cleaners) (assq name eldev--cleaner-aliases))
               (signal 'eldev-error `(:hint ("Check output of `%s clean --list-cleaners'" ,(eldev-shell-command t)) "Unknown cleaner `%s'" ,name)))
             (push name cleaners)))
-      (dolist (entry eldev--cleaners)
-        (when (eldev-get (cdr entry) :default)
-          (push (car entry) cleaners))))
+      (setf cleaners (mapcar #'car (eldev-filter (eldev-get (cdr it) :default) eldev--cleaners))))
     (when all
-      (setf cleaners (mapcar #'car eldev--cleaners)))
+      ;; It is important to _append_ to the list of cleaners, to handle e.g. `clean all
+      ;; global-cache' properly.
+      (setf cleaners (append cleaners (mapcar #'car (eldev-filter (not (eldev-get (cdr it) :only-explicit)) eldev--cleaners)))))
     (unless cleaners
       (signal 'eldev-error `("There are no %scleaners registered in this project" ,(if all "" "default "))))
     (setf cleaners (nreverse cleaners))
@@ -2786,6 +2791,7 @@ selectors (e.g. ERT's `:new')."
 doesn't affect any projects, but if Eldev has to prepare a new
 project (or an existing project for a different Emacs version),
 it will have to redownload all dependency packages."
+  :only-explicit  t
   (eldev-global-package-archive-cache-dir))
 
 

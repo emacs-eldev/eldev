@@ -31,4 +31,20 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-clean-global-cache-1 ()
+  (let ((global-cache-dir (expand-file-name "global-cache/" (eldev--test-eldev-dir))))
+    (make-directory global-cache-dir t)
+    (eldev--test-run "empty-project" ("clean" "global-cache" "--dry-run")
+      (should (member global-cache-dir (eldev--test-line-list stdout)))
+      (should (= exit-code 0)))
+    ;; `all' must not include the global cache: it has to be named explicitly.
+    (eldev--test-run "empty-project" ("clean" "all" "--dry-run")
+      (should (not (member global-cache-dir (eldev--test-line-list stdout))))
+      (should (= exit-code 0)))
+    ;; But the two can be combined.
+    (eldev--test-run "empty-project" ("clean" "all" "global-cache" "--dry-run")
+      (should (member global-cache-dir (eldev--test-line-list stdout)))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/clean)

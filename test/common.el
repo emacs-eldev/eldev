@@ -20,6 +20,10 @@
 (defun eldev--test-tmp-subdir (name)
   (expand-file-name name (expand-file-name (format "test/.tmp/%s.%s" emacs-major-version emacs-minor-version) eldev-project-dir)))
 
+(defun eldev--test-eldev-dir ()
+  (or eldev--test-eldev-dir (eldev--test-tmp-subdir "stdroot")))
+
+
 (defun eldev--test-project-dir (&optional test-project)
   (file-name-as-directory (expand-file-name (or test-project eldev--test-project) (eldev--test-dir))))
 
@@ -105,7 +109,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                                                                ;; Otherwise, let the child processes use the
                                                                ;; sources (maybe byte-compiled) directly.
                                                                eldev-project-dir))
-                                 ,(format "ELDEV_DIR=%s"   (or eldev--test-eldev-dir (eldev--test-tmp-subdir "stdroot")))
+                                 ,(format "ELDEV_DIR=%s"   (eldev--test-eldev-dir))
                                  ,@process-environment)))
      (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
        ,@body)))
@@ -138,6 +142,9 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (:nolf   (setf trailing-lf ""))))
     (concat (mapconcat (or formatter (lambda (line) (eldev-format-message (replace-regexp-in-string "%" "%%" line)))) (eldev-flatten-tree arguments) "\n")
             trailing-lf)))
+
+(defun eldev--test-line-list (multiline-string)
+  (split-string multiline-string "\n" t))
 
 (defmacro eldev--test-in-project-environment (&rest body)
   `(let ((eldev-project-dir   (eldev--test-project-dir))
@@ -180,7 +187,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (eldev--test-assert-unsorted (eldev--test-find-files directory) (eldev-flatten-tree arguments) (eldev-format-message "Wrong files in `%s'" directory)))
 
 (defun eldev--test-assert-building (stdout targets)
-  (eldev--test-assert-unsorted (split-string stdout "\n" t)
+  (eldev--test-assert-unsorted (eldev--test-line-list stdout)
                                (mapcar (lambda (target)
                                          (format "%-8s %s" (or (car (cdr-safe target)) "ELC") (if (consp target) (car target) target)))
                                        targets)
