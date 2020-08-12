@@ -196,7 +196,7 @@ Needed for compatibility."
   "Determine if REGEXP is valid.
 Since 0.2."
   (ignore-errors
-    (string-match regexp "")
+    (string-match-p regexp "")
     t))
 
 
