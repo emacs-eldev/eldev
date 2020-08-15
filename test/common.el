@@ -61,8 +61,11 @@
                     ,no-errors)
                (goto-char 1)
                (unwind-protect
-                   (prog1 (progn ,@body)
-                     (setf ,no-errors t))
+                   (condition-case error
+                       (prog1 (progn ,@body)
+                         (setf ,no-errors t))
+                     (ert-test-skipped (setf ,no-errors t)
+                                       (signal (car error) (cdr error))))
                  (unless ,no-errors
                    (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (mapconcat #'eldev-quote-sh-string (cons ,executable prepared-command-line) " ") default-directory)
                    (when process-input-file
@@ -229,6 +232,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                     (insert-file-contents-literally (expand-file-name (format "eldev-%s.entry" (or forced-version (eldev-message-version (eldev-package-descriptor)))) archive-dir))
                     (read (current-buffer))))
              (current-buffer)))))
+
+
+(defun eldev--test-skip-if-missing-linter (exit-code stderr)
+  (unless (= exit-code 0)
+    (dolist (line (eldev--test-line-list stderr))
+      (when (string-match-p (rx "Emacs version" (+ any) "required" (+ any) "cannot use linter") line)
+        (ert-skip line)))))
 
 
 (provide 'test/common)
