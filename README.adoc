@@ -25,6 +25,7 @@ endif::[]
 :uri-package-lint: https://github.com/purcell/package-lint
 :uri-relint: https://github.com/mattiase/relint
 :uri-elisp-lint: https://github.com/gonewest818/elisp-lint/
+:uri-projectile: https://github.com/bbatsov/projectile
 :uri-travis: https://travis-ci.org/
 :uri-github-wflows: https://help.github.com/en/actions
 :uri-circle: https://circleci.com/
@@ -106,7 +107,9 @@ think real-world usage provides better models.
 
     A simple project with no dependencies.  As you can see, there is
     nothing in its `Eldev`.  The file is actually not even needed, it
-    is only there to signify that Eldev can be used on the project.
+    is only there to signify that Eldev can be used on the project and
+    for some tools ({uri-flycheck-eldev}[flycheck-eldev],
+    {uri-projectile}[Projectile]).
 
 {uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.travis.yml[`.travis.yml`]::
 
@@ -310,7 +313,11 @@ directory where it is run from.  This is done by loading Elisp file
 called `Eldev` (without extension!) in the current directory.  This
 file is similar to Make’s `Makefile` or Cask’s `Cask`.  But even more
 so to Gradle’s `build.gradle`: because it is a program.  File `Eldev`
-is not strictly required, but nearly all projects will have one.
+is not strictly required, but nearly all projects will have one.  It
+is also generally recommended to create it even if empty, because
+otherwise some tools (e.g. {uri-flycheck-eldev}[flycheck-eldev],
+{uri-projectile}[Projectile]) will not recognize the project as
+Eldev-based without it.
 
 You can create the file in your project manually, but it is easier to
 just let Eldev itself do it for you, especially the first time:
