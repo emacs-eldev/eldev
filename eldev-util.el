@@ -854,14 +854,20 @@ Try evaluating `(package-buffer-info)' in a buffer with the file" "%s" ,message)
       (when (and found-package (or (null version) (version-list-<= version (package-desc-version found-package))))
         found-package))))
 
-;; Of course this is not exposed through a public interface.
-(defun eldev-find-built-in-version (package-name)
+;; Of course this is not exposed through a public interface.  Won't work on Emacs 25 and
+;; below, but apparently they don't know the versions themselves (see `M-x
+;; package-list-packages').
+(defun eldev-find-built-in-version (package-name &optional as-string)
   (if (eq package-name 'emacs)
-      (version-to-list emacs-version)
-    (when (and (package-built-in-p package-name) (boundp 'package--builtins) (fboundp 'package--bi-desc-version))
-      (let ((data (cdr (assq package-name package--builtins))))
-        (when data
-          (package--bi-desc-version data))))))
+      (if as-string emacs-version (version-to-list emacs-version))
+    (when (package-built-in-p package-name)
+      (let ((version (when (and (boundp 'package--builtins) (fboundp 'package--bi-desc-version))
+                       (let ((data (cdr (assq package-name package--builtins))))
+                         (when data
+                           (package--bi-desc-version data))))))
+        (if as-string
+            (if version (package-version-join version) "?")
+          version)))))
 
 
 (defun eldev-install-package-file (file)

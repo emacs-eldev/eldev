@@ -2506,7 +2506,11 @@ mode output is restricted to just the version."
                          emacs-version
                        (let ((descriptor (if (eq package this-package-name)
                                              this-package
-                                           (eldev-find-package-descriptor package nil t))))
+                                           ;; Note that all built-in packages can be queried because of the
+                                           ;; below code.  However, we do not promise that, maybe later we'll
+                                           ;; filter for only declared dependencies.  Also, Emacs 24 and 25
+                                           ;; don't know versions of their own built-ins, apparently.
+                                           (or (eldev-find-package-descriptor package nil t) (eldev-find-built-in-version package t)))))
                          (unless descriptor
                            (signal 'eldev-error `(:hint ("Check output of `%s dependency-tree'" ,(eldev-shell-command t))
                                                         "Package `%s' is not among those used in the build" ,package)))
