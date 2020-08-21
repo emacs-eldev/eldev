@@ -3,4 +3,5 @@
  (dependency-b . [(1 0) ((dependency-a (0))) "Dependency test package B" single nil])
  (dummy-lint . [(1 0) nil "Dummy linter" single nil])
  (misc-a . [(1 0) nil "Miscellaneous package A" single nil])
- (project-i . [(1 0) nil "Test project with autoload cookies in multiple files" tar nil]))
+ (project-i . [(1 0) nil "Test project with autoload cookies in multiple files" tar nil])
+ (dependency-org . [(1 0) ((org (0))) "A dummy package that depends on Org" single nil]))

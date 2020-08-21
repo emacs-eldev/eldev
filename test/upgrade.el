@@ -248,9 +248,11 @@
                           "version" "dependency-b")
       (should (string= stdout "dependency-b 1.0\n"))
       (should (= exit-code 0)))
+    ;; Note that even if we order upgrading only `dependency-b', `dependency-a' also must
+    ;; be upgraded, because `dependency-b 1.1' requires `dependency-a 1.1'.
     (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-b" . ,(expand-file-name "../package-archive-b")) 0)
                           "upgrade" "dependency-b")
-      (should (string= stdout "Upgraded or installed 1 dependency package\n"))
+      (should (string= stdout "Upgraded or installed 2 dependency packages\n"))
       (should (= exit-code 0)))
     (eldev--test-run nil ("version" "dependency-b")
       (should (string= stdout "dependency-b 1.1\n"))

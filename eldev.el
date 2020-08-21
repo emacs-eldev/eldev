@@ -1643,11 +1643,19 @@ Since 0.2."
           ;; Don't use archives we haven't fetched yet.
           (setf package-archives (eldev-filter (not (assoc it archive-statuses)) all-package-archives))
           (package-read-all-archive-contents)
-          (setf plan (cons nil nil))
           (condition-case error
-              (let ((visited (make-hash-table :test #'eq)))
-                (dolist (package-plist all-packages)
-                  (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan (and archive-statuses (not eldev-upgrade-downgrade-mode)) visited))
+              (let ((considered           (make-hash-table :test #'eq))
+                    (highest-requirements (make-hash-table :test #'eq)))
+                ;; If during planning we find a situation where package X is required at a
+                ;; higher version than what has been considered already, remember this and
+                ;; restart planning.  This looks like a cleaner way than trying to rewrite
+                ;; what has been planned already.  See test `eldev-issue-18' for an
+                ;; example of such situation.
+                (while (catch 'restart-planning
+                         (setf plan (cons nil nil))
+                         (dolist (package-plist all-packages)
+                           (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan (and archive-statuses (not eldev-upgrade-downgrade-mode))
+                                                           considered highest-requirements))))
                 (when archive-statuses
                   (eldev-trace "Not fetching contents of other archive(s) as redundant")
                   (setf archive-statuses nil)))
@@ -1804,25 +1812,36 @@ Since 0.2."
                 (when archive
                   (list archive))))))
 
-(defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new visited &optional required-by)
-  (let ((package-name     (plist-get package-plist :package))
-        (required-version (plist-get package-plist :version))
-        (required-by-hint (lambda ()
-                            (when required-by
-                              (eldev-format-message "Required by package %s"
-                                                    (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) required-by " <- "))))))
-    (unless (gethash package-name visited)
-      (when (stringp required-version)
-        (setf required-version (version-to-list required-version)))
+(defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new considered highest-requirements &optional required-by)
+  (let* ((package-name        (plist-get package-plist :package))
+         (required-version    (plist-get package-plist :version))
+         (highest-requirement (gethash package-name highest-requirements))
+         (required-by-hint    (lambda ()
+                                (when required-by
+                                  (eldev-format-message "Required by package %s"
+                                                        (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) required-by " <- ")))))
+         (considered-version  (gethash package-name considered)))
+    (when (stringp required-version)
+      (setf required-version (version-to-list required-version)))
+    ;; Elevate requirement if needed.
+    (when (version-list-< required-version highest-requirement)
+      (setf required-version highest-requirement))
+    (when (and considered-version (version-list-< considered-version required-version))
+      (puthash package-name required-version highest-requirements)
+      ;; Unlike `considered', `highest-requirements' must not be cleared between passes.
+      (clrhash considered)
+      (throw 'restart-planning t))
+    (unless (and considered-version (version-list-<= required-version considered-version))
       (unless (package-built-in-p package-name required-version)
         (when (eq package-name 'emacs)
           (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
                                                     "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
-               (already-installed         (unless local (eldev-find-package-descriptor package-name required-version nil)))
+               (already-installed         (unless local (eldev-find-package-descriptor package-name)))
                (already-installed-version (when already-installed (package-desc-version already-installed)))
+               (already-installed-too-old (version-list-< already-installed-version required-version))
                (upgrading                 (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)))
-               (package                   (unless upgrading already-installed))
+               (package                   (unless (or upgrading already-installed-too-old) already-installed))
                (archives                  (eldev--package-plist-get-archives package-plist t)))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
@@ -1875,6 +1894,7 @@ Since 0.2."
                 ;; Should be caught at an upper level, unless the package archive is gone.
                 (signal 'eldev-missing-dependency `("Dependency `%s' was once installed, but is not available anymore" ,package-name)))
               (unless (or (version-list-< already-installed-version best-version)
+                          already-installed-too-old
                           (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
                 (setf package already-installed))
               (unless package
@@ -1890,11 +1910,11 @@ Since 0.2."
                                                                        `("Dependency `%s' %s is not available" ,package-name ,(eldev-message-version required-version t))))))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
-                                            default-archives plan fail-if-too-new visited (cons package-name required-by)))
+                                            default-archives plan fail-if-too-new considered highest-requirements (cons package-name required-by)))
           (if (eq package already-installed)
               (push package-name (cdr plan))
             (push `(,package . ,already-installed) (car plan)))))
-      (puthash package-name t visited))))
+      (puthash package-name (or required-version `(,most-negative-fixnum)) considered))))
 
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
   (let ((dir (expand-file-name eldev--internal-pseudoarchive (expand-file-name "archives" package-user-dir))))
