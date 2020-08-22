@@ -281,6 +281,18 @@ altered."
      ,@body))
 
 
+(defun eldev--guess-url-from-file-error (error)
+  ;; Another example of marvelous Elisp design.  It is sometimes first (installing
+  ;; packages from an HTTPS archive), sometimes last (installing from a local archive)...
+  (let ((data (cdr error))
+        url)
+    (while (and (null url) (consp data))
+      (let ((element (pop data)))
+        (when (and (stringp element) (string-match-p (rx (or "/" "\\")) element))
+          (setf url element))))
+    (or url (when (stringp (car-safe (cdr error))) (cadr error)))))
+
+
 
 ;; Output.
 

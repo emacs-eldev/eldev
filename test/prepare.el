@@ -50,4 +50,20 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-prepare-outdated-archive-contents-1 ()
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
+                          "version" "dependency-a")
+      (should (string= stdout "dependency-a 1.0\n"))
+      (should (= exit-code 0)))
+    ;; To simulate archive contents being outdated, we treacherously replace archive URL
+    ;; here: `package-archive-b' has newer versions of various packages.
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-b")))
+                          "--setup" `(eldev-add-extra-dependencies 'test 'dependency-b)
+                          "version" "dependency-b")
+      (should (string= stdout "dependency-b 1.1\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/prepare)
