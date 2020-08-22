@@ -478,7 +478,7 @@ file `~/foo/Eldev-local`:
 ----
 
 Note that the form _must not_ be added to `Eldev`: other developers
-who check out your project probably don‘t even have a local copy of
+who check out your project probably don’t even have a local copy of
 `barlib` or maybe have it in some other place.  In other words, this
 should really remain your own private setting and go to `Eldev-local`.
 
@@ -961,8 +961,9 @@ as the default in their file `Eldev`:
 (setf eldev-build-load-before-byte-compiling t)
 ----
 
-You can find more information in section “Evaluation During
-Compilation” of Elisp manual.
+You can find more information in section
+https://www.gnu.org/software/emacs/manual/html_node/elisp/Eval-During-Compile.html[“Evaluation
+During Compilation” of Elisp manual].
 
 ==== Speed of byte-compilation ====
 
@@ -1024,11 +1025,13 @@ useful ones:
 `global-cache`::
 
     Remove contents of the <<global-cache,global package archive
-    cache>>.  This can be executed from any project.
+    cache>>.  This can be executed from any directory.
 
 `all` (or `everything`)::
 
-    Run all available cleaners.
+    Run all available cleaners.  Some cross-project data may still be
+    retained (currently, only the global package archive cache), that
+    can be cleaned only by explicitly mentioning it.
 
 Cleaners executed by default are called `.elc`, `.info` and
 `info-dir`.  Normally, they delete their targets in all
@@ -1236,7 +1239,7 @@ documentation) like this:
     $ eldev test \"foo\"
 --
 
-If you dislike these simplifications, set `eldev-dwim` to nil in
+If you dislike these simplifications, set `eldev-dwim` to `nil` in
 `~/.eldev/config`.
 
 
@@ -1746,7 +1749,7 @@ space-separated list of any of the following flags:
 {since-0-3-2} `safe`, `force`::
 
     whether to run `undercover` even if the plugin detects it likely
-    won't work on this Emacs version (as of May 10th 2020 the tool
+    won’t work on this Emacs version (as of May 10th 2020 the tool
     https://github.com/undercover-el/undercover.el/pull/57[doesn’t
     work on Emacs 27]); default is to behave safely.
 
@@ -1910,9 +1913,9 @@ added later).
 
     Executed after successfully loading dependencies.  Functions are
     called with arguments `TYPE` and `ADDITIONAL-SETS`.  `TYPE` is
-    either t if the project is being loaded for actual use, symbol
+    either `t` if the project is being loaded for actual use, symbol
     `load-only` if it is loaded only for side effect (e.g. to build a
-    tree of its dependencies), and nil if invoked from
+    tree of its dependencies), and `nil` if invoked from
     `eldev-load-extra-dependencies` (i.e. if the project is not being
     loaded at all: only some additional sets).  The second is a list
     of <<additional-dependencies,additional dependency sets>>.
