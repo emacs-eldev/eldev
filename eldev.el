@@ -2638,7 +2638,7 @@ Should normally be specified only from command line.")
                                                                               (eldev-test-ert-save-results)))))
                                       (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
                                                     (features             . buttercup)
-                                                    (packages             . ((:package buttercup :archive melpa)))
+                                                    (packages             . ((:package buttercup :archive melpa :version "1.23")))
                                                     (require              . eldev-buttercup)
                                                     (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
                                                     (run-tests            . (lambda (selectors _runner environment)
@@ -2903,10 +2903,9 @@ For Buttercup:
                     (ert-batch-backtrace-right-margin . ,right-margin)
                     (eldev--test-ert-short-backtraces . t))))
                (`buttercup
-                `((buttercup-color                  . ,(eldev-output-colorized-p))
-                  (eldev--buttercup-silent-skipping . t)
-                  (eldev--buttercup-quiet           . ,(not (eldev-unless-quiet t)))
-                  (buttercup-stack-frame-style      . full))))))
+                `((buttercup-color                         . ,(eldev-output-colorized-p))
+                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))
+                  (buttercup-stack-frame-style             . full))))))
 
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"

@@ -20,25 +20,17 @@
 (require 'eldev)
 
 
-;; FIXME: Let's hope for improvement in Buttercup itself.  Large parts
-;;        of this integration code can be pushed into Buttercup.
-
-
-(defvar buttercup-stack-frame-style)
 (defvar buttercup-suites)
+(defvar buttercup-reporter-batch-quiet-statuses)
 (defvar buttercup-color)
-(defvar buttercup-reporter)
+(defvar buttercup-stack-frame-style)
 
-(declare-function buttercup--specs "buttercup")
+(declare-function buttercup-mark-skipped "buttercup")
 (declare-function buttercup-spec-full-name "buttercup")
 (declare-function buttercup-run "buttercup")
-(declare-function buttercup-spec-status "buttercup")
-(declare-function buttercup-spec-failure-description "buttercup")
 (declare-function buttercup-suites-total-specs-defined "buttercup")
-
-
-(defvar eldev--buttercup-silent-skipping nil)
-(defvar eldev--buttercup-quiet nil)
+(declare-function buttercup-suites-total-specs-failed "buttercup")
+(declare-function buttercup-suites-total-specs-pending "buttercup")
 
 
 (defun eldev-test-buttercup-preprocess-selectors (selectors)
@@ -54,51 +46,13 @@
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Buttercup framework"))
   (unless eldev-test-print-backtraces
     (eldev-warn "Option `--omit-backtraces' (`-B') is not supported with Buttercup framework"))
-  (eldev-bind-from-environment environment (buttercup-color eldev--buttercup-silent-skipping eldev--buttercup-quiet buttercup-stack-frame-style)
-    ;; Ugly, but as of 1.19 there is no better way in Buttercup.
-    (let ((num-skipped 0))
-      (when selectors
-        (dolist (spec (buttercup--specs buttercup-suites))
-          (let ((spec-full-name (buttercup-spec-full-name spec)))
-            (unless (eldev-any-p (string-match it spec-full-name) selectors)
-              (eval `(setf (buttercup-spec-function ,spec)
-                           (lambda () (signal 'buttercup-pending "SKIPPED")))
-                    t)
-              (setf num-skipped (1+ num-skipped))))))
-      (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) num-skipped)))
-    (let ((buttercup-reporter (if (or eldev--buttercup-silent-skipping eldev--buttercup-quiet)
-                                  (eldev--buttercup-reporter-delaying-adapter buttercup-reporter)
-                                buttercup-reporter)))
-      (buttercup-run))))
-
-
-;; I submitted a more complicated version of this with additional
-;; features as a PR to Buttercup.
-(defun eldev--buttercup-reporter-delaying-adapter (base-reporter)
-  (let (pending)
-    (lambda (event arg)
-      (pcase event
-        ((or `suite-started `spec-started)
-         (push (list event arg) pending))
-        ((or `suite-done `spec-done)
-         (if (if (eq event 'suite-done)
-                 pending
-               (eldev--buttercup-spec-omitted-p arg))
-             (pop pending)
-           (dolist (event-arg (nreverse pending))
-             (apply base-reporter event-arg))
-           (funcall base-reporter event arg)
-           (setf pending nil)))
-        (_
-         ;; Other events are never delayed.
-         (funcall base-reporter event arg))))))
-
-(defun eldev--buttercup-spec-omitted-p (spec)
-  (or (and eldev--buttercup-quiet
-           (not (eq (buttercup-spec-status spec) 'failed)))
-      (and eldev--buttercup-silent-skipping
-           (eq (buttercup-spec-status spec) 'pending)
-           (equal (buttercup-spec-failure-description spec) "SKIPPED"))))
+  (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color)
+    (when selectors
+      ;; With not-yet-released 1.24 could be just: (buttercup-mark-skipped selectors t)
+      (buttercup-mark-skipped (mapconcat (lambda (selector) (concat "\\(?:" selector "\\)")) selectors "\\|") t))
+    (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))
+    (unless (buttercup-run t)
+      (signal 'eldev-error `("%s failed" ,(eldev-message-plural (buttercup-suites-total-specs-failed buttercup-suites) "test"))))))
 
 
 (provide 'eldev-buttercup)
