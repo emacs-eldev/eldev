@@ -1717,7 +1717,7 @@ Since 0.2."
                                                                                         ;; up-to-date, but some packages cannot be fetched.  In this case, refresh the
                                                                                         ;; contents file (but don't do it more than once).
                                                                                         (when (eq (cdr archive) 'fetched-now)
-                                                                                          (signal 'eldev-error `(:hint ,(format-message "When accessing package archive `%s'" (caar archive))
+                                                                                          (signal 'eldev-error `(:hint ,(eldev-format-message "When accessing package archive `%s'" (caar archive))
                                                                                                                        "%s" ,(error-message-string error))))
                                                                                         (eldev-print :stderr "Contents of package archive `%s' seems out-of-date, will refetch..." (caar archive))
                                                                                         (setf (cdr archive) nil)
