@@ -118,4 +118,43 @@
       (should (= exit-code 0)))))
 
 
+;; Real situation: we bumped our requirement for Buttercup.  Certain project had contents
+;; of MELPA Stable and Unstable fetched.  Now, `eldev test' in it would install unstable
+;; Buttercup because the newly required 1.23 had not been available from Stable before,
+;; and MELPA Unstable versions are dumb and always "satisfy" requirements anyway.  The fix
+;; was to force refetch of Stable archive if Unstable (not the most prioritized) was
+;; deemed needed for anything.
+;;
+;; This test tries to simulate this situation with local archives and extra dependencies.
+(ert-deftest eldev-stable/unstable-required-refetch-1 ()
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '(:stable   ("archive-a" . ,(expand-file-name "../package-archive-a"))
+                                                                  :unstable ("archive-b" . ,(expand-file-name "../package-archive-b")))
+                                                                '(0 . 0))
+                          "version" "dependency-a")
+      (should (string= stdout "dependency-a 1.0\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '(:stable   ("archive-a" . ,(expand-file-name "../package-archive-a"))
+                                                                  :unstable ("archive-b" . ,(expand-file-name "../package-archive-b")))
+                                                                '(0 . 0))
+                          "--unstable" "upgrade" "dependency-a")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("version" "dependency-a")
+      (should (string= stdout "dependency-a 1.1\n"))
+      (should (= exit-code 0)))
+    ;; At this point both archives must be fetched.  We now intentionally substitude
+    ;; `archive-a' to be `package-archive-c', so that `misc-a' is also available from it,
+    ;; but only if Eldev refetches the contents.
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive '(:stable   ("archive-a" . ,(expand-file-name "../package-archive-c"))
+                                                                  :unstable ("archive-b" . ,(expand-file-name "../package-archive-b")))
+                                                                '(0 . 0))
+                          ;; Require 1.1, so that it doesn't try `package-archive-a'.
+                          "--setup" `(eldev-add-extra-dependencies 'test '(:package misc-a :version "1.1"))
+                          "version" "misc-a")
+      ;; In `package-archive-c' it has version 1.2, while in `package-archive-b' -- 1.1.
+      (should (string= stdout "misc-a 1.2\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/archives)

@@ -50,6 +50,7 @@
       (should (= exit-code 0)))))
 
 
+;; This does not really use `prepare' command, but probably still best put here.
 (ert-deftest eldev-prepare-outdated-archive-contents-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)

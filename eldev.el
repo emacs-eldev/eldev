@@ -1672,7 +1672,8 @@ Since 0.2."
                      (up-to-date-packages (cdr plan))
                      (non-local-plan-size 0)
                      (dependency-index    0)
-                     unknown-packages)
+                     unknown-packages
+                     refetching-wanted)
                  (when (and to-be-upgraded (not (eq to-be-upgraded t)))
                    (dolist (package-to-be-upgraded to-be-upgraded)
                      (unless (or (eldev-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
@@ -1683,7 +1684,22 @@ Since 0.2."
                                                   "Cannot upgrade %s: `%s' has no such dependencies" ,(eldev-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
                  (dolist (dependency planned-packages)
                    (when (or self (null (eldev--loading-mode (car dependency))))
-                     (setf non-local-plan-size (1+ non-local-plan-size))))
+                     (setf non-local-plan-size (1+ non-local-plan-size))
+                     ;; If we determine that archive X has to be used for installing or
+                     ;; upgrading, always fetch more prioritized archives first: maybe we
+                     ;; skipped them only because cached contents files are too old.
+                     (let ((used-archive (package-desc-archive (car dependency)))
+                           (archive-scan archive-statuses))
+                       (while archive-scan
+                         (let ((archive (pop archive-scan)))
+                           (cond ((string= used-archive (caar archive))
+                                  (setf archive-scan nil))
+                                 ((not (eq (cdr archive) 'fetched-now))
+                                  (setf (cdr archive) nil
+                                        refetching-wanted t)
+                                  (eldev-verbose "Will refetch contents of package archive `%s' to make sure that `%s' really needs to be used" (caar archive) used-archive))))))))
+                 (when refetching-wanted
+                   (throw 'refetch-archives t))
                  (when (and dry-run (> non-local-plan-size 0))
                    (eldev-verbose "In dry-run mode Eldev only pretends it is upgrading, installing or deleting dependencies"))
                  (dolist (dependency planned-packages)
