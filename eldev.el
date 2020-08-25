@@ -2616,7 +2616,10 @@ execution and other common commands.")
   "If non-nil, stop as soon as a test produces an unexpected result.")
 
 (defvar eldev-test-print-backtraces t
-  "If non-nil (default), print assertion backtraces.")
+  "If non-nil (default), print assertion backtraces.
+By default, backtrace line length is up to test runner to choose.
+However, if value of this variable is an integer, print for that
+screen width.  Value 1 or less means no limit.")
 
 (defvar eldev-test-expect-at-least nil
   "Fail if there are fewer than this many tests.
@@ -2893,7 +2896,9 @@ it will have to redownload all dependency packages."
 
 
 (eldev-deftestrunner eldev-test-runner-standard (framework selectors)
-  "Invokes test framework without changing anything."
+  "Invokes test framework without changing anything.  However,
+various options to command `test' are still respected if
+possible."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard
            (pcase framework
              ;; For Buttercup we still pass through our color setting.
@@ -2905,25 +2910,20 @@ it will have to redownload all dependency packages."
 For ERT:
   - if Eldev is in quiet mode, set `ert-quiet' to t;
   - only backtrace frames inside test functions are printed;
-  - long line trimming in backtraces is disabled.
+  - long line trimming in backtraces is disabled by default.
 
 For Buttercup:
   - output for skipped tests (e.g. because of selectors) is omitted;
   - if Eldev is in quiet mode, only failed tests are mentioned;
-  - backtraces lines are not truncated (i.e. `full' stack frame style)."
+  - backtraces lines are not truncated (i.e. `full' stack frame style)
+    by default."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
              ;; Other frameworks are just invoked with empty environment.
              (pcase framework
-               ;; Workaround: older Emacs versions don't support setting
-               ;; `ert-batch-backtrace-right-margin' to nil.  We assume that if the
-               ;; variable is customizable, nil is already supported.
                (`ert
-                (let ((right-margin (if (get 'ert-batch-backtrace-right-margin 'custom-type)
-                                        nil
-                                      1000000)))
-                  `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
-                    (ert-batch-backtrace-right-margin . ,right-margin)
-                    (eldev--test-ert-short-backtraces . t))))
+                `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
+                  (ert-batch-backtrace-right-margin . nil)
+                  (eldev--test-ert-short-backtraces . t)))
                (`buttercup
                 `((buttercup-color                         . ,(eldev-output-colorized-p))
                   (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))
@@ -2943,12 +2943,19 @@ For Buttercup:
    :options       (-c --continue))
   :for-command    test)
 
-(eldev-defbooloptions eldev-test-print-backtraces eldev-test-omit-backtraces eldev-test-print-backtraces
-  ("Print failure backtraces"
-   :options       (-b --print-backtraces))
-  ("Omit failure backtraces for brevity"
-   :options       (-B --omit-backtraces))
-  :for-command    test)
+(eldev-defoption eldev-test-print-backtraces (&optional width)
+  "Print failure backtraces for given screen WIDTH; default value
+is up to the used test runner"
+  :options        (-b --print-backtraces)
+  :optional-value WIDTH
+  :for-command    test
+  (setf eldev-test-print-backtraces (if width (string-to-number width) t)))
+
+(eldev-defoption eldev-test-omit-backtraces ()
+  "Omit failure backtraces for brevity"
+  :options        (-B --omit-backtraces)
+  :for-command    test
+  (setf eldev-test-print-backtraces nil))
 
 (eldev-defoption eldev-test-expect-at-least (n)
   "Fail if fewer than N tests match selectors"

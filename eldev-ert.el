@@ -76,6 +76,12 @@ This is a wrapper around `ert-run-tests-batch' that handles
 use this for ERT framework, unless they can do better."
   ;; Since ERT doesn't support features we want out-of-the-box, we have to hack.
   (eldev-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin eldev--test-ert-short-backtraces)
+    (when (integerp eldev-test-print-backtraces)
+      (setf ert-batch-backtrace-right-margin (when (> eldev-test-print-backtraces 1) (1- eldev-test-print-backtraces))))
+    ;; Workaround: older Emacsen don't support setting `ert-batch-backtrace-right-margin'
+    ;; to nil.  We assume that if the variable is customizable, nil is already supported.
+    (unless (or ert-batch-backtrace-right-margin (get 'ert-batch-backtrace-right-margin 'custom-type))
+      (setf ert-batch-backtrace-right-margin 1000000))
     (let (completed-tests)
       (eldev-advised (#'ert-run-tests
                       ;; There is a difference in number arguments in Emacs 24, so just hide

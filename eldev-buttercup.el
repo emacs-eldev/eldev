@@ -47,6 +47,9 @@
   (unless eldev-test-print-backtraces
     (eldev-warn "Option `--omit-backtraces' (`-B') is not supported with Buttercup framework"))
   (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color)
+    (when (integerp eldev-test-print-backtraces)
+      ;; Just always use `crop' for now: Buttercup doesn't support varying width yet.
+      (setf buttercup-stack-frame-style (if (> eldev-test-print-backtraces 1) 'crop 'full)))
     (when selectors
       ;; With not-yet-released 1.24 could be just: (buttercup-mark-skipped selectors t)
       (buttercup-mark-skipped (mapconcat (lambda (selector) (concat "\\(?:" selector "\\)")) selectors "\\|") t))
