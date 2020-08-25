@@ -458,6 +458,7 @@ they are installed first.  However, if you want to check if package
 archives have been specified correctly and all dependencies can be
 looked up without problems, you can explicitly use command `prepare`.
 
+[#local-dependencies]
 === Local dependencies
 
 Imagine you are developing more than one project at once and they
@@ -711,19 +712,9 @@ functionality, or those that consist of a single file — don’t have any
 autoloading functions or other forms.
 
 Local dependencies also have their autoloads activated regardless of
-loading mode.  However, in order for the autoloads file to be built
-automatically, you need to load them in one of the “built” mode:
-`built`, `built-and-compiled` or `built-source`.  (Or `packaged` —
-this, of course, also works.)  Otherwise, the autoloads file may be
-out-of-date or not generated at all.
-
-So, when adding a local dependency that uses the `autoloads` plugin,
-you need to specify it like this:
-
-[source]
-----
-(eldev-use-local-dependency "~/barlib" 'built)
-----
+loading mode.  If the autoloads file is kept up-to-date using
+<<autoloads-plugin,the plugin>>, Eldev will take care to do this as
+needed in local dependencies too.
 
 
 == Build system
@@ -1094,6 +1085,19 @@ Both ways of selecting tests can be used together.  In this case they
 are combined with ‘and’ operation: only tests that match selector and
 which are defined in a loaded file are run.
 
+When a test is failing, a backtrace of the failure is printed.  You
+can affect its readability and completeness using options `-b`
+(`--print-backtrace`, the default) and `-B` (`--omit-backtraces`).
+The first option accepts your screen width as an optional parameter;
+backtrace lines get cut to the specified width.  Special value of 0
+(the default in Eldev) disables truncation of backtrace lines.  Second
+option, `-B`, is surprisingly useful.  In many cases backtraces don’t
+actually give any useful information, especially when the tests
+contain only a single assertion, and only clutter the output.  If you
+have different preferences compared to Eldev, it is a good idea to
+customize variable `eldev-test-print-backtraces` in file
+`~/.eldev/config`.
+
 How exactly tests are executed depends on _test runner_.  If you
 dislike the default behavior of Eldev, you can choose a different test
 runner using `--runner` (`-r`) option of `test` command; see the list
@@ -1145,6 +1149,8 @@ executed.
 Things that won’t work with Buttercup at the moment:
 
 * option `--stop-on-unexpected` (`-s`);
+* specifying screen width with option `--print-backtraces` (`-b`): it
+  will always work as if 80 was specified;
 * option `--omit-backtraces` (`-B`).
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
@@ -1683,17 +1689,10 @@ also registered as a dependency to all `.elc` targets in the project;
 this way, byte-compiling always has access to up-to-date list of
 autoloaded functions.
 
-If you use a project with this plugin as a local dependency, you will
-need to load it in `built`, `built-and-compiled`, `built-source` or
-`packaged` mode.  Otherwise file `DEPENDENCY-autoloads.el` may be
-out-of-date or not generated at all.
-
-For example:
-
-[source]
-----
-(eldev-use-local-dependency "~/mylib" 'built-and-compiled)
-----
+This plugin can also be activated in projects you use as
+<<local-dependencies,local dependencies>> for other projects.  Eldev
+knows how to keep the autoloads file up-to-date in all local
+dependencies, regardless of their loading mode.
 
 [#undercover-plugin]
 === undercover
