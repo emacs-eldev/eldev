@@ -43,6 +43,22 @@
       (should (string= stdout "\"Hello, world!\"\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-autoloads-5 ()
+  ;; Test that when `project-j' is used as a local dependency, its autoloads file is still
+  ;; generated automatically.
+  (dolist (loading-mode '(as-is source byte-compiled))
+    (let ((eldev--test-project "project-j"))
+      (eldev--test-run nil ("clean")
+        (should (= exit-code 0)))
+      (eldev--test-delete-cache))
+    (let ((eldev--test-project "project-a"))
+      (eldev--test-delete-cache)
+      (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'eval 'project-j)
+                            "--setup" `(eldev-use-local-dependency "../project-j" ',loading-mode)
+                            "eval" `(project-j-hello))
+        (should (string= stdout "\"Hello\"\n"))
+        (should (= exit-code 0))))))
+
 
 (ert-deftest eldev-autoloads-no-backup-1 ()
   (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j-autoloads.el~")

@@ -2071,18 +2071,24 @@ descriptor."
       (push file eldev--loaded-autoloads-files))))
 
 (defun eldev--load-local-dependency (dependency)
-  (let* ((dependency-name (package-desc-name dependency))
+  (let* ((loading-mode    (eldev--loading-mode dependency))
+         (dependency-name (package-desc-name dependency))
          (package-name    (package-desc-name (eldev-package-descriptor)))
          (project-itself  (eq dependency-name package-name))
-         (loading-mode    (eldev--loading-mode dependency)))
+         (dependency-dir  (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-dependencies))))
+         ;; For project itself autoloads are handled differently.  For other loading mode
+         ;; they get built without special care.
+         (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled)))
+                            (eldev--cross-project-internal-eval dependency-dir '(not (null (memq 'autoloads (eldev-active-plugins)))) t))))
     (when (cdr (assq dependency-name package-alist))
       (error "Local dependency `%s' is already listed in `package-alist'" dependency-name))
     ;; FIXME: Special-case project itself: no need to launch separate process(es) for it.
     ;; I don't want to move this into an alist, to avoid fixing the way it works.
     (let ((commands (eldev-pcase-exhaustive loading-mode
-                      (`as-is)              ; Nothing to do.
-                      (`source              `(("clean" ".elc" "--set" "main" "--delete")))
-                      (`byte-compiled       `(("build" ":compile")))
+                      (`as-is               (when build-autoloads `(("build" ":autoloads"))))
+                      (`source              `(("clean" ".elc" "--set" "main" "--delete")
+                                              ,@(when build-autoloads `(("build" ":autoloads")))))
+                      (`byte-compiled       `(("build" ":compile" ,@(when build-autoloads `(":autoloads")))))
                       (`built               `(("build" ":default")))
                       (`built-and-compiled  `(("build" ":default" ":compile")))
                       (`built-source        `(("clean" ".elc" "--set" "main" "--delete")
@@ -2092,7 +2098,7 @@ descriptor."
         (if project-itself
             (eldev-verbose "Preparing to load the project in mode `%s'" loading-mode)
           (eldev-verbose "Preparing to load local dependency `%s' in mode `%s'" dependency-name loading-mode))
-        (let ((default-directory (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-dependencies)))))
+        (let ((default-directory dependency-dir))
           (dolist (command commands)
             (eldev-trace "Full command line (in directory `%s'):\n  %s" default-directory (eldev-message-command-line (eldev-shell-command) command))
             (eldev-call-process (eldev-shell-command) command

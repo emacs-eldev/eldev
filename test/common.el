@@ -31,7 +31,7 @@
   (expand-file-name eldev-cache-dir (eldev--test-project-dir test-project)))
 
 (defun eldev--test-delete-cache (&optional test-project)
-  (let ((dir (eldev--test-project-cache-dir)))
+  (let ((dir (eldev--test-project-cache-dir test-project)))
     (when (file-exists-p dir)
       (ignore-errors (delete-directory dir t)))))
 
