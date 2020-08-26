@@ -69,9 +69,8 @@
 (ert-deftest eldev-require-version-upgrade-1 ()
   (eldev--test-require-version "project-a" ("upgrade") nil))
 
-;; FIXME
-;; (ert-deftest eldev-require-version-upgrade-self-1 ()
-;;   (eldev--test-require-version "project-a" ("upgrade") t))
+(ert-deftest eldev-require-version-upgrade-self-1 ()
+  (eldev--test-require-version "project-a" ("upgrade-self" "--dry-run") t))
 
 (ert-deftest eldev-require-version-version-1 ()
   (eldev--test-require-version "project-a" ("version") t
