@@ -26,8 +26,8 @@ endif::[]
 :uri-relint: https://github.com/mattiase/relint
 :uri-elisp-lint: https://github.com/gonewest818/elisp-lint/
 :uri-projectile: https://github.com/bbatsov/projectile
-:uri-travis: https://travis-ci.org/
 :uri-github-wflows: https://help.github.com/en/actions
+:uri-travis: https://travis-ci.org/
 :uri-circle: https://circleci.com/
 :uri-docker: https://www.docker.com/
 :uri-coveralls: https://coveralls.io/
@@ -119,7 +119,7 @@ think real-world usage provides better models.
     enables <<undercover-plugin,undercover>> plugin to collect test
     code coverage statistics.
 
-{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.travis.yml[`.travis.yml`]::
+{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
     This project has several dependencies, so it needs to instruct
     Eldev how to find them.  Additionally, it deactivates (i.e. makes
@@ -136,9 +136,9 @@ think real-world usage provides better models.
     are later included in its package.
 
 All these projects also use <<continuous-integration,continuous
-integration>> on either <<travis-ci,Travis CI>> or
-<<github-workflows,GitHub>> for automated testing.  Various elements
-of files `Eldev` in these projects are documented below.
+integration>> on either <<github-workflows,GitHub>> or
+<<travis-ci,Travis CI>> for automated testing.  Various elements of
+files `Eldev` in these projects are documented below.
 
 
 == Requirements
@@ -1436,6 +1436,71 @@ servers.  But of course this only applies if the test framework your
 project uses is already supported (currently <<ert,ERT>> and
 <<buttercup,Buttercup>>).
 
+[#github-workflows]
+=== GitHub workflows
+
+The easiest option for continuous integration for GitHub-hosted
+projects are {uri-github-wflows}[GitHub workflows], as this doesn’t
+involve using a 3rd-party service.  Probably most of Elisp projects
+can take advantage of this, since GitHub appears to be the most
+popular hosting for Elisp projects.
+
+Workflow definition files for GitHub are somewhat more verbose than
+for <<travis-ci,Travis CI>>, but ultimately not really more
+complicated.  The easiest way to install Emacs binary of appropriate
+version is to use {uri-setup-emacs}[`purcell/setup-emacs`] action
+(which internally uses {uri-nix-emacs}[nix-emacs-ci]).  Since
+{uri-evm}[EVM] seems tuned to Ubuntu Trusty (i.e. what Travis CI
+provides), it is likely unsuitable for GitHub workflows.
+
+There is a short shell script that installs Eldev itself for use on
+GitHub runners.  Modifying `$PATH` there is a bit tricky, so you
+probably should just go with the script, as demonstrated below.
+
+A basic workflow file (you can e.g. name it
+`.github/workflows/test.yml`) would look something like this:
+
+....
+name: CI
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs_version:
+          # Add more lines like this if you want to test on different Emacs versions.
+          - 26.3
+
+    steps:
+    - name: Set up Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
+
+    - name: Install Eldev
+      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+
+    - name: Check out the source code
+      uses: actions/checkout@v2
+
+    - name: Test the project
+      run: |
+        eldev -p -dtT test
+....
+
+Eldev’s terminal autorecognition doesn’t work on GitHub machines
+(unlike e.g. on Travis CI).  If you want colored output from Eldev,
+you need to explicitly enable it using `-C` (`--color`) global option.
+
 [#travis-ci]
 === Travis CI
 
@@ -1501,70 +1566,6 @@ install:
 script:
   - eldev -p -dtT test
 ....
-
-[#github-workflows]
-=== GitHub workflows
-
-Another option for continuous integration is
-{uri-github-wflows}[GitHub workflows].  Naturally, it is only
-available to projects hosted on GitHub, but those are probably most of
-Elisp projects anyway.
-
-Workflow definition files for GitHub are somewhat more verbose than
-for Travis CI, but ultimately not really more complicated.  The
-easiest way to install Emacs binary of appropriate version is to use
-{uri-setup-emacs}[`purcell/setup-emacs`] action (which internally uses
-{uri-nix-emacs}[nix-emacs-ci]).  Since EVM seems tuned to Ubuntu
-Trusty (i.e. what Travis CI provides), it is likely unsuitable for
-GitHub workflows.
-
-There is yet another short shell script that installs Eldev itself for
-use on GitHub runners.  Modifying `$PATH` there is a bit tricky, so
-you probably should just go with the script, as demonstrated below.
-
-A basic workflow file (you can e.g. name it
-`.github/workflows/test.yml`) would look something like this:
-
-....
-name: CI
-
-on:
-  push:
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    paths-ignore:
-      - '**.md'
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        emacs_version:
-          # Add more lines like this if you want to test on different Emacs versions.
-          - 26.3
-
-    steps:
-    - name: Set up Emacs
-      uses: purcell/setup-emacs@master
-      with:
-        version: ${{matrix.emacs_version}}
-
-    - name: Install Eldev
-      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
-
-    - name: Check out the source code
-      uses: actions/checkout@v2
-
-    - name: Test the project
-      run: |
-        eldev -p -dtT test
-....
-
-Eldev’s terminal autorecognition doesn’t work on GitHub machines
-(unlike e.g. on Travis CI).  If you want colored output from Eldev,
-you need to explicitly enable it using `-C` (`--color`) global option.
 
 [#circle-ci]
 === CircleCI
@@ -2312,12 +2313,12 @@ Elisp code:
 * {uri-nix-emacs}[nix-emacs-ci] — installer of different Emacs
   versions that uses Nix and Cachix; useful for continuous
   integration.
-* {uri-travis}[Travis CI] — continuous integration service, the most
-  used one for Elisp projects; Eldev has <<travis-ci,additional
-  support>> for it.
 * {uri-github-wflows}[GitHub workflows] — a part of GitHub available
   to any hosted project, which can be used for
   <<github-workflows,continuous integration>> among other things.
+* {uri-travis}[Travis CI] — continuous integration service, the most
+  used one for Elisp projects; Eldev has <<travis-ci,additional
+  support>> for it.
 * {uri-circle}[CircleCI] — another continuous integration service;
   Eldev provides <<circle-ci,a special installation script>> for it.
 * {uri-coveralls}[Coveralls] — web service to help you track your
