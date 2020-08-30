@@ -33,7 +33,7 @@
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("--quiet" "dependency-tree")
-      (should (string= stdout "missing-dependency-a 1.0\n    dependency-a (any)    [UNAVAILABLE]\n"))
+      (should (string= stdout "missing-dependency-a 1.0\n    dependency-a 0.1    [UNAVAILABLE]\n"))
       (should (= exit-code 0)))))
 
 

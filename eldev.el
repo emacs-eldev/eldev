@@ -3272,8 +3272,11 @@ least one warning."
   ;; This linter needs access to package archive contents, so at least fetch all archives
   ;; we have never fetched yet.
   (let ((eldev-global-cache-archive-contents-max-age nil))
-    (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch))
-    (package-read-all-archive-contents))
+    ;; Need to make sure that all archive contents is loaded
+    ;; (`eldev--install-or-upgrade-dependencies' loads as few archives as required to
+    ;; install the runtime dependencies).
+    (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch)))
+  (eldev--linter-package-present-archives)
   (require 'package-lint)
   (dolist (file (eldev-lint-find-files "*.el"))
     (eldev-lint-linting-file file
@@ -3284,6 +3287,12 @@ least one warning."
         (pcase-dolist (`(,line ,col ,type ,message) (package-lint-buffer))
           (eldev-lint-printing-warning (if (eq type 'error) :error :warning)
             (message "%s:%d:%d: %s: %s" file line col type message)))))))
+
+(defun eldev--linter-package-present-archives ()
+  ;; Issue #19: otherwise the linter will complain about local dependencies that are not
+  ;; available from "normal" package archives.
+  (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
+  (package-read-all-archive-contents))
 
 
 (declare-function relint-file "relint")
@@ -3319,10 +3328,10 @@ change `elisp-lint's configuration."
   ;; This linter might need access to package dependencies for byte-compilation.
   (eldev-load-project-dependencies 'runtime nil t)
   ;; This linter might invoke `package-lint' that needs access to package archive
-  ;; contents.  Need to make sure that all archive contents is loaded
-  ;; (`eldev--install-or-upgrade-dependencies' loads as few archives as required to
-  ;; install the runtime dependencies).
-  (package-read-all-archive-contents)
+  ;; contents.  Unlike `eldev-linter-package' (where we load _only_ extra dependencies,
+  ;; which might not be enough), here we don't need to fetch archive contents, as it
+  ;; should have been done by `eldev-load-project-dependencies' already.
+  (eldev--linter-package-present-archives)
   (require 'elisp-lint)
   ;; I don't see a better way than just replacing its output function completely.
   (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)

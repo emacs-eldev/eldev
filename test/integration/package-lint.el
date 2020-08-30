@@ -13,4 +13,17 @@
     (should (= exit-code 1))))
 
 
+;; https://github.com/doublep/eldev/issues/19
+;;
+;; `package-lint' would deem local dependencies uninstallable if they were not available
+;; from "normal" archives.
+(ert-deftest eldev-package-lint-local-dependencies-1 ()
+  (let ((eldev--test-project "missing-dependency-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a")
+                          "lint" "package" "--required")
+      (eldev--test-skip-if-missing-linter exit-code stderr)
+      (should (= exit-code 0)))))
+
+
 (provide 'test/integration/package-lint)
