@@ -669,7 +669,7 @@ global option `--loading` (or `-m`) with its argument being the name
 of the mode.  Since this is supposed to be used quite frequently,
 there are also shortcut options to select specific modes: `--as-is`
 (or `-a`), `--packaged` (`-p`), `--source` (`-s`) or `--byte-compiled`
-(`-b`).  For example, the following command will run unit-tests in the
+(`-c`).  For example, the following command will run unit-tests in the
 project, having it loaded as an Emacs package:
 
     $ eldev -p test
