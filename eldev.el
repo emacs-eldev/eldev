@@ -843,9 +843,13 @@ Returns COMMAND-LINE with options removed."
                         (when (string= term "--help")
                           (when (and (null command) command-line (assq (intern (car command-line)) eldev--commands))
                             (setf command (intern (car command-line))))
-                          (signal 'eldev-quit (if command (eldev-help (symbol-name command)) (eldev-help))))
+                          (if command
+                              (eldev-help (symbol-name command))
+                            (eldev-help))
+                          (signal 'eldev-quit 0))
                         (when (and (null command) (string= term "--version"))
-                          (signal 'eldev-quit (apply #'eldev-version command-line)))
+                          (apply #'eldev-version command-line)
+                          (signal 'eldev-quit 0))
                         (signal 'eldev-wrong-command-usage `(t "Unknown option `%s'" ,term)))))
                   (if long-option
                       (setf term nil)

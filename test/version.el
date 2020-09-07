@@ -55,6 +55,17 @@
       (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))))
 
+;; https://github.com/doublep/eldev/issues/21#issuecomment-688208274
+;;
+;; While `--version' is not advertised, we silently support it.  It is supposed not only
+;; to work as `version' command, but also exit with success code, which it didn't.
+(ert-deftest eldev-own-version-8 ()
+  (let ((eldev--test-project "empty-project"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--version")
+      (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
+      (should (= exit-code 0)))))
+
 (ert-deftest eldev-own-version-missing-dependency-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)

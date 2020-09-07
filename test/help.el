@@ -9,6 +9,7 @@
                              stdout))
     (should (= exit-code 0))))
 
+;; While `--help' is not advertised, we silently support it.
 (ert-deftest eldev-help-2 ()
   (eldev--test-run "empty-project" ("--help")
     (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-first-line (eldev--test-capture-output (eldev-help))))
