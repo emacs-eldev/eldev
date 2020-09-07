@@ -44,6 +44,17 @@
       (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))))
 
+;; https://github.com/doublep/eldev/issues/21
+;;
+;; In short: would fail previously if run in debug mode.  Placing test here as it doesn't
+;; require anything external.
+(ert-deftest eldev-own-version-7 ()
+  (let ((eldev--test-project "empty-project"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--debug" "version")
+      (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
+      (should (= exit-code 0)))))
+
 (ert-deftest eldev-own-version-missing-dependency-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)

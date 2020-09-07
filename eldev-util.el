@@ -837,12 +837,17 @@ return the descriptor of the project being built."
                              ;; FIXME: Maybe use `abbreviate-file-name', but make sure it is really safe first.
                              (let ((default-directory (expand-file-name project-dir)))
                                (dired-mode)
-                               (condition-case-unless-debug error
+                               ;; Used to use `condition-case-unless-debug' here, but it makes the error in
+                               ;; debug mode leak out e.g. for `version' command, which is not supposed to
+                               ;; ever fail to print Eldev's own version (see issue #21).  Seems easier to
+                               ;; just avoid this in all cases than to single out certain commands.
+                               (condition-case error
                                    (eldev--package-dir-info)
                                  (error (let ((message (error-message-string error)))
-                                          (if (string-match-p "package headers" message)
+                                          (if (and (string-match-p "package headers" message) (file-equal-p project-dir eldev-project-dir))
                                               ;; This message is quite confusing.  Add some hinting (though
-                                              ;; this way you lose the option to use `-d'...).
+                                              ;; this way you lose the option to use `-d', but hopefully
+                                              ;; backtrace for this error shouldn't be necessary).
                                               (signal 'eldev-error `(:hint "Headers in the project's main file are likely corrupt or incomplete
 Try evaluating `(package-buffer-info)' in a buffer with the file" "%s" ,message))
                                             (signal (car error) (cdr error)))))))))))
