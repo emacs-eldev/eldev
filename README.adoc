@@ -19,6 +19,7 @@ endif::[]
 :uri-cask: https://github.com/cask/cask
 :uri-makem-sh: https://github.com/alphapapa/makem.sh
 :uri-emake: https://github.com/vermiculus/emake.el
+:uri-keg: https://github.com/conao3/keg.el
 :uri-makel: https://gitea.petton.fr/DamienCassou/makel
 :uri-evm: https://github.com/rejeep/evm
 :uri-nix-emacs: https://github.com/purcell/nix-emacs-ci
@@ -2291,6 +2292,8 @@ Other build tools you might want to use instead of Eldev:
 * {uri-makem-sh}[makem.sh] — a shell script that performs many common
   Elisp development tasks; must be copied to your project.
 * {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
+* {uri-keg}[Keg] — a build tool that can be seen as a successor to
+  Cask; uses a similar project description file.
 * {uri-makel}[makel] — a prebuilt `Makefile` with typical targets
   useful to Elisp projects.
 
