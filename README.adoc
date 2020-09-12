@@ -156,9 +156,6 @@ Eldev intentionally has no dependencies, at least currently: otherwise
 your project would also see them, which could in theory lead to some
 problems.
 
-NOTE: Eldev could reasonably be backported to work on Emacs 24.1 and
-up if anyone interested has access to such old versions.
-
 == Installation
 
 There are several ways to install Eldev.
