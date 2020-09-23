@@ -54,5 +54,12 @@
       ;; lint' without parameters on older Emacs versions.
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-lint-disabled-linter-message ()
+  (eldev--test-run "empty-project" ("--setup" '(add-to-list 'eldev-lint-disabled 'elisp) "lint" "elisp")
+    (should (string-match-p
+             (rx (or "Linter ‘elisp’ is disabled (see variable ‘eldev-lint-disabled’)\n"
+                     "Linter `elisp' is disabled (see variable `eldev-lint-disabled')\n"))
+             stderr))
+    (should (= exit-code 1))))
 
 (provide 'test/lint)
