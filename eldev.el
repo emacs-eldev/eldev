@@ -3003,11 +3003,11 @@ is up to the used test runner"
 
 ;; eldev lint
 
-(defvar eldev-lint-default t
+(defvar eldev-lint-default :default
   "Linters to run by default.
-Default value t means all linters known to Eldev.  Variables
-`eldev-lint-default-excluded' and `eldev-lint-disabled' take
-precedence.")
+`:default' means all linters defined with :default t, t means all
+linters known to Eldev. Variables `eldev-lint-default-excluded'
+and `eldev-lint-disabled' take precedence.")
 
 (defvar eldev-lint-default-excluded nil
   "Linters to be excluded from those run by default.")
@@ -3050,7 +3050,9 @@ error.")
   (while keywords
     (eldev-pcase-exhaustive (pop keywords)
       (:aliases
-       (eldev-register-linter-aliases name (pop keywords)))))
+       (eldev-register-linter-aliases name (pop keywords)))
+      ((and (or :default) keyword)
+       (eldev-put linter keyword (pop keywords)))))
   (eldev--assq-set name linter eldev--linters))
 
 (defun eldev-register-linter-aliases (linter aliases)
@@ -3058,7 +3060,27 @@ error.")
     (eldev--assq-set alias linter eldev--linter-aliases)))
 
 (defmacro eldev-deflinter (name arguments &rest body)
-  "Register a linter in Eldev."
+  "Register a linter in Eldev.
+
+BODY can contain the following keywords:
+
+    :name NAME
+
+        Linter name (a symbol) for ther command line.  Default
+        value is derived from function name by removing `eldev-'
+        prefix (or a prefix for any other project) and word
+        `linter-'.
+
+    :aliases ALIASES
+
+        One (a symbol) or several (list of symbols) aliases for
+        the linter.
+
+    :default VALUE
+
+        Whether the linter should be invoked by default,
+        i.e. when `eldev lint' is called without further
+        command line arguments."
   (declare (doc-string 3) (indent 2))
   (let ((parsed-body (eldev-macroexp-parse-body body))
         (linter-name (intern (replace-regexp-in-string (rx bol (1+ (not (any "-"))) (1+ "-") (? "linter-")) "" (symbol-name name))))
@@ -3137,8 +3159,12 @@ least one warning."
       (eldev-print "Nothing to do"))))
 
 (defun eldev-lint-default-p (linter)
-  (and (or (eq eldev-lint-default t) (memq linter eldev-lint-default))
-       (not (memq linter eldev-lint-default-excluded)) (not (memq linter eldev-lint-disabled))))
+  (and (eldev-pcase-exhaustive eldev-lint-default
+         (`t t)
+         (:default (eldev-get (cdr-safe (assq linter eldev--linters)) :default))
+         (_ (memq linter eldev-lint-default)))
+       (not (memq linter eldev-lint-default-excluded))
+       (not (memq linter eldev-lint-disabled))))
 
 
 (eldev-defoption eldev-lint-files (pattern)
@@ -3247,6 +3273,7 @@ least one warning."
 (eldev-deflinter eldev-linter-doc ()
   "Check documentation for style errors."
   :aliases        (checkdoc documentation)
+  :default        t
   ;; Old Emacs version don't have `checkdoc-file' and also don't use `warn'.
   (let ((newer-emacs (fboundp 'checkdoc-file)))
     (eldev-advised ('checkdoc-error :around (lambda (original &rest arguments)
@@ -3270,6 +3297,7 @@ least one warning."
 (eldev-deflinter eldev-linter-package ()
   "Check package metadata, e.g. correctness of its dependencies."
   :aliases        (package-lint pack)
+  :default        t
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
   (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa gnu)))
   (eldev-load-extra-dependencies 'runtime)
@@ -3304,6 +3332,7 @@ least one warning."
 (eldev-deflinter eldev-linter-re ()
   "Find errors, deprecated syntax etc. in regular expressions."
   :aliases        (relint regex regexp)
+  :default        t
   (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu :version "1.18"))
   (eldev-load-extra-dependencies 'runtime)
   (require 'relint)
