@@ -3121,7 +3121,7 @@ least one warning."
               (let ((canonical-name (or (cdr (assq linter eldev--linter-aliases)) linter)))
                 (when (or (memq linter eldev-lint-disabled) (memq canonical-name eldev-lint-disabled))
                   ;; This can only happen if a linter is requested explicitly.
-                  (signal 'eldev-error `("Linter `%s' is disabled (see variable `eldev-lint-disabled')" linter)))
+                  (signal 'eldev-error `("Linter `%s' is disabled (see variable `eldev-lint-disabled')" ,linter)))
                 (eldev-verbose "Running linter `%s'..." linter)
                 (condition-case error
                     (funcall (cdr (assq canonical-name eldev--linters)))
