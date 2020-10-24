@@ -27,6 +27,20 @@ While Eldev uses Emacs' built-in package `vc', it supports only a
 few VCS.  Currently, these are only `Git' and `Hg'.")
 
 
+(defun eldev-vc-root-dir ()
+  "Same as `vc-root-dir', needed for compatibility on Emacs 24."
+  (if (fboundp 'vc-root-dir)
+      (vc-root-dir)
+    (let ((backend (vc-deduce-backend)))
+      (if backend
+          (condition-case err
+              (vc-call-backend backend 'root default-directory)
+            (vc-not-supported
+             (unless (eq (cadr err) 'root)
+               (signal (car err) (cdr err)))
+             nil))))))
+
+
 (defun eldev-vc-executable (backend &optional not-required)
   "Return VC executable for given BACKEND.
 Specifying a non-supported backend will either return nil or
@@ -74,7 +88,7 @@ Since 0.8."
   (eldev-with-vc project-dir
     ;; Even if built-in `vc' can detect some VCS, we only support a few selected ones.
     ;; This makes it easier to test and give some guarantees.
-    (when (and (memq backend '(Git Hg SVN)) (let ((root (vc-root-dir))) (and root (file-equal-p root default-directory))))
+    (when (and (memq backend '(Git Hg SVN)) (let ((root (eldev-vc-root-dir))) (and root (file-equal-p root default-directory))))
       backend)))
 
 
