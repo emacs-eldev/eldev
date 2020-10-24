@@ -36,10 +36,10 @@ jobs:
 
     - name: Set up additional packages (Ubuntu)
       if: startsWith (matrix.os, 'ubuntu')
-      run: sudo apt-get -y install texinfo
+      run: sudo apt-get -y install texinfo mercurial subversion
     - name: Set up additional packages (macOS)
       if: startsWith (matrix.os, 'macos')
-      run: brew install texinfo
+      run: brew install texinfo mercurial subversion
 
     - name: Check out the source code
       uses: actions/checkout@v2
@@ -48,6 +48,9 @@ jobs:
       run: |
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC test --omit-backtraces --expect 200
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC test --test-type integration --omit-backtraces --expect 5
+
+    - name: Ensure clean byte-compilation
+      run: |
         # Also require that byte-compilation produces no warnings.
         # We'd use Eldev itself to byte-compile, but that could hide
         # some problems (for Eldev itself, other packages should be
@@ -66,6 +69,9 @@ jobs:
         # might indicate something is wrong with the test.  Here we
         # can already use Eldev.
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC compile --set test --warnings-as-errors
+
+    - name: Lint the project
+      run: |
         # Run `relint' on Eldev's source code, more as a test of
         # Eldev--relint integration, because we use `rx' macro.
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC lint re

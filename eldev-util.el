@@ -675,6 +675,16 @@ through `executable-find' if possible.  Since Eldev 0.2.")
 Can be set explicitly or left to t, in which case it is located
 through `executable-find' if possible.  Since Eldev 0.2.")
 
+(defvar eldev-hg-executable t
+  "Mercurial executable (hg).
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.8.")
+
+(defvar eldev-svn-executable t
+  "Subversion executable (svn).
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.8.")
+
 
 (defmacro eldev-find-executable (cache-var not-required finder-form error-message &rest error-arguments)
   "Find and executable using FINDER-FORM.
@@ -727,6 +737,33 @@ See also variable `eldev-git-executable'."
   (eldev-find-executable eldev-git-executable not-required
     (executable-find "git")
     "Git is not installed (cannot find `git' executable)"))
+
+(defvar vc-git-program)
+(with-eval-after-load 'vc-git
+  (setf vc-git-program (eldev-git-executable t)))
+
+(defun eldev-hg-executable (&optional not-required)
+  "Find `hg' executable.
+See also variable `eldev-hg-executable'."
+  (eldev-find-executable eldev-hg-executable not-required
+    (executable-find "hg")
+    "Mercurial is not installed (cannot find `hg' executable)"))
+
+(defvar vc-hg-program)
+(with-eval-after-load 'vc-hg
+  (setf vc-hg-program (eldev-hg-executable t)))
+
+(defun eldev-svn-executable (&optional not-required)
+  "Find `svn' executable.
+See also variable `eldev-svn-executable'."
+  (eldev-find-executable eldev-svn-executable not-required
+    (executable-find "svn")
+    "Subversion is not installed (cannot find `svn' executable)"))
+
+(defvar vc-svn-program)
+(with-eval-after-load 'vc-svn
+  (setf vc-svn-program (eldev-svn-executable t)))
+
 
 (defun eldev-directory-in-exec-path (directory)
   "Determine if DIRECTORY is in $PATH environment variable."

@@ -126,4 +126,27 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-init-git-1 ()
+  (eldev--test-with-temp-vc-copy "project-a" 'Git
+    (eldev--test-delete-quietly nil "Eldev")
+    (eldev--test-run nil ("init" "--non-interactive")
+      (should (string= stdout (eldev-format-message "Created file `%s' for this project\nModified file `.gitignore'\n" eldev-file)))
+      (should (string= (eldev--test-file-contents nil ".gitignore") (eldev-format-message "\
+# Added automatically by `eldev init'.
+/.eldev
+/Eldev-local
+"))))))
+
+(ert-deftest eldev-init-hg-1 ()
+  (eldev--test-with-temp-vc-copy "project-a" 'Hg
+    (eldev--test-delete-quietly nil "Eldev")
+    (eldev--test-run nil ("init" "--non-interactive")
+      (should (string= stdout (eldev-format-message "Created file `%s' for this project\nModified file `.hgignore'\n" eldev-file)))
+      (should (string= (eldev--test-file-contents nil ".hgignore") (eldev-format-message "\
+# Added automatically by `eldev init'.
+^\\.eldev$
+^Eldev-local$
+"))))))
+
+
 (provide 'test/init)

@@ -4833,151 +4833,16 @@ documentation."
 
 (defvar eldev-init-interactive t)
 
-(declare-function eldev--autoloads-used-p 'eldev-plugins)
+(declare-function eldev--do-init 'eldev-vc)
 
 (eldev-defcommand eldev-init (&rest parameters)
   "Initialize project in this directory to use Eldev.  This command
 will fail if the project already has file named `Eldev'."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
-  (when (file-exists-p eldev-file)
-    (signal 'eldev-error `("File `%s' already exists in this project" ,eldev-file)))
-  (let* ((package         (ignore-errors (eldev-package-descriptor)))
-         (requirements    (when package (package-desc-reqs package)))
-         (archives-to-use t)
-         autoloads
-         .gitignore)
-    (if eldev-init-interactive
-        (cond (requirements
-               (when (eldev-y-or-n-p "Try to automatically select package archive(s) for dependency lookup? ")
-                 (eldev-print "Please wait, this might take a while...")
-                 (dolist (archive eldev--known-package-archives)
-                   (unless (eldev--stable/unstable-archive-p (cadr archive))
-                     (eldev-use-package-archive (car archive))))
-                 (let ((archive-options (eldev--init-all-archive-combinations
-                                         (mapcar #'car (eldev-filter (or (eldev--stable/unstable-archive-p (cadr it))
-                                                                         (null (eldev--stable/unstable-archive-counterpart (cadr it))))
-                                                                     eldev--known-package-archives)))))
-                   (while archive-options
-                     (let ((archives (pop archive-options))
-                           simple)
-                       (dolist (archive archives)
-                         (let ((entry (eldev--resolve-package-archive archive)))
-                           (if (eldev--stable/unstable-archive-p entry)
-                               (progn (push (plist-get entry :stable)   simple)
-                                      (push (plist-get entry :unstable) simple))
-                             (push entry simple))))
-                       (if (let ((package-archives (eldev-filter (memq it simple) package-archives)))
-                             (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch))
-                             (package-read-all-archive-contents)
-                             (package-load-all-descriptors)
-                             (ignore-errors
-                               (let ((inhibit-message t))
-                                 (package-compute-transaction nil requirements))))
-                           (progn (eldev-print "Autoguessed the following %s" (eldev-message-enumerate '("package archive:" "package archives:") archives))
-                                  (setf archives-to-use archives
-                                        archive-options nil))
-                         (eldev-verbose "Cannot fetch project dependencies from %s" (eldev-message-enumerate "package archive" archives))))))
-                 (when (eq archives-to-use t)
-                   (eldev-warn "Failed to autoguess needed package archives; please edit `%s' as appropriate later" eldev-file))))
-              (package
-               (eldev-print "This project has no dependencies (yet)")))
-      (eldev-trace (cond (requirements
-                          "Not in interactive mode, not autodetermining package archives to use")
-                         (package
-                          "This project has no dependencies (yet)"))))
-    (unless package
-      (eldev-warn "This directory doesn't seem to contain a valid Elisp package (yet)")
-      (eldev-print "If it does have main `.el' file, headers in it are likely corrupt or incomplete
-Try evaluating `(package-buffer-info)' in a buffer with the file")
-      ;; In non-interactive mode we continue anyway; in interactive we ask first.
-      (when (and eldev-init-interactive (not (eldev-y-or-n-p "Continue anyway? ")))
-        (signal 'eldev-quit 1)))
-    (require 'eldev-plugins)
-    (when (eldev--autoloads-used-p)
-      (eldev-trace "Detected autoload cookies in project `.el' files")
-      (setf autoloads (if eldev-init-interactive
-                          (eldev-y-or-n-p (eldev-format-message "Autoload cookies (`;;;###autoload') detected; enable plugin `autoloads'? "))
-                        (eldev-trace "Not in interactive mode, will enable plugin `autoloads' by default")
-                        t)))
-    (cond ((file-directory-p ".git")
-           (eldev-trace "Detected `.git' subdirectory, assuming a Git repository")
-           (setf .gitignore (if eldev-init-interactive
-                                (eldev-y-or-n-p (eldev-format-message "Usage of Git detected; modify `.gitignore' as appropriate? "))
-                              (eldev-trace "Not in interactive mode, will modify `.gitignore' by default")
-                              t)))
-          (t
-           (eldev-verbose "This doesn't appear to be a supported VCS repository")))
-    (with-temp-file eldev-file
-      (insert "; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-\n\n")
-      (cond ((eq archives-to-use t)
-             (eldev-trace "Adding a few commented-out calls to `eldev-use-package-archive' to `%s'" eldev-file)
-             (insert ";; Uncomment some calls below as needed for your project.\n")
-             (dolist (archive eldev--known-package-archives)
-               (when (or (eldev--stable/unstable-archive-p (cadr archive))
-                         (null (eldev--stable/unstable-archive-counterpart (cadr archive) t)))
-                 (insert (format ";(eldev-use-package-archive '%s)\n" (car archive))))))
-            (archives-to-use
-             (eldev-trace "Adding the autodetermined package archives to `%s'" eldev-file)
-             (insert ";; Autodetermined by `eldev init'.\n")
-             (dolist (archive archives-to-use)
-               (insert (format "(eldev-use-package-archive '%s)\n" archive))))
-            (t
-             (insert ";; Calls to `eldev-use-package-archive' are not needed: no dependencies\n")))
-      (when autoloads
-        (insert "\n(eldev-use-plugin 'autoloads)\n")))
-    (eldev-print "Created file `%s' for this project" eldev-file)
-    (cond (.gitignore
-           (when (eldev-git-executable 'warn)
-             (let ((files-to-ignore `(,eldev-cache-dir ,eldev-local-file))
-                   add-to-ignore)
-               (dolist (file files-to-ignore)
-                 (if (/= (call-process (eldev-git-executable) nil nil nil "check-ignore" "--quiet" file)  0)
-                     (progn (push file add-to-ignore)
-                            (eldev-trace "Git doesn't ignore `%s' currently" file))
-                   (eldev-trace "Git already ignores `%s'" file)))
-               (if add-to-ignore
-                   (let (failed)
-                     (setf add-to-ignore (nreverse add-to-ignore))
-                     (eldev-verbose "Adding %s to `.gitignore'" (eldev-message-enumerate "file" add-to-ignore))
-                     (with-temp-file ".gitignore"
-                       (condition-case nil
-                           (insert-file-contents ".gitignore" t)
-                         (file-missing))
-                       (goto-char (point-max))
-                       (unless (eolp)
-                         (insert "\n"))
-                       (when (looking-back (rx nonl "\n") nil)
-                         (insert "\n"))
-                       (insert "# Added automatically by `eldev init'.\n")
-                       (dolist (file add-to-ignore)
-                         (insert (format "/%s\n" file))))
-                     (dolist (file files-to-ignore)
-                       (when (/= (call-process (eldev-git-executable) nil nil nil "check-ignore" "--quiet" file) 0)
-                         (eldev-warn "Failed to convince Git to ignore file `%s'" file)
-                         (setf failed t)))
-                     (unless failed
-                       (eldev-print "Modified file `.gitignore'")))
-                 (eldev-verbose "Git already ignores what Eldev thinks it should"))))))))
-
-(defun eldev--init-all-archive-combinations (all-archives)
-  (let ((combinations (list nil)))
-    (dotimes (k (length all-archives))
-      (setf k            (- (length all-archives) k 1)
-            combinations (append combinations (mapcar (lambda (combination) (cons k combination)) combinations))))
-    (mapcar (lambda (combination)
-              (mapcar (lambda (k) (nth k all-archives)) combination))
-            (sort combinations (lambda (a b)
-                                 (let ((length-a (length a))
-                                       (length-b (length b)))
-                                   (or (< length-a length-b)
-                                       (and (= length-a length-b)
-                                            (let (before)
-                                              (while a
-                                                (when (< (pop a) (pop b))
-                                                  (setf before t
-                                                        a      nil)))
-                                              before)))))))))
+  ;; Real work is done in `eldev-vc'.
+  (require 'eldev-vc)
+  (eldev--do-init))
 
 (eldev-defbooloptions eldev-init-interactive-mode eldev-init-non-interactive-mode eldev-init-interactive
   ("Create `Eldev' interactively"
