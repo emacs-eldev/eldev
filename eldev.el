@@ -3159,10 +3159,10 @@ least one warning."
       (eldev-print "Nothing to do"))))
 
 (defun eldev-lint-default-p (linter)
-  (and (eldev-pcase-exhaustive eldev-lint-default
-         (`t t)
+  (and (pcase eldev-lint-default
+         (`t       t)
          (:default (eldev-get (cdr-safe (assq linter eldev--linters)) :default))
-         (_ (memq linter eldev-lint-default)))
+         (_        (memq linter eldev-lint-default)))
        (not (memq linter eldev-lint-default-excluded))
        (not (memq linter eldev-lint-disabled))))
 
