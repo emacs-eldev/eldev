@@ -2750,6 +2750,7 @@ unexpected result."
               (eldev-test-finalize-framework framework selectors))))
       (eldev-print "No test files to load"))))
 
+(defvar byte-compiler-error-flag)
 (defun eldev--test-autoinstalling-framework (enabled callback)
   ;; If framework is specified explicitly, ensure it is installed first.  Otherwise
   ;; appropriate framework will be installed from `require' advice below.
@@ -2770,7 +2771,11 @@ unexpected result."
                                            (when autoinstall
                                              (eldev-verbose "Installing testing framework package(s) as required...")
                                              (apply #'eldev-add-extra-dependencies 'runtime autoinstall)
-                                             (eldev-load-extra-dependencies 'runtime)))))))
+                                             ;; Backporting the fix from https://debbugs.gnu.org/cgi/bugreport.cgi?bug=41065
+                                             ;; for this specific case: Emacs would attribute results of inner byte-compilation
+                                             ;; (dependency package installation) to outer (byte-compiling the project itself).
+                                             (let (byte-compiler-error-flag)
+                                               (eldev-load-extra-dependencies 'runtime))))))))
     (funcall callback)))
 
 (defun eldev-test-get-framework-data (framework)
