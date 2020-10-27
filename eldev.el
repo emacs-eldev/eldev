@@ -1769,7 +1769,14 @@ Since 0.2."
                      (eldev-print (if self "Eldev is up-to-date" "All dependencies are up-to-date")))))
                nil)))
     (when activate
-      (eldev--do-activate-dependencies package-name all-packages additional-sets no-error-if-missing))))
+      (eldev--do-activate-dependencies package-name all-packages additional-sets no-error-if-missing)
+      ;; See e.g. `eldev-test-utility-files-in-package-mode-1'.  Basically, test files
+      ;; cannot be `require'd if `eldev-project-dir' is not in `load-path', which happens
+      ;; if the project is loaded in packaged mode.  Always add the directory, regardless
+      ;; of command (e.g. it is feasible that someone would require a test utility feature
+      ;; from `eval' command), but at _the end_.
+      (when (eq core 'project)
+        (add-to-list 'load-path eldev-project-dir t)))))
 
 (defun eldev--do-activate-dependencies (package-name dependencies additional-sets no-error-if-missing)
   ;; Also add the additional loading roots here.

@@ -77,9 +77,12 @@
 (defvar eldev--test-targets-project-c-test
   '(":default"
     ":compile"
+    "    test/dummy.elc  [ELC]"
+    "        test/dummy.el"
     "    test/project-c.elc  [ELC]"
     "        test/project-c.el"
-    "        [inh] project-c.elc"))
+    "        [inh] project-c.elc"
+    "        [inh] test/dummy.elc"))
 
 
 (defvar eldev--test-targets-project-d-main

@@ -63,4 +63,11 @@
     (should (string-match-p "\\`\n*[0-9]+ tests? produced an unexpected result\n*\\'" stderr))))
 
 
+(ert-deftest eldev-test-utility-files-in-package-mode-1 ()
+  ;; Pre-0.8 Eldev would fail to test projects loaded in packaged mode if they had any
+  ;; test utility files (subject to file ordering, so we specify target file explicitly).
+  (eldev--test-run "project-c" ("--packaged" "test" "project-c.el")
+    (should (= exit-code 0))))
+
+
 (provide 'test/test)
