@@ -76,8 +76,13 @@ This is a wrapper around `ert-run-tests-batch' that handles
 use this for ERT framework, unless they can do better."
   ;; Since ERT doesn't support features we want out-of-the-box, we have to hack.
   (eldev-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin eldev--test-ert-short-backtraces)
-    (when (integerp eldev-test-print-backtraces)
-      (setf ert-batch-backtrace-right-margin (when (> eldev-test-print-backtraces 1) (1- eldev-test-print-backtraces))))
+    (if (integerp eldev-test-print-backtraces)
+        (setf ert-batch-backtrace-right-margin (when (> eldev-test-print-backtraces 1) (1- eldev-test-print-backtraces)))
+      ;; Otherwise use value of `eldev-backtrace-style', but only if test runner doesn't
+      ;; specify anything.
+      (unless (assq 'ert-batch-backtrace-right-margin environment)
+        (setf ert-batch-backtrace-right-margin (when (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1))
+                                                 (1- eldev-backtrace-style)))))
     ;; Workaround: older Emacsen don't support setting `ert-batch-backtrace-right-margin'
     ;; to nil.  We assume that if the variable is customizable, nil is already supported.
     (unless (or ert-batch-backtrace-right-margin (get 'ert-batch-backtrace-right-margin 'custom-type))
@@ -95,6 +100,8 @@ use this for ERT framework, unless they can do better."
                                          (prog1 (eldev-advised ('backtrace-to-string
                                                                 :around (lambda (original &optional frames)
                                                                           (if eldev-test-print-backtraces
+                                                                              ;; Highlighting would make no effect since ERT uses
+                                                                              ;; `buffer-substring-no-properties'.  Oh well.
                                                                               (funcall original (eldev--ert-maybe-shorten-backtrace frames))
                                                                             "    [omitted]")))
                                                   (eldev-advised ('ert--print-backtrace

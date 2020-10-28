@@ -301,6 +301,15 @@ altered."
 Can be a symbol `quiet', `verbose' or `trace'.  Any other value,
 including nil, stands for the default verbosity level.")
 
+(defvar eldev-backtrace-style t
+  "Default style for printed backtraces.
+If this value is t, backtrace lines are not truncated and printed
+out fully.  If this is an integer greater than 1 (e.g. 80), lines
+are truncated for that screen width.  Other values can be defined
+later.  Any unknown value is treated as t.
+
+Since 0.8")
+
 (defvar eldev-coloring-mode 'auto
   "Whether to use coloring on output.
 Special symbol \\='auto means that coloring should be used when
@@ -575,6 +584,70 @@ human-readable errors if there are any problems."
                                `("Trailing garbage after the %s: `%s'" ,description ,tail)
                              `("Trailing garbage after the expression in %s: `%s'" ,description ,tail))))
     (car result)))
+
+
+(defvar backtrace-line-length)
+
+(defun eldev-backtrace ()
+  "Print backtrace to stderr.
+This is similar to built-in function `backtrace', but respects
+`eldev-backtrace-style' value.  Since 0.8."
+  ;; Not using newer functions for compatibility reasons.
+  (let ((limit eldev-backtrace-style))
+    (setf limit (when (and (integerp limit) (> limit 1)) (1- limit)))
+    (with-temp-buffer
+      (let ((standard-output       (current-buffer))
+            ;; Emacs' `backtrace' module can die if this value is too small or nil.
+            (backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
+        (backtrace))
+      (goto-char 1)
+      ;; Discard backtrace part inside this function.
+      (when (search-forward-regexp (rx bol (0+ " ") "eldev-backtrace()" eol) nil t)
+        (beginning-of-line)
+        (delete-region 1 (point)))
+      (eldev-highlight-backtrace)
+      ;; Optionally truncate long lines.
+      (when limit
+        (goto-char 1)
+        (while (not (eobp))
+          (let* ((line-end    (line-end-position))
+                 (line-length (- line-end (point))))
+            (when (> line-length limit)
+              (delete-region (+ (point) limit) line-end)))
+          (forward-line)))
+      (goto-char (point-max))
+      (when (eq (char-before) ?\n)
+        (delete-char -1))
+      (eldev-output :stderr "%s" (buffer-string)))))
+
+(defun eldev-highlight-backtrace (&optional backtrace)
+  "Highlight elements in given BACKTRACE.
+The argument can be either a string or a buffer.  If it is not
+specified, current buffer is highlighted.  Currently,
+highlighting is done only on Emacs 27 and up and only for frames'
+main function names.
+
+If the argument is a string, return highlighted string (i.e. with
+faces set up).  Otherwise, just modify the buffer.
+
+Since 0.8."
+  ;; This is useful for non-byte-compiled code.  However, it seems that on pre-27 Emacs
+  ;; single frames can take multiple lines.
+  (if (>= emacs-major-version 27)
+      (if (stringp backtrace)
+          (with-temp-buffer
+            (insert backtrace)
+            (eldev--do-highlight-backtrace)
+            (buffer-string))
+        (with-current-buffer (or backtrace (current-buffer))
+          (eldev--do-highlight-backtrace)))
+    backtrace))
+
+(defun eldev--do-highlight-backtrace ()
+  (save-excursion
+    (goto-char 1)
+    (while (re-search-forward (rx bol (0+ " ") (group (1+ (not (any "("))))) nil t)
+      (add-face-text-property (match-beginning 1) (match-end 1) 'name))))
 
 
 (defmacro eldev-output-reroute-messages (&rest body)

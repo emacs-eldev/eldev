@@ -419,6 +419,16 @@ This is only a wrapper over `eldev-defoption'."
    :options       --no-backtrace-on-abort
    :hidden-if     :default))
 
+(eldev-defoption eldev-backtrace-style (&optional width)
+  "Print backtraces for given screen WIDTH; if omitted, don't
+truncate backtrace lines"
+  :options        (-b --backtrace --backtrace-style)
+  :optional-value WIDTH
+  :default-value  (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1))
+                      eldev-backtrace-style
+                    "untruncated")
+  (setf eldev-backtrace-style (if width (string-to-number width) t)))
+
 (eldev-defoption eldev-set-loading-mode (mode)
   "Set the project's loading mode"
   :options        (-m --loading)
@@ -667,9 +677,7 @@ Used by Eldev startup script."
                                                           (apply original arguments))))
                         (eldev-parse-options command-line nil t t)
                         (when eldev-print-backtrace-on-abort
-                          ;; Using a wrapper function results in unnecessary frame(s) in
-                          ;; the backtrace, so let's avoid this until needed.
-                          (add-hook 'kill-emacs-hook #'backtrace))
+                          (add-hook 'kill-emacs-hook #'eldev-backtrace))
                         ;; Since this is printed before `~/.eldev/config' is loaded it can
                         ;; ignore some settings from that file, e.g. colorizing mode.
                         (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
@@ -729,7 +737,7 @@ Used by Eldev startup script."
                                (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))))
-      (remove-hook 'kill-emacs-hook #'backtrace)
+      (remove-hook 'kill-emacs-hook #'eldev-backtrace)
       (eldev-trace "Finished %s on %s" (if (eq exit-code 0) "successfully" "erroneously") (replace-regexp-in-string " +" " " (current-time-string))))
     (when eldev-too-old
       (when (eq (car eldev-too-old) :hint)
@@ -2628,9 +2636,11 @@ execution and other common commands.")
 
 (defvar eldev-test-print-backtraces t
   "If non-nil (default), print assertion backtraces.
-By default, backtrace line length is up to test runner to choose.
-However, if value of this variable is an integer, print for that
-screen width.  Value 1 or less means no limit.")
+By default, style of backtraces is determined by variable
+`eldev-backtrace-style' (also settable by global command line
+option), as long as this is supported by the testing framework.
+However, if value of this variable is an integer, it overrides
+the value of `eldev-backtrace-style'.")
 
 (defvar eldev-test-expect-at-least nil
   "Fail if there are fewer than this many tests.
@@ -2913,7 +2923,8 @@ it will have to redownload all dependency packages."
 
 (eldev-deftestrunner eldev-test-runner-standard (framework selectors)
   "Invokes test framework without changing anything.  However,
-various options to command `test' are still respected if
+various options to command `test' and global option `-b'
+(variable `eldev-backtrace-style') are still respected if
 possible."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard
            (pcase framework
@@ -2925,25 +2936,24 @@ possible."
 
 For ERT:
   - if Eldev is in quiet mode, set `ert-quiet' to t;
-  - only backtrace frames inside test functions are printed;
-  - long line trimming in backtraces is disabled by default.
+  - only backtrace frames inside test functions are printed.
 
 For Buttercup:
   - output for skipped tests (e.g. because of selectors) is omitted;
-  - if Eldev is in quiet mode, only failed tests are mentioned;
-  - backtraces lines are not truncated (i.e. `full' stack frame style)
-    by default."
+  - if Eldev is in quiet mode, only failed tests are mentioned.
+
+Backtraces are formatted according to `eldev-test-print-backtraces'
+and `eldev-backtrace-style'.  For Buttercup, any truncation results
+in `crop' stack frame style."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
              ;; Other frameworks are just invoked with empty environment.
              (pcase framework
                (`ert
                 `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
-                  (ert-batch-backtrace-right-margin . nil)
                   (eldev--test-ert-short-backtraces . t)))
                (`buttercup
                 `((buttercup-color                         . ,(eldev-output-colorized-p))
-                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))
-                  (buttercup-stack-frame-style             . full))))))
+                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed)))))))))
 
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"
@@ -2960,17 +2970,22 @@ For Buttercup:
   :for-command    test)
 
 (eldev-defoption eldev-test-print-backtraces (&optional width)
-  "Print failure backtraces for given screen WIDTH; default value
-is up to the used test runner"
+  "Print test failure backtraces; WIDTH overrides value of the
+global option `-b'"
   :options        (-b --print-backtraces)
-  :optional-value WIDTH
   :for-command    test
+  :optional-value WIDTH
+  :default-value  (pcase eldev-test-print-backtraces
+                    (`nil            "omit")
+                    ((pred integerp) (if (> eldev-test-print-backtraces 1) eldev-test-print-backtraces "untruncated"))
+                    (_               "use global style"))
   (setf eldev-test-print-backtraces (if width (string-to-number width) t)))
 
 (eldev-defoption eldev-test-omit-backtraces ()
   "Omit failure backtraces for brevity"
   :options        (-B --omit-backtraces)
   :for-command    test
+  :if-default     (not eldev-test-print-backtraces)
   (setf eldev-test-print-backtraces nil))
 
 (eldev-defoption eldev-test-expect-at-least (n)
