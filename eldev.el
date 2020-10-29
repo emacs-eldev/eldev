@@ -653,7 +653,11 @@ Used by Eldev startup script."
 
 (defun eldev-cli (command-line)
   "Eldev entry point."
-  (let (command
+  ;; We parse command line in a separate from `command-line-args' and
+  ;; `command-line-args-left' way, but whatever code we execute from here should believe
+  ;; there are no arguments left.
+  (let (command-line-args-left
+        command
         eldev-too-old
         exit-code)
     (unwind-protect
