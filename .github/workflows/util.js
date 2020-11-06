@@ -32,6 +32,7 @@ function expandTilde(path) {
 }
 
 module.exports = {
+    getRawUrl,
     downloadScript,
     expandTilde
 };
