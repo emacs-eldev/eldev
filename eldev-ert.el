@@ -33,6 +33,9 @@
 (defvar eldev--test-ert-short-backtraces nil)
 (defvar eldev--test-ert-results nil)
 
+(defvar-local eldev--ert-backtrace-buffer nil)
+
+
 (defun eldev-test-ert-preprocess-selectors (selectors)
   "Convert SELECTORS to ERT format."
   (eldev-test-selectors-to-elisp-values selectors t))
@@ -100,16 +103,20 @@ use this for ERT framework, unless they can do better."
                                          (prog1 (eldev-advised ('backtrace-to-string
                                                                 :around (lambda (original &optional frames)
                                                                           (if eldev-test-print-backtraces
-                                                                              ;; Highlighting would make no effect since ERT uses
-                                                                              ;; `buffer-substring-no-properties'.  Oh well.
-                                                                              (funcall original (eldev--ert-maybe-shorten-backtrace frames))
+                                                                              (progn (setf eldev--ert-backtrace-buffer t)
+                                                                                     (eldev-highlight-backtrace
+                                                                                      (funcall original (eldev--ert-maybe-shorten-backtrace frames))))
                                                                             "    [omitted]")))
                                                   (eldev-advised ('ert--print-backtrace
                                                                   :around (lambda (original &optional frames &rest arguments)
                                                                             (if eldev-test-print-backtraces
                                                                                 (apply original (eldev--ert-maybe-shorten-backtrace frames) arguments)
                                                                               (insert "    [omitted]\n"))))
-                                                    (apply listener event-type arguments)))
+                                                    ;; Workaround for ERT stripping faces we set in backtraces.
+                                                    (eldev-advised ('buffer-substring-no-properties
+                                                                    :around (lambda (original &rest arguments)
+                                                                              (apply (if eldev--ert-backtrace-buffer #'buffer-substring original) arguments)))
+                                                      (apply listener event-type arguments))))
                                            (pcase event-type
                                              (`run-started
                                               (eldev-test-validate-amount (ert-stats-total (nth 0 arguments))))
