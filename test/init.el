@@ -127,7 +127,7 @@
 
 
 (ert-deftest eldev-init-git-1 ()
-  (eldev--test-with-temp-vc-copy "project-a" 'Git
+  (eldev--test-with-temp-copy "project-a" 'Git
     (eldev--test-delete-quietly nil "Eldev")
     (eldev--test-run nil ("init" "--non-interactive")
       (should (string= stdout (eldev-format-message "Created file `%s' for this project\nModified file `.gitignore'\n" eldev-file)))
@@ -138,7 +138,7 @@
 "))))))
 
 (ert-deftest eldev-init-hg-1 ()
-  (eldev--test-with-temp-vc-copy "project-a" 'Hg
+  (eldev--test-with-temp-copy "project-a" 'Hg
     (eldev--test-delete-quietly nil "Eldev")
     (eldev--test-run nil ("init" "--non-interactive")
       (should (string= stdout (eldev-format-message "Created file `%s' for this project\nModified file `.hgignore'\n" eldev-file)))

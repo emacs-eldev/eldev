@@ -202,10 +202,10 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
         (if dont-check-if-ignored
             (setf add-to-ignore files-to-ignore)
           (dolist (file files-to-ignore)
-            (if (/= (call-process (eldev-git-executable) nil nil nil "check-ignore" "--quiet" file) 0)
-                (progn (push file add-to-ignore)
-                       (eldev-trace "Git doesn't ignore `%s' currently" file))
-              (eldev-trace "Git already ignores `%s'" file)))
+            (if (= (eldev-call-process (eldev-git-executable) `("check-ignore" "--quiet" ,file)) 0)
+                (eldev-trace "Git already ignores `%s'" file)
+              (push file add-to-ignore)
+              (eldev-trace "Git doesn't ignore `%s' currently" file)))
           (setf add-to-ignore (nreverse add-to-ignore)))
         (if add-to-ignore
             (let (failed)
@@ -213,7 +213,8 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
               (with-temp-buffer
                 (if (eq vc-backend 'SVN)
                     ;; This can return non-null status if there is no such property yet.
-                    (call-process (eldev-svn-executable) nil '(t nil) nil "propget" "svn:ignore" ".")
+                    (eldev-call-process (eldev-svn-executable) '("propget" "svn:ignore" ".")
+                      :destination '(t nil))
                   (condition-case nil
                       (insert-file-contents .ignore t)
                     ;; Pre-26 Emacsen don't know about `file-missing', so catch broadly.
@@ -232,11 +233,11 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                             (`SVN file))
                           "\n"))
                 (if (eq vc-backend 'SVN)
-                    (setf failed (/= (call-process (eldev-svn-executable) nil nil nil "propset" "svn:ignore" (buffer-string) ".") 0))
+                    (setf failed (/= (eldev-call-process (eldev-svn-executable) `("propset" "svn:ignore" ,(buffer-string) ".")) 0))
                   (write-region nil nil .ignore nil 'quiet)))
               (unless dont-check-if-ignored
                 (dolist (file files-to-ignore)
-                  (when (/= (call-process (eldev-git-executable) nil nil nil "check-ignore" "--quiet" file) 0)
+                  (when (/= (eldev-call-process (eldev-git-executable) `("check-ignore" "--quiet" ,file)) 0)
                     (eldev-warn "Failed to convince Git to ignore file `%s'" file)
                     (setf failed t))))
               (unless failed

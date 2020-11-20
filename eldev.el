@@ -2123,23 +2123,20 @@ descriptor."
           (eldev-verbose "Preparing to load local dependency `%s' in mode `%s'" dependency-name loading-mode))
         (let ((default-directory dependency-dir))
           (dolist (command commands)
-            (eldev-trace "Full command line (in directory `%s'):\n  %s" default-directory (eldev-message-command-line (eldev-shell-command) command))
             (eldev-call-process (eldev-shell-command) command
-              (if (= exit-code 0)
-                  (progn
-                    (eldev--forward-process-output "Output of the child Eldev process:" "Child Eldev process produced no output" t)
-                    (when (string= (car command) "package")
-                      (goto-char (point-max))
-                      (forward-line -2)
-                      (let ((point (point)))
-                        (end-of-line)
-                        (let ((file (buffer-substring-no-properties point (point))))
-                          (forward-line)
-                          (push `(,dependency-name ,file ,(looking-at "up-to-date")) eldev--local-dependency-packages)))))
-                (eldev-warn "Output of the child Eldev process:\n%s" (buffer-string))
-                (signal 'eldev-error (if project-itself
-                                         `("Child Eldev process for exited with error code %d" ,exit-code)
-                                       `("Child Eldev process for local dependency `%s' exited with error code %d" ,dependency-name ,exit-code))))))))
+              :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
+              :die-on-error       (if project-itself
+                                      "child Eldev process"
+                                    (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
+              (eldev--forward-process-output "Output of the child Eldev process:" "Child Eldev process produced no output" t)
+              (when (string= (car command) "package")
+                (goto-char (point-max))
+                (forward-line -2)
+                (let ((point (point)))
+                  (end-of-line)
+                  (let ((file (buffer-substring-no-properties point (point))))
+                    (forward-line)
+                    (push `(,dependency-name ,file ,(looking-at "up-to-date")) eldev--local-dependency-packages))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 
 ;; This is a hackish function only working for packages loaded in `as-is' and similar
@@ -3591,10 +3588,11 @@ obligations."
               (remhash cache-key eldev--internal-eval-cache)
               (setf eldev--internal-eval-cache-modified t)
               (eldev-trace "Discarded cached value for form `%S' in directory `%s' as `Eldev' and/or `Eldev-local' are newer" form project-dir))))
-        (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
-        ;; FIXME: Are we sure `--quiet' is enough to silence stderr?  Maybe redirect it instead?
         (let ((default-directory project-dir))
           (eldev-call-process (eldev-shell-command) `("--quiet" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
+            :destination   '(t nil)
+            :pre-execution (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
+            ;; Not using `:die-on-error' because we need a custom message.
             (unless (= exit-code 0)
               (eldev-warn "Output of the child Eldev process:\n%s" (buffer-string))
               (signal 'eldev-error `("Failed to evaluate Eldev expression in directory `%s'" ,project-dir)))
@@ -3666,22 +3664,21 @@ be passed to Emacs, else it will most likely fail."
         (push (eldev-macroexp-quote (symbol-value variable)) forwarding)))
     (let* ((autoloads           (apply #'nconc (mapcar (lambda (file) `("--load" ,file)) eldev--loaded-autoloads-files)))
            (value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
-           (command-line        (if (string= (car parameters) "--")
-                                    (append autoloads value-forwarding (cdr parameters))
-                                  (append eldev-emacs-default-command-line
-                                          autoloads
-                                          value-forwarding
-                                          (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
-                                                                  (eldev-required-features eldev-emacs-required-features)))
-                                          parameters)))
            (effective-load-path (mapconcat #'identity load-path path-separator))
            (process-environment `(,(format "EMACSLOADPATH=%s" effective-load-path) ,@process-environment)))
-      (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line eldev-emacs-executable command-line))
-      (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
-      (eldev-call-process eldev-emacs-executable command-line
-        (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")
-        (unless (= exit-code 0)
-          (signal 'eldev-error `("Child Emacs process exited with error code %d" ,exit-code)))))))
+      (eldev-call-process eldev-emacs-executable
+          (if (string= (car parameters) "--")
+              (append autoloads value-forwarding (cdr parameters))
+            (append eldev-emacs-default-command-line
+                    autoloads
+                    value-forwarding
+                    (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
+                                            (eldev-required-features eldev-emacs-required-features)))
+                    parameters))
+        :pre-execution (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
+        :pre-execution (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
+        :die-on-error  "child Emacs"
+        (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")))))
 
 
 
@@ -4718,9 +4715,8 @@ possible to build arbitrary targets this way."
                    :aliases (info dot-info)
                    :default t)
   (eldev-call-process (eldev-makeinfo-executable) `("--no-split" ,source "--output" ,target ,@(when eldev-build-suppress-warnings '("--no-warn")))
-    (eldev--forward-process-output)
-    (unless (= exit-code 0)
-      (signal 'eldev-error `("`makeinfo' process exited with error code %d" ,exit-code)))))
+    :die-on-error t
+    (eldev--forward-process-output)))
 
 (eldev-defbuilder eldev-builder-info-dir (sources target)
   :type           many-to-one
@@ -4732,9 +4728,8 @@ possible to build arbitrary targets this way."
                    "Delete `dir' file generated from `.info'."
                    :default t)
   (eldev-call-process (eldev-install-info-executable) `("--dir-file" ,target ,@sources ,@(when eldev-build-suppress-warnings '("--silent")))
-    (eldev--forward-process-output)
-    (unless (= exit-code 0)
-      (signal 'eldev-error `("`install-info' process exited with error code %d" ,exit-code)))))
+    :die-on-error t
+    (eldev--forward-process-output)))
 
 
 (eldev-defbuilder eldev-builder-package (sources targets)
@@ -4791,15 +4786,13 @@ possible to build arbitrary targets this way."
               (push (concat name-version-dir source) files-to-tar))
             ;; Note that `file-name-as-directory' is important on older Emacs versions,
             ;; otherwise `tar' will be executed from `/tmp'.
-            (let ((default-directory (file-name-as-directory working-dir))
-                  (command-line      `("-cf" ,(expand-file-name package-target eldev-project-dir) ,@(nreverse files-to-tar))))
+            (let ((default-directory (file-name-as-directory working-dir)))
               (eldev-verbose "%s" (eldev-message-enumerate-files "Packaging the following file%s: %s (%d)" sources))
-              (eldev-trace "Full command line to create package tarball:\n  %s" (eldev-message-command-line (eldev-tar-executable) command-line))
-              (eldev-call-process (eldev-tar-executable) command-line
-                (unless (= exit-code 0)
-                  (eldev-warn "`tar' output (ran from directory `%s'):" working-dir))
-                (eldev--forward-process-output)
-                (unless (= exit-code 0)
+              (eldev-call-process (eldev-tar-executable) `("-cf" ,(expand-file-name package-target eldev-project-dir) ,@(nreverse files-to-tar))
+                :trace-command-line "Full command line to create package tarball"
+                (if (= exit-code 0)
+                    (eldev--forward-process-output)
+                  (eldev-warn "`tar' output (ran from directory `%s'):" working-dir)
                   (signal 'eldev-build-failed `("Failed to create package tarball `%s'" ,package-target)))))
             ;; Note that if packaging fails, `working-dir' and `descriptor-file' are not
             ;; deleted.  This is intentional.

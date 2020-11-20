@@ -118,28 +118,31 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
      (eldev--test-call-process "Eldev" eldev--test-shell-command ,command-line
        ,@body)))
 
-(defmacro eldev--test-with-temp-vc-copy (test-project backend &rest body)
+(defmacro eldev--test-with-temp-copy (test-project vc-backend &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
-  `(let* ((backend             ,backend)
-          (eldev--test-project (eldev--test-make-temp-vc-copy ,test-project backend)))
+  `(let* ((vc-backend          ,vc-backend)
+          (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend)))
      (unless eldev--test-project
-       (ert-skip (eldev-format-message "%s couldn't be found" backend)))
+       (ert-skip (eldev-format-message "%s couldn't be found" vc-backend)))
      ,@body))
 
-(defun eldev--test-make-temp-vc-copy (test-project backend)
-  (unless (memq backend '(Git Hg))
-    (error "Cannot create temporary VC copy for backend `%s'" backend))
-  (when (eldev-vc-executable backend t)
-    (let ((project-dir (eldev--test-project-dir test-project))
-          (copy-dir    (file-name-as-directory (make-temp-file "eldev-" t "-test"))))
-      ;; To avoid copying generated files.
-      (eldev--test-run test-project ("clean" "everything")
-        (should (= exit-code 0)))
-      (copy-directory project-dir copy-dir t nil t)
-      (let ((default-directory copy-dir))
-        (when (/= (call-process (eldev-vc-executable backend) nil nil nil "init") 0)
-          (error "Unable to initialize %s repository in the copied directory `%s'" backend copy-dir)))
-      copy-dir)))
+(defun eldev--test-make-temp-copy (test-project vc-backend)
+  (unless (memq vc-backend '(nil Git Hg))
+    (error "Cannot create temporary VC copy for backend `%s'" vc-backend))
+  (let ((executable (if vc-backend (eldev-vc-executable vc-backend t) t)))
+    (when executable
+      (let ((project-dir (eldev--test-project-dir test-project))
+            (copy-dir    (file-name-as-directory (make-temp-file "eldev-" t "-test"))))
+        ;; To avoid copying generated files.
+        (eldev--test-run test-project ("clean" "everything")
+          (should (= exit-code 0)))
+        (copy-directory project-dir copy-dir t nil t)
+        (when vc-backend
+          (let ((default-directory copy-dir))
+            (eldev-call-process executable `("init")                      :die-on-error t)
+            (eldev-call-process executable `("add" ".")                   :die-on-error t)
+            (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
+        copy-dir))))
 
 
 (defun eldev--test-file-contents (test-project file &optional not-required)
@@ -149,6 +152,15 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (buffer-string))
     (file-error (unless not-required
                   (signal (car error) (cdr error))))))
+
+(defmacro eldev--test-with-file-buffer (test-project file &rest body)
+  "Execute in a buffer with a FILE from TEST-PROJECT and write results back."
+  (declare (indent 2) (debug (stringp sexp body)))
+  `(with-temp-buffer
+     (insert-file-contents (expand-file-name ,file (eldev--test-project-dir ,test-project)) t)
+     ,@body
+     (let ((backup-inhibited t))
+       (save-buffer))))
 
 (defmacro eldev--test-capture-output (&rest body)
   `(with-temp-buffer

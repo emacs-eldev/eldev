@@ -848,12 +848,74 @@ See also variable `eldev-svn-executable'."
   "Execute given process synchronously.
 Put output (both stderr and stdout) to a temporary buffer.  Run
 BODY with this buffer set as current and variable `exit-code'
-bound to the exit code of the process."
+bound to the exit code of the process.
+
+Since 0.8:
+
+There are additional variables `executable' and `command-line'
+bound to actual values (evaluated macro arguments).  Return value
+is that of the BODY.  If BODY is empty, return the process' exit
+code.
+
+Also, eat up several options from BODY if present:
+
+    :pre-execution FORM
+
+        Form to evaluate before launching the child process.  See
+        also `:trace-command-line' below.
+
+    :trace-command-line MESSAGE
+
+        If non-nil, trace the command line before executing.  The
+        value can also be a string or a form that evaluates to
+        one (replaces the default message).
+
+    :destination DESTINATION
+
+        Use given destination (evaluated) instead of the
+        defaults.  See function `call-process' for details.
+
+    :infile FILE
+
+        Fetch input from given file (evaluated).
+
+    :die-on-error FLAG
+
+        Die with an `eldev-error' if the child process exits with
+        anything but zero code.  Can also be a string or a form
+        evaluating to one, in which case it is used instead of
+        the executable name.  Process output is also printed with
+        `eldev-warn'."
   (declare (indent 2) (debug (form sexp body)))
-  `(with-temp-buffer
-     (let ((exit-code (apply #'call-process ,executable nil t nil ,command-line)))
-       (goto-char 1)
-       ,@body)))
+  (let ((destination t)
+        infile
+        pre-execution
+        trace-command-line
+        die-on-error)
+    (while (keywordp (car body))
+      (eldev-pcase-exhaustive (pop body)
+        (:pre-execution      (push (pop body) pre-execution))
+        (:trace-command-line (setf trace-command-line (pop body)))
+        (:destination        (setf destination        (pop body)))
+        (:infile             (setf infile             (pop body)))
+        (:die-on-error       (setf die-on-error       (pop body)))))
+    `(let ((executable   ,executable)
+           (command-line ,command-line))
+       (with-temp-buffer
+         ,@(nreverse pre-execution)
+         ,@(when trace-command-line
+             `((eldev-trace "%s:\n  %s"
+                            ,(if (eq trace-command-line t) "Full command line" trace-command-line)
+                            (eldev-message-command-line executable command-line))))
+         (let ((exit-code (apply #'call-process executable ,infile ,destination nil command-line)))
+           (goto-char 1)
+           ,@(when die-on-error
+               `((when (/= exit-code 0)
+                   (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
+                     (unless (= (point-min) (point-max))
+                       (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
+                     (signal 'eldev-error (list "%s%s exited with error code %d" (upcase (substring description 0 1)) (substring description 1) exit-code))))))
+           ,@(or body '(exit-code)))))))
 
 (defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
   (if (= (point-min) (point-max))
