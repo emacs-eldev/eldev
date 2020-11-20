@@ -639,6 +639,7 @@ Since 0.2.1.")
 
 (defvar eldev-executing-command-hook nil)
 (defvar eldev-too-old nil)
+(defvar eldev--setup-step nil)
 
 
 (defun eldev-start-up ()
@@ -677,6 +678,7 @@ Used by Eldev startup script."
                       ;; print error stacktraces even if `debug-on-error' is t.  Add a
                       ;; workaround.
                       (eldev-advised (#'debug :around (lambda (original &rest arguments)
+                                                        ;; FIXME: Maybe also try to highlight this?
                                                         (let ((inhibit-message nil))
                                                           (apply original arguments))))
                         (eldev-parse-options command-line nil t t)
@@ -738,9 +740,12 @@ Used by Eldev startup script."
                              (when hint
                                (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
                              (when hint-about-command
-                               (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))))
+                               (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))
+                             (eldev--maybe-inform-about-setup-step)))
               (eldev-quit  (setf exit-code (cdr error))))
-          (error (eldev-error "%s" (error-message-string error))))
+          (error (eldev-error "%s" (error-message-string error))
+                 (eldev--maybe-inform-about-setup-step)
+                 (eldev-print :stderr "Run with `--debug' (`-d') option to see error backtrace")))
       (remove-hook 'kill-emacs-hook #'eldev-backtrace)
       (eldev-trace "Finished %s on %s" (if (eq exit-code 0) "successfully" "erroneously") (replace-regexp-in-string " +" " " (current-time-string))))
     (when eldev-too-old
@@ -748,6 +753,10 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+(defun eldev--maybe-inform-about-setup-step ()
+  (when eldev--setup-step
+    (eldev-print :stderr "Failed setup step: %s%s" (downcase (substring eldev--setup-step 0 1)) (substring eldev--setup-step 1))))
 
 (defun eldev-extract-error-message (error)
   "Extract the message from an `eldev-error'.
@@ -762,7 +771,8 @@ Since 0.2."
 (defun eldev--set-up ()
   (let (loaded-project-config)
     (dolist (form (reverse eldev-setup-first-forms))
-      (eldev-trace "Evaluating form `%S' specified on the command line..." form)
+      (setf eldev--setup-step (eldev-format-message "Evaluating form `%S' specified on the command line" form))
+      (eldev-trace "%s..." eldev--setup-step)
       (eval form t))
     (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
                       (eldev-file             . "No file `%s', project building uses only defaults")
@@ -784,14 +794,17 @@ Since 0.2."
                          (insert-file-contents file nil 0 100)
                          (looking-at (rx "#!"))))
                   (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
-                (progn (eldev-trace "Loading file `%s'..." filename)
+                (progn (setf eldev--setup-step (eldev-format-message "Loading file `%s'" filename))
+                       (eldev-trace "%s..." eldev--setup-step)
                        (load file nil t t)
                        (when (memq symbol '(eldev-file eldev-local-file))
                          (setf loaded-project-config t))))
             (eldev-verbose (cdr config) filename)))))
     (dolist (form (reverse eldev-setup-forms))
-      (eldev-trace "Evaluating form `%S' specified on the command line..." form)
+      (setf eldev--setup-step (eldev-format-message "Evaluating form `%S' specified on the command line..." form))
+      (eldev-trace "%s..." eldev--setup-step)
       (eval form t))
+    (setf eldev--setup-step nil)
     (when loaded-project-config
       ;; This is an undocumented flag file indicating that `Eldev' or `Eldev-local' have
       ;; been loaded at least once in this project.
