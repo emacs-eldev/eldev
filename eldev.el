@@ -371,7 +371,8 @@ BODY can contain the following keywords:
     :default-value FORM
 
         Evaluate given FORM to determine default value for the
-        option.
+        option.  Special case: if the form evaluates to symbol
+        `:no-default', don't print anything.
 
     :hidden-if FORM or :hidden-if :default
 
@@ -1360,7 +1361,9 @@ If COMMAND is nil, list global options instead."
       (when default
         (setf documentation (format (if documentation (format "%s [%%s]" documentation) "[%s]") default-string)))
       (when default-value
-        (setf documentation (format (if documentation (format "%s [%%s: %%s]" documentation) "[%s: %s]") default-string (eval default-value t))))
+        (setf default-value (eval default-value t))
+        (unless (eq default-value :no-default)
+          (setf documentation (format (if documentation (format "%s [%%s: %%s]" documentation) "[%s: %s]") default-string default-value))))
       (when (symbolp command-or-option)
         (setf command-or-option (symbol-name command-or-option)))
       (if documentation
@@ -2976,12 +2979,24 @@ in `crop' stack frame style."
   :value          PATTERN
   (push pattern eldev-test-file-patterns))
 
-(eldev-defbooloptions eldev-test-stop-on-unexpected-mode eldev-test-continue-mode eldev-test-stop-on-unexpected
-  ("Stop if any test produces an unexpected result (usually a failure)"
-   :options       (-s --stop --stop-on-unexpected))
-  ("Execute all scheduled tests regardless of results"
-   :options       (-c --continue))
-  :for-command    test)
+(eldev-defoption eldev-test-stop-on-unexpected-mode (&optional num-failures)
+  "Stop after this many unexpected results (usually failures), 1 if omitted"
+  :options        (-s --stop --stop-on-unexpected)
+  :for-command    test
+  :optional-value N
+  :default-value  (if eldev-test-stop-on-unexpected
+                      (if (and (integerp eldev-test-stop-on-unexpected) (> eldev-test-stop-on-unexpected 1))
+                          eldev-test-stop-on-unexpected
+                        "right away")
+                    :no-default)
+  (setf eldev-test-stop-on-unexpected (if num-failures (string-to-number num-failures) t)))
+
+(eldev-defoption eldev-test-continue-mode ()
+  "Execute all scheduled tests regardless of results"
+  :options        (-c --continue)
+  :for-command    test
+  :if-default     (null eldev-test-stop-on-unexpected)
+  (setf eldev-test-stop-on-unexpected nil))
 
 (eldev-defoption eldev-test-print-backtraces (&optional width)
   "Print test failure backtraces; WIDTH overrides value of the
@@ -2990,7 +3005,7 @@ global option `-b'"
   :for-command    test
   :optional-value WIDTH
   :default-value  (pcase eldev-test-print-backtraces
-                    (`nil            "omit")
+                    (`nil            :no-default)
                     ((pred integerp) (if (> eldev-test-print-backtraces 1) eldev-test-print-backtraces "untruncated"))
                     (_               "use global style"))
   (setf eldev-test-print-backtraces (if width (string-to-number width) t)))

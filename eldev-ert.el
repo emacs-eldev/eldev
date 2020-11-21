@@ -90,7 +90,10 @@ use this for ERT framework, unless they can do better."
     ;; to nil.  We assume that if the variable is customizable, nil is already supported.
     (unless (or ert-batch-backtrace-right-margin (get 'ert-batch-backtrace-right-margin 'custom-type))
       (setf ert-batch-backtrace-right-margin 1000000))
-    (let (completed-tests)
+    (let ((stop-after-failures eldev-test-stop-on-unexpected)
+          completed-tests)
+      (when (and stop-after-failures (not (and (integerp stop-after-failures) (> stop-after-failures 1))))
+        (setf stop-after-failures 1))
       (eldev-advised (#'ert-run-tests
                       ;; There is a difference in number arguments in Emacs 24, so just hide
                       ;; the extra arguments with `&rest'.
@@ -121,13 +124,13 @@ use this for ERT framework, unless they can do better."
                                              (`run-started
                                               (eldev-test-validate-amount (ert-stats-total (nth 0 arguments))))
                                              (`test-ended
-                                              (when eldev-test-stop-on-unexpected
+                                              (when stop-after-failures
                                                 (let ((stats             (nth 0 arguments))
                                                       (test              (nth 1 arguments))
                                                       (result            (nth 2 arguments))
                                                       (num-tests-ignored 0))
                                                   (push test completed-tests)
-                                                  (unless (ert-test-result-expected-p test result)
+                                                  (unless (or (ert-test-result-expected-p test result) (> (setf stop-after-failures (1- stop-after-failures)) 0))
                                                     ;; Since this really goes into internals, assert some things beforehand.
                                                     (when (and (fboundp #'ert--stats-tests) (fboundp #'ert-test-most-recent-result)
                                                                (vectorp (ert--stats-tests stats)))
