@@ -139,7 +139,14 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (copy-directory project-dir copy-dir t nil t)
         (when vc-backend
           (let ((default-directory copy-dir))
-            (eldev-call-process executable `("init")                      :die-on-error t)
+            (eldev-call-process executable `("init") :die-on-error t)
+            (eldev-pcase-exhaustive vc-backend
+              (`Git (eldev-call-process executable `("config" "user.name"  "Eldev")             :die-on-error t)
+                    (eldev-call-process executable `("config" "user.email" "eldev@example.com") :die-on-error t))
+              ;; Mercurial doesn't appear to provide commands for this.
+              (`Hg  (with-temp-file ".hg/hgrc"
+                      (erase-buffer)
+                      (insert "[ui]\nusername = Eldev <eldev@example.com>\n"))))
             (eldev-call-process executable `("add" ".")                   :die-on-error t)
             (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
         copy-dir))))
