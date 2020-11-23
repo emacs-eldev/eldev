@@ -75,3 +75,35 @@ jobs:
         # Run `relint' on Eldev's source code, more as a test of
         # Eldev--relint integration, because we use `rx' macro.
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC lint re
+
+    # Method 1: if you have a catch-all directory for executables.  We
+    # don't test bootstrapping, as that is supposed to have been
+    # tested by normal ERT tests.
+    - name: Test installation 1
+      run: |
+        mkdir ~/fake-bin
+        cd ~/fake-bin
+        curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
+        test -x ~/fake-bin/eldev
+
+    # Method 2: general case, with Eldev script installed to
+    # `~/.eldev/bin'.  We don't add it to `$PATH' as we never run it.
+    - name: Test installation 2
+      run: |
+        ! test -x ~/.eldev/bin/eldev
+        curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
+        test -x ~/.eldev/bin/eldev
+        rm -r ~/.eldev/bin
+
+    # GitHub-specific installation specifically for workflows.
+    - name: Test GitHub-specific installation
+      run: |
+        ! test -x ~/.eldev/bin/eldev
+        curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+        test -x ~/.eldev/bin/eldev
+
+    - name: ...continued
+      run: |
+        # "" is useful in case `which' returns an empty string.
+        test ""`which eldev` = ~/.eldev/bin/eldev
+        rm -r ~/.eldev/bin
