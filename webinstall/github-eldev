@@ -12,8 +12,8 @@ set -e
 
 ELDEV_BIN_DIR=~/.eldev/bin
 
-# Magic output that instructs GitHub to modify `$PATH'.
-echo "::add-path::$ELDEV_BIN_DIR"
+# `$GITHUB_PATH' is a magic file which contents is translated to environment variable `$PATH'.
+echo "$ELDEV_BIN_DIR" >> $GITHUB_PATH
 
 mkdir -p $ELDEV_BIN_DIR
 curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
