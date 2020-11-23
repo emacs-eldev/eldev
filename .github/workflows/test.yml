@@ -7,10 +7,10 @@ name: CI
 
 on:
   push:
-    paths-ignore: ['**.adoc', 'webinstall/**']
+    paths-ignore: ['**.adoc']
     branches-ignore: ['future-doc']
   pull_request:
-    paths-ignore: ['**.adoc', 'webinstall/**']
+    paths-ignore: ['**.adoc']
     branches-ignore: ['future-doc']
 
 jobs:
