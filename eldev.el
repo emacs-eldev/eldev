@@ -757,7 +757,7 @@ Used by Eldev startup script."
 
 (defun eldev--maybe-inform-about-setup-step ()
   (when eldev--setup-step
-    (eldev-print :stderr "Failed setup step: %s%s" (downcase (substring eldev--setup-step 0 1)) (substring eldev--setup-step 1))))
+    (eldev-print :stderr "Failed setup step: %s" eldev--setup-step)))
 
 (defun eldev-extract-error-message (error)
   "Extract the message from an `eldev-error'.
@@ -772,8 +772,8 @@ Since 0.2."
 (defun eldev--set-up ()
   (let (loaded-project-config)
     (dolist (form (reverse eldev-setup-first-forms))
-      (setf eldev--setup-step (eldev-format-message "Evaluating form `%S' specified on the command line" form))
-      (eldev-trace "%s..." eldev--setup-step)
+      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line" form))
+      (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
       (eval form t))
     (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
                       (eldev-file             . "No file `%s', project building uses only defaults")
@@ -795,15 +795,15 @@ Since 0.2."
                          (insert-file-contents file nil 0 100)
                          (looking-at (rx "#!"))))
                   (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
-                (progn (setf eldev--setup-step (eldev-format-message "Loading file `%s'" filename))
-                       (eldev-trace "%s..." eldev--setup-step)
+                (progn (setf eldev--setup-step (eldev-format-message "loading file `%s'" filename))
+                       (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
                        (load file nil t t)
                        (when (memq symbol '(eldev-file eldev-local-file))
                          (setf loaded-project-config t))))
             (eldev-verbose (cdr config) filename)))))
     (dolist (form (reverse eldev-setup-forms))
-      (setf eldev--setup-step (eldev-format-message "Evaluating form `%S' specified on the command line..." form))
-      (eldev-trace "%s..." eldev--setup-step)
+      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line..." form))
+      (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
       (eval form t))
     (setf eldev--setup-step nil)
     (when loaded-project-config
@@ -1816,11 +1816,15 @@ Since 0.2."
                               (let ((inhibit-message nil))
                                 (catch 'exit
                                   (let* ((dependency-name (package-desc-name dependency))
-                                         (recursing       (memq dependency-name recursing-for)))
+                                         (recursing       (memq dependency-name recursing-for))
+                                         (description     (eldev-format-message "%s package `%s'"
+                                                                                (cond ((eq dependency-name package-name)               "project")
+                                                                                      ((or recursing (eldev--loading-mode dependency)) "local dependency")
+                                                                                      (t                                               "dependency"))
+                                                                                dependency-name)))
                                     (eldev-pcase-exhaustive (unless recursing (eldev--loading-mode dependency))
                                       (`nil
-                                       (eldev-trace (if recursing "Activating local dependency package `%s'..." "Activating dependency package `%s'...")
-                                                    dependency-name)
+                                       (eldev-trace "Activating %s..." description)
                                        (or (let ((inhibit-message t))
                                              (apply original dependency rest))
                                            (progn (setf missing-dependency dependency-name)
@@ -1835,8 +1839,7 @@ Since 0.2."
                                               (package-dir      (if (eq dependency-name package-name)
                                                                     eldev-project-dir
                                                                   ;; 2 and 3 stand for directory name and its absolute path.
-                                                                  (eldev-trace "Activating local dependency `%s' in directory `%s'"
-                                                                               dependency-name (nth 2 (assq dependency-name eldev--local-dependencies)))
+                                                                  (eldev-trace "Activating %s in directory `%s'" description (nth 2 (assq dependency-name eldev--local-dependencies)))
                                                                   (nth 3 (assq dependency-name eldev--local-dependencies)))))
                                          ;; Use package's autoloads file if it is present.  At this
                                          ;; stage we never generate anything: only use existing files.
@@ -1860,10 +1863,10 @@ Since 0.2."
                                                                     ;; least if we can find the installed copy.
                                                                     (ignore-errors (package-load-descriptor (expand-file-name (package-desc-full-name dependency) package-user-dir))))))
                                            (if up-to-date-desc
-                                               (progn (eldev-trace "Local dependency package `%s' hasn't changed since last installation, no need to reinstall" dependency-name)
+                                               (progn (eldev-trace "%s hasn't changed since last installation, no need to reinstall" (eldev-message-upcase-first description))
                                                       (eldev--assq-set dependency-name `(,up-to-date-desc) package-alist)
                                                       (package-activate dependency-name))
-                                             (eldev-trace "(Re)installing local dependency package `%s'..." dependency-name)
+                                             (eldev-trace "(Re)installing %s..." description)
                                              (eldev-install-package-file (nth 1 generated-package))))
                                          (pop recursing-for)))))))))
       (dolist (plist dependencies)

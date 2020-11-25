@@ -430,6 +430,11 @@ package descriptor."
   "Format given command line for human-readable messages"
   (concat executable " " (mapconcat #'eldev-quote-sh-string command-line " ")))
 
+(defun eldev-message-upcase-first (string)
+  (if (> (length string) 0)
+      (concat (upcase (substring string 0 1)) (substring string 1))
+    string))
+
 (defun eldev-y-or-n-p (prompt)
   "Similar to `y-or-n-p'.
 Currently works exactly like that built-in, but may be changed
@@ -914,7 +919,7 @@ Also, eat up several options from BODY if present:
                    (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
                      (unless (= (point-min) (point-max))
                        (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
-                     (signal 'eldev-error (list "%s%s exited with error code %d" (upcase (substring description 0 1)) (substring description 1) exit-code))))))
+                     (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description)))))))
            ,@(or body '(exit-code)))))))
 
 (defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
