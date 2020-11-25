@@ -207,16 +207,23 @@ Since 0.5")
   "Forms executed as the last step of Eldev setup.
 Should normally be specified only via command line.")
 
+(defvar eldev-skip-global-config nil
+  "Whether to skip file `~/.eldev/config'.
+Occasionally useful to some external tools.  Not exposed through
+normal interface, but can be set in a `--setup-first' form.
+
+Since 0.8")
+
 (defvar eldev-skip-project-config nil
   "Whether to skip both files `Eldev' and `Eldev-local'.
-Occasionally useful to some external tools. Not exposed through
+Occasionally useful to some external tools.  Not exposed through
 normal interface, but can be set in a `--setup-first' form.
 
 Since 0.5")
 
 (defvar eldev-skip-local-project-config nil
   "Whether to skip file `Eldev-local'.
-Occasionally useful to some external tools. Not exposed through
+Occasionally useful to some external tools.  Not exposed through
 normal interface, but can be set in a `--setup-first' form.
 
 Since 0.5")
@@ -781,7 +788,9 @@ Since 0.2."
       (let* ((symbol           (car config))
              (filename         (symbol-value symbol))
              (file             (locate-file filename (list eldev-project-dir)))
-             (skipping-because (or (when (and eldev-skip-project-config (memq symbol '(eldev-file eldev-local-file)))
+             (skipping-because (or (when (and eldev-skip-global-config (eq symbol 'eldev-user-config-file))
+                                     'eldev-skip-global-config)
+                                   (when (and eldev-skip-project-config (memq symbol '(eldev-file eldev-local-file)))
                                      'eldev-skip-project-config)
                                    (when (and eldev-skip-local-project-config (eq symbol 'eldev-local-file))
                                      'eldev-skip-local-project-config))))
