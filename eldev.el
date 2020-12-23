@@ -77,6 +77,15 @@
 (defvar package-archive-priorities)
 (defvar byte-compile-log-warning-function)
 
+;; Using `autoload' function directly instead of ;;;###autoload cookies since the latter
+;; won't work with ELDEV_LOCAL.  This must be at the top _and_ in `eval-and-compile', else
+;; byte-compilation gives warnings...
+(eval-and-compile
+  (dolist (autoloads '(("eldev-plugins" eldev-active-plugins eldev-use-plugin)
+                       ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-vc-detect)))
+    (dolist (function (cdr autoloads))
+      (autoload function (car autoloads)))))
+
 
 (defvar eldev-shell-command (or (eldev-getenv "ELDEV_CMD") "eldev")
   "Command used to launch Eldev, in raw form.
@@ -4914,14 +4923,6 @@ will fail if the project already has file named `Eldev'."
   ("Don't ask any questions"
    :options       (-n --non-interactive))
   :for-command    init)
-
-
-;; Using `autoload' function directly instead of ;;;###autoload cookies since the latter
-;; won't work with ELDEV_LOCAL.
-(dolist (autoloads '(("eldev-plugins" eldev-active-plugins eldev-use-plugin)
-                     ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-vc-detect)))
-  (dolist (function (cdr autoloads))
-    (autoload function (car autoloads))))
 
 
 (provide 'eldev)
