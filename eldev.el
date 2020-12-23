@@ -4918,8 +4918,10 @@ will fail if the project already has file named `Eldev'."
 
 ;; Using `autoload' function directly instead of ;;;###autoload cookies since the latter
 ;; won't work with ELDEV_LOCAL.
-(autoload 'eldev-active-plugins "eldev-plugins")
-(autoload 'eldev-use-plugin "eldev-plugins")
+(dolist (autoloads '(("eldev-plugins" eldev-active-plugins eldev-use-plugin)
+                     ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-vc-detect)))
+  (dolist (function (cdr autoloads))
+    (autoload function (car autoloads))))
 
 
 (provide 'eldev)

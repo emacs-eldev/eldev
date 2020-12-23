@@ -210,32 +210,8 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
         (if add-to-ignore
             (let (failed)
               (eldev-verbose "Adding %s to `%s'" (eldev-message-enumerate "file" add-to-ignore) .ignore)
-              (with-temp-buffer
-                (if (eq vc-backend 'SVN)
-                    ;; This can return non-null status if there is no such property yet.
-                    (eldev-call-process (eldev-svn-executable) '("propget" "svn:ignore" ".")
-                      :destination '(t nil))
-                  (condition-case nil
-                      (insert-file-contents .ignore t)
-                    ;; Pre-26 Emacsen don't know about `file-missing', so catch broadly.
-                    (file-error)))
-                (goto-char (point-max))
-                (unless (eolp)
-                  (insert "\n"))
-                (when (looking-back (rx nonl "\n") nil)
-                  (insert "\n"))
-                (unless (eq vc-backend 'SVN)
-                  (insert (eldev-format-message "# Added automatically by `eldev init'.\n")))
-                (dolist (file add-to-ignore)
-                  (insert (eldev-pcase-exhaustive vc-backend
-                            (`Git (format "/%s"  file))
-                            (`Hg  (format "^%s$" (regexp-quote file)))
-                            (`SVN file))
-                          "\n"))
-                (if (eq vc-backend 'SVN)
-                    (setf failed (/= (eldev-call-process (eldev-svn-executable) `("propset" "svn:ignore" ,(buffer-string) ".")) 0))
-                  (write-region nil nil .ignore nil 'quiet)))
-              (unless dont-check-if-ignored
+              (setf failed (eldev--vc-ignore-standard-files vc-backend files-to-ignore))
+              (unless (or failed dont-check-if-ignored)
                 (dolist (file files-to-ignore)
                   (when (/= (eldev-call-process (eldev-git-executable) `("check-ignore" "--quiet" ,file)) 0)
                     (eldev-warn "Failed to convince Git to ignore file `%s'" file)
@@ -262,6 +238,42 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                                                   (setf before t
                                                         a      nil)))
                                               before)))))))))
+
+(defun eldev--vc-ignore-file (backend)
+  (eldev-pcase-exhaustive backend
+    (`Git ".gitignore")
+    (`Hg  ".hgignore")
+    ;; Not really a file, but close enough.
+    (`SVN "svn:ignore")))
+
+(defun eldev--vc-ignore-standard-files (backend &optional files)
+  (with-temp-buffer
+    (let ((.ignore (eldev--vc-ignore-file backend)))
+      (if (eq backend 'SVN)
+          ;; This can return non-null status if there is no such property yet.
+          (eldev-call-process (eldev-svn-executable) '("propget" "svn:ignore" ".")
+            :destination '(t nil))
+        (condition-case nil
+            (insert-file-contents .ignore t)
+          ;; Pre-26 Emacsen don't know about `file-missing', so catch broadly.
+          (file-error)))
+      (goto-char (point-max))
+      (unless (eolp)
+        (insert "\n"))
+      (when (looking-back (rx nonl "\n") nil)
+        (insert "\n"))
+      (unless (eq backend 'SVN)
+        (insert (eldev-format-message "# Added automatically by `eldev init'.\n")))
+      (dolist (file (or files `(,eldev-cache-dir ,eldev-local-file)))
+        (insert (eldev-pcase-exhaustive backend
+                  (`Git (format "/%s"  file))
+                  (`Hg  (format "^%s$" (regexp-quote file)))
+                  (`SVN file))
+                "\n"))
+      (if (eq backend 'SVN)
+          (/= (eldev-call-process (eldev-svn-executable) `("propset" "svn:ignore" ,(buffer-string) ".")) 0)
+        (write-region nil nil .ignore nil 'quiet)
+        nil))))
 
 
 (provide 'eldev-vc)

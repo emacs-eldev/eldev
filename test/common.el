@@ -120,36 +120,60 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 (defmacro eldev--test-with-temp-copy (test-project vc-backend &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
-  `(let* ((vc-backend          ,vc-backend)
-          (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend)))
-     (unless eldev--test-project
-       (ert-skip (eldev-format-message "%s couldn't be found" vc-backend)))
-     ,@body))
+  (let ((ignores :std))
+    (while (keywordp (car body))
+      (eldev-pcase-exhaustive (pop body)
+        (:ignores (setf ignores (pop body)))))
+    `(let* ((vc-backend          ,vc-backend)
+            (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores)))
+       (unless eldev--test-project
+         (ert-skip (eldev-format-message "%s couldn't be found" vc-backend)))
+       (prog1 (progn ,@body)
+         ;; Delete the copy if there are no errors.
+         (ignore-errors (delete-directory eldev--test-project t))))))
 
-(defun eldev--test-make-temp-copy (test-project vc-backend)
-  (unless (memq vc-backend '(nil Git Hg))
+(defun eldev--test-make-temp-copy (test-project vc-backend ignores)
+  (unless (memq vc-backend '(nil Git Hg SVN))
     (error "Cannot create temporary VC copy for backend `%s'" vc-backend))
-  (let ((executable (if vc-backend (eldev-vc-executable vc-backend t) t)))
-    (when executable
-      (let ((project-dir (eldev--test-project-dir test-project))
-            (copy-dir    (file-name-as-directory (make-temp-file "eldev-" t "-test"))))
-        ;; To avoid copying generated files.
-        (eldev--test-run test-project ("clean" "everything")
-          (should (= exit-code 0)))
-        (copy-directory project-dir copy-dir t nil t)
-        (when vc-backend
-          (let ((default-directory copy-dir))
-            (eldev-call-process executable `("init") :die-on-error t)
-            (eldev-pcase-exhaustive vc-backend
-              (`Git (eldev-call-process executable `("config" "user.name"  "Eldev")             :die-on-error t)
-                    (eldev-call-process executable `("config" "user.email" "eldev@example.com") :die-on-error t))
-              ;; Mercurial doesn't appear to provide commands for this.
-              (`Hg  (with-temp-file ".hg/hgrc"
-                      (erase-buffer)
-                      (insert "[ui]\nusername = Eldev <eldev@example.com>\n"))))
-            (eldev-call-process executable `("add" ".")                   :die-on-error t)
-            (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
-        copy-dir))))
+  (let* ((svnadmin   (when (eq vc-backend 'SVN) (eldev-svnadmin-executable t)))
+         (executable (if vc-backend
+                         (when (or (not (eq vc-backend 'SVN)) svnadmin)
+                           (eldev-vc-executable vc-backend t))
+                       t)))
+    (unless executable
+      (ert-skip (eldev-format-message "%s doesn't appear to be installed" (eldev-vc-full-name vc-backend))))
+    (let ((project-dir    (eldev--test-project-dir test-project))
+          (copy-dir       (file-name-as-directory (make-temp-file "eldev-" t (if vc-backend (format "-test-%s" (downcase (symbol-name vc-backend))) "-test"))))
+          (repository-dir (when svnadmin
+                            (file-name-as-directory (make-temp-file "eldev-" t "-test-svnrepo")))))
+      ;; To avoid copying generated files.
+      (eldev--test-run test-project ("clean" "everything")
+        (should (= exit-code 0)))
+      (when svnadmin
+        (eldev-call-process svnadmin   `("create" ,repository-dir) :die-on-error t)
+        (eldev-call-process executable `("mkdir" ,(format "file://%s/trunk" repository-dir) ,(format "file://%s/branches" repository-dir) "--message" "Init") :die-on-error t)
+        (eldev-call-process executable `("checkout" ,(format "file://%s/trunk" repository-dir) ,copy-dir) :die-on-error t))
+      (copy-directory project-dir copy-dir t nil t)
+      (when vc-backend
+        (let ((default-directory copy-dir))
+          (unless svnadmin
+            (eldev-call-process executable `("init") :die-on-error t))
+          (when (eq ignores :std)
+            (eldev--vc-ignore-standard-files vc-backend))
+          (pcase vc-backend
+            (`Git (eldev-call-process executable `("config" "user.name"  "Eldev")             :die-on-error t)
+                  (eldev-call-process executable `("config" "user.email" "eldev@example.com") :die-on-error t))
+            ;; Mercurial doesn't appear to provide commands for this.
+            (`Hg  (with-temp-file ".hg/hgrc"
+                    (erase-buffer)
+                    (insert "[ui]\nusername = Eldev <eldev@example.com>\n"))))
+          ;; Subversion doesn't allow 'add .'.
+          (let ((all-files (directory-files copy-dir)))
+            (dolist (special-file '("." ".." ".git" ".hg" ".svn"))
+              (setf all-files (remove special-file all-files)))
+            (eldev-call-process executable `("add" ,@all-files) :die-on-error t))
+          (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
+      copy-dir)))
 
 
 (defun eldev--test-file-contents (test-project file &optional not-required)
@@ -164,7 +188,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   "Execute in a buffer with a FILE from TEST-PROJECT and write results back."
   (declare (indent 2) (debug (stringp sexp body)))
   `(with-temp-buffer
-     (insert-file-contents (expand-file-name ,file (eldev--test-project-dir ,test-project)) t)
+     (ignore-errors (insert-file-contents (expand-file-name ,file (eldev--test-project-dir ,test-project)) t))
      ,@body
      (let ((backup-inhibited t))
        (save-buffer))))

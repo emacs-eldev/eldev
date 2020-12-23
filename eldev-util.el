@@ -763,6 +763,11 @@ through `executable-find' if possible.  Since Eldev 0.8.")
 Can be set explicitly or left to t, in which case it is located
 through `executable-find' if possible.  Since Eldev 0.8.")
 
+(defvar eldev-svnadmin-executable t
+  "Subversion administrator executable (svnadmin).
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 0.8.")
+
 
 (defmacro eldev-find-executable (cache-var not-required finder-form error-message &rest error-arguments)
   "Find and executable using FINDER-FORM.
@@ -837,6 +842,13 @@ See also variable `eldev-svn-executable'."
   (eldev-find-executable eldev-svn-executable not-required
     (executable-find "svn")
     "Subversion is not installed (cannot find `svn' executable)"))
+
+(defun eldev-svnadmin-executable (&optional not-required)
+  "Find `svnadmin' executable.
+See also variable `eldev-svnadmin-executable'."
+  (eldev-find-executable eldev-svnadmin-executable not-required
+    (executable-find "svnadmin")
+    "Subversion is not installed (cannot find `svnadmin' executable)"))
 
 (defvar vc-svn-program)
 (with-eval-after-load 'vc-svn
