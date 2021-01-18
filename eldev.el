@@ -1916,18 +1916,20 @@ Since 0.2."
   (let* ((package-name        (plist-get package-plist :package))
          (required-version    (plist-get package-plist :version))
          (highest-requirement (gethash package-name highest-requirements))
+         (real-required-by    required-by)
          (required-by-hint    (lambda ()
                                 (when required-by
                                   (eldev-format-message "Required by package %s"
-                                                        (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) required-by " <- ")))))
+                                                        (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- ")))))
          (considered-version  (gethash package-name considered)))
     (when (stringp required-version)
       (setf required-version (version-to-list required-version)))
     ;; Elevate requirement if needed.
-    (when (version-list-< required-version highest-requirement)
-      (setf required-version highest-requirement))
+    (when (version-list-< required-version (car highest-requirement))
+      (setf required-version (car highest-requirement)
+            real-required-by (cdr highest-requirement)))
     (when (and considered-version (version-list-< considered-version required-version))
-      (puthash package-name required-version highest-requirements)
+      (puthash package-name (cons required-version real-required-by) highest-requirements)
       ;; Unlike `considered', `highest-requirements' must not be cleared between passes.
       (clrhash considered)
       (throw 'restart-planning t))
