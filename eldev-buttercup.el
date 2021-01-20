@@ -44,19 +44,17 @@
   "Run Buttercup tests according to given SELECTORS (patterns)."
   (when eldev-test-stop-on-unexpected
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Buttercup framework"))
-  (unless eldev-test-print-backtraces
-    (eldev-warn "Option `--omit-backtraces' (`-B') is not supported with Buttercup framework"))
   (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color)
-    (if (integerp eldev-test-print-backtraces)
-        ;; Just always use `crop' for now: Buttercup doesn't support varying width yet.
-        (setf buttercup-stack-frame-style (if (> eldev-test-print-backtraces 1) 'crop 'full))
+    (pcase eldev-test-print-backtraces
+      (`nil            (setf buttercup-stack-frame-style 'omit))
+      ;; Just always use `crop' for now: Buttercup doesn't support varying width yet.
+      ((pred integerp) (setf buttercup-stack-frame-style (if (> eldev-test-print-backtraces 1) 'crop 'full)))
       ;; Otherwise use value of `eldev-backtrace-style', but only if test runner doesn't
       ;; specify anything.
-      (unless (assq 'buttercup-stack-frame-style environment)
-        (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full))))
+      (_               (unless (assq 'buttercup-stack-frame-style environment)
+                         (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full)))))
     (when selectors
-      ;; With not-yet-released 1.24 could be just: (buttercup-mark-skipped selectors t)
-      (buttercup-mark-skipped (mapconcat (lambda (selector) (concat "\\(?:" selector "\\)")) selectors "\\|") t))
+      (buttercup-mark-skipped selectors t))
     (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))
     (unless (buttercup-run t)
       (signal 'eldev-error `("%s failed" ,(eldev-message-plural (buttercup-suites-total-specs-failed buttercup-suites) "test"))))))
