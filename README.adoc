@@ -594,9 +594,9 @@ dependencies, but also with common development tools used by the
 project during development, for example <<buttercup,Buttercup>> or
 <<linting,various linters>>.  This works exactly the same as for
 project dependencies, with the only exception that the tool must be
-installed first.  E.g, for Buttercup you need to <<testing,test>> your
-project at least once, so that Eldev knows about the need for this
-tool.
+installed first.  E.g., for Buttercup you need to <<testing,test>>
+your project at least once, so that Eldev knows about the need for
+this tool.
 
 Development tools are installed from package archives hardcoded inside
 Eldev, regardless of which archives you have configured for your
@@ -1147,8 +1147,7 @@ Things that won’t work with Buttercup at the moment:
 
 * option `--stop-on-unexpected` (`-s`);
 * specifying screen width with option `--print-backtraces` (`-b`): it
-  will always work as if 80 was specified;
-* option `--omit-backtraces` (`-B`).
+  will always work as if 80 was specified.
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
