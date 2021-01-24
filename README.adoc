@@ -1814,7 +1814,7 @@ space-separated list of any of the following flags:
 
     whether to generate the report; default value is `auto`;
 
-`coveralls`, `simplecov`, `text`::
+`coveralls`, `simplecov`, `codecov`, `text`::
 
     format of the report to generate; default is `coveralls`;
 
@@ -1834,7 +1834,8 @@ each other:
 
 * if report format is not set explicitly, it is derived from extension
   of report filename if possible: `.json` for `simplecov` format,
-  `.txt` or `.text` for a text report;
+  `.txt` or `.text` for a text report; `codecov` format cannot be set
+  this way, currently;
 * when requested format is not `coveralls`, report is always generated
   unless `auto` or `off` (`never`) is specified explicitly.
 
