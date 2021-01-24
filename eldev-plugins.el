@@ -166,11 +166,12 @@ effectively not modified.")
 
 (defvar eldev-undercover-fileset "*.el")
 
-(defconst eldev--undercover-flags '(auto on off always never coveralls simplecov text merge restart send dontsend safe force))
+(defconst eldev--undercover-flags '(auto on off always never coveralls simplecov codecov text merge restart send dontsend safe force))
 
 
 (defvar undercover-force-coverage)
 (defvar undercover--report-file-path)
+(defvar undercover--report-format)
 
 
 (defun eldev--undercover-config (&optional plugin-configuration)
@@ -182,14 +183,14 @@ effectively not modified.")
         force)
     (dolist (flag (append plugin-configuration (eldev-listify eldev-undercover-config)))
       (eldev-pcase-exhaustive flag
-        ((or `auto `on `off)              (setf mode     flag))
-        ((or `always `never)              (setf mode     (if (eq flag 'always) 'on 'off)))
-        ((or `coveralls `simplecov `text) (setf format   flag))
-        ((or `merge `restart)             (setf merge    (eq flag 'merge)))
-        ((or `send `dontsend)             (setf dontsend (eq flag 'dontsend)))
-        ((or `safe `force)                (setf force    (eq flag 'force)))
+        ((or `auto `on `off)                       (setf mode     flag))
+        ((or `always `never)                       (setf mode     (if (eq flag 'always) 'on 'off)))
+        ((or `coveralls `simplecov `codecov `text) (setf format   flag))
+        ((or `merge `restart)                      (setf merge    (eq flag 'merge)))
+        ((or `send `dontsend)                      (setf dontsend (eq flag 'dontsend)))
+        ((or `safe `force)                         (setf force    (eq flag 'force)))
         ;; This is mostly for plugin configuration.
-        ((pred stringp)                   (setf file flag))))
+        ((pred stringp)                            (setf file flag))))
     (unless file
       (setf file eldev-undercover-report-file))
     (when eldev-dwim
@@ -225,8 +226,8 @@ list of any of the following flags:
   - `auto' (default), `on' (or `always'), `off' (or `never'):
     whether to collect coverage statistics and generate a report;
 
-  - `coveralls' (default), `simplecov', `text': format of the
-    generated report;
+  - `coveralls' (default), `simplecov', `codecov', `text': format
+    of the generated report;
 
   - `merge' or `restart' (default): whether to merge with
     existing report file or delete it and create new report from
@@ -243,13 +244,13 @@ list of any of the following flags:
     future).
 
 Most flags have their default value provided by `undercover'
-library itself.  As of version 0.7 those are `coveralls' and
+library itself.  As of version 0.8 those are `coveralls' and
 `send'.  However, defaults can also be changed in project's file
 `Eldev'.
 
 Additionally, option `--undercover-report' (`-U') lets you change
 the report's filename.  Default value is controlled by the
-library; as of 0.7 it is `/tmp/undercover_coveralls_report'.
+library.
 
 When `eldev-dwim' is non-nil (default), certain flags can affect
 each other:
@@ -299,11 +300,6 @@ plugin documentation for more information."
   nil)
 
 (defun eldev--set-up-undercover (configuration)
-  ;; Suppose you have files `foo.el' (the main file of your project) and `test/foo.el'
-  ;; (your tests).  The way `undercover' is implemented, it will try to instrument both
-  ;; files, because it never looks at the path.  Worse yet, it will also instrument
-  ;; something like `.eldev/.../foo.el' if that is loaded.  For this reason, we use
-  ;; absolute pathnames below.
   (let* ((configuration (eldev--undercover-config configuration))
          (mode          (plist-get (car configuration) :mode)))
     (cond ((eq mode 'off)
@@ -320,7 +316,7 @@ plugin documentation for more information."
           (t
            (let ((files (eldev-find-and-trace-files '(:and (eldev-standard-filesets 'main) eldev-undercover-fileset) "file%s for `undercover' to instrument" 'dont-trace)))
              (when files
-               (eldev-add-extra-dependencies 'runtime '(:package undercover :version "0.7" :archives melpa))
+               (eldev-add-extra-dependencies 'runtime '(:package undercover :version "0.8" :archives melpa))
                (eldev-load-extra-dependencies 'runtime)
                (require 'undercover)
                (setf undercover-force-coverage (not (eq mode 'auto)))
@@ -330,37 +326,40 @@ plugin documentation for more information."
                ;; We already have a list of files, disable wildcard processing.
                (eldev-advised ('undercover--wildcards-to-files :override #'identity)
                  (eldev-advised ('undercover--edebug-files :before (lambda (files &rest _ignored)
-                                                                     (if (plist-get (car configuration) :merge)
-                                                                         (eldev-trace "Code coverage report will be merged with existing")
-                                                                       (if (boundp 'undercover--report-file-path)
-                                                                           (when (file-exists-p undercover--report-file-path)
-                                                                             (delete-file undercover--report-file-path)
-                                                                             (eldev-trace "Deleted previous code coverage report; new one will be restarted from scratch"))
-                                                                         (eldev-warn "Cannot determine where coverage report is generated; unable to honor `restart' flag")))
                                                                      (eldev-verbose "Instrumenting %s for collecting coverage information with `undercover'"
                                                                                     (eldev-message-plural (length files) "file"))))
                    ;; Because `undercover-report' runs from `kill-emacs-hook', using
                    ;; `eldev-advised' here would not be enough.
                    (advice-add 'undercover-report :around (lambda (original &rest etc)
-                                                            (when (boundp 'undercover--report-file-path)
-                                                              (eldev-verbose "Saving `undercover' report to file `%s'..." undercover--report-file-path)
-                                                              ;; `undercover' will fail if file is in a non-existing directory.
-                                                              (let ((dir (file-name-directory undercover--report-file-path)))
-                                                                (when dir
-                                                                  (make-directory dir t))))
-                                                            (eldev-output-reroute-messages
-                                                              (let ((eldev-message-rerouting-wrapper #'eldev-verbose))
-                                                                (apply original etc)))))
-                   (let ((original-file-handlers file-name-handler-alist))
-                     ;; Since `undercover' is a macro, we have to do it like this.
-                     (eval `(undercover ,@files ,@(cdr configuration)) t)
-                     ;; `undercover' prepends "/" to filename regexp, but we already use absolute
-                     ;; paths.  See also https://github.com/undercover-el/undercover.el/pull/58
-                     (let ((scan file-name-handler-alist))
-                       (while (and scan (not (eq scan original-file-handlers)))
-                         (when (string-prefix-p "/" (caar scan))
-                           (setf (caar scan) (concat "^" (substring (caar scan) 1))))
-                         (setf scan (cdr scan)))))))))))))
+                                                            ;; Ugly, ugly, ugly: going deep into internals.
+                                                            (let* ((report-format (when (boundp 'undercover--report-format) undercover--report-format))
+                                                                   effective-report-name)
+                                                              (when (boundp 'undercover--report-file-path)
+                                                                (setf effective-report-name (or undercover--report-file-path
+                                                                                                (pcase report-format
+                                                                                                  (`coveralls "/tmp/undercover_coveralls_report")
+                                                                                                  (`simplecov "coverage/.resultset.json")
+                                                                                                  (`codecov   "coverage-final.json")))))
+                                                              (when effective-report-name
+                                                                (eldev-verbose "Saving `undercover' report to file `%s'..." effective-report-name)
+                                                                ;; `undercover' will fail if file is in a non-existing directory.
+                                                                (let ((dir (file-name-directory effective-report-name)))
+                                                                  (when dir
+                                                                    (make-directory dir t))))
+                                                              (if (plist-get (car configuration) :merge)
+                                                                  (eldev-trace "Code coverage report will be merged with existing")
+                                                                (if effective-report-name
+                                                                    (when (file-exists-p effective-report-name)
+                                                                      (delete-file effective-report-name)
+                                                                      (eldev-trace "Deleted previous code coverage report; new one will be restarted from scratch"))
+                                                                  (unless (eq report-format 'text)
+                                                                    (eldev-warn "Cannot determine where coverage report is generated; unable to honor `restart' flag"))))
+                                                              (eldev-output-reroute-messages
+                                                                (let ((eldev-message-rerouting-wrapper (unless (and (eq report-format 'text) (null effective-report-name))
+                                                                                                         #'eldev-verbose)))
+                                                                  (apply original etc))))))
+                   ;; Since `undercover' is a macro, we have to do it like this.
+                   (eval `(undercover ,@files ,@(cdr configuration)) t)))))))))
 
 
 (provide 'eldev-plugins)
