@@ -1671,9 +1671,9 @@ Eldev scripts.
 * {since-0-3} Global option `-Q` (`--backtrace-on-abort`) makes Eldev
   print backtrace if it is aborted with `^C`.  This is useful if your
   project freezes or has very bad performance, and you want to figure
-  where exactly this happens.
+  out where exactly this happens.
 
-* {since-0-7} Global option `-b` (`--backtrace`) lets you adapt
+* {since-0-8} Global option `-b` (`--backtrace`) lets you adapt
   backtraces to your screen width and thus make them more readable at
   the expense of completeness (by default, Eldev doesn’t truncate
   backtrace lines).  It is a good idea to change the default in file
