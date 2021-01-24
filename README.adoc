@@ -46,6 +46,7 @@ endif::[]
 :since-0-4: image:https://img.shields.io/badge/since-0.4-8be[Since 0.4,float=right]
 :since-0-5: image:https://img.shields.io/badge/since-0.5-8be[Since 0.5,float=right]
 :since-0-6: image:https://img.shields.io/badge/since-0.6-8be[Since 0.6,float=right]
+:since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
 
 = Eldev
 
@@ -398,6 +399,38 @@ from affecting your Emacs and, finally, to simplify testing of certain
 
 * Eldev supports <<different-emacs-versions,executing on different
   Emacs version>> for the same project without any additional steps.
+
+=== Using preinstalled dependencies
+
+{since-0-8} Starting with version 0.8 you can opt out of some of the
+default project isolation features and use preinstalled dependencies,
+e.g. those from your normal Emacs.  To activate this mode, use global
+option `--external` (`-X`), e.g.:
+
+    $ eldev -X test
+
+In this mode Eldev will expect dependencies to be installed in given
+directory (standard Emacs location — `~/.emacs.d/elpa` — is only the
+default: you can use another directory).  If a dependency is not
+installed, Eldev _will not_ install it on its own: it doesn’t know
+which package archives should be used.  Likewise, it will not upgrade
+anything.  In all such cases, i.e. when required dependencies are not
+correctly preinstalled in the specified external directory, Eldev will
+simply fail.
+
+<<local-dependencies,Local dependencies>> discussed later take
+precedence even in this mode: anything declared as local will override
+dependencies available from an external directory, just like it will
+in usual full isolation mode.
+
+This mode can be useful to load exactly the same dependency versions
+as those installed in your normal Emacs.  However, it is not suitable
+for continuous integration or for working on packages that you do not
+have — for whatever reason — installed normally.  It is also difficult
+to test on <<different-emacs-versions,different Emacs versions>> in
+external directory mode.  Therefore, it is not the default.  But, as
+usual in Eldev, you can make it the default in file `~/.eldev/config`
+if you want.
 
 
 == Project dependencies
