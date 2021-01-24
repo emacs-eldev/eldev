@@ -111,7 +111,7 @@ instead.")
   "Name of Eldev cache subdirectory, `.eldev'.
 See also function `eldev-cache-dir'.")
 
-(defconst eldev--internal-pseudoarchive "--eldev--")
+(defvar eldev--internal-pseudoarchive "--eldev--")
 
 (defvar eldev--loading-modes
   '((as-is
@@ -197,6 +197,18 @@ that as a precaution.")
 
 (defvar eldev-project-loading-mode nil
   "Project loading mode, `as-is' if not specified.")
+
+(defvar eldev-external-package-dir nil
+  "Use given directory instead of managing dependencies separately.
+If this value is nil (default), Eldev will manage and install
+dependencies as needed.  If a directory is specified, Eldev never
+installs anything and will fail if a dependency is missing.
+Local dependencies will still be loaded from their directories.
+
+If value of this variable is t, load from the standard Emacs
+location, i.e. `~/.emacs.d/elpa'.
+
+Since 0.8.")
 
 (defvar eldev-prefer-stable-archives t
   "Prefer stable archives (e.g. MELPA Stable) whenever possible.
@@ -565,6 +577,23 @@ truncate backtrace lines"
   ("Prefer bleeding-edge archives (e.g. MELPA [Unstable]: melpa.org)"
    :options       --unstable))
 
+(eldev-defoption eldev-enable-project-isolation ()
+  "Manage and install project dependencies normally"
+  :options        (-I --isolated)
+  :if-default     (null eldev-external-package-dir)
+  :hidden-if      :default
+  (setf eldev-external-package-dir nil))
+
+(eldev-defoption eldev-use-external-package-dir (&optional dir)
+  "Use preinstalled dependencies from given directory"
+  :options        (-X --external --external-deps)
+  :optional-value DIR
+  :default-value  (let ((dir (abbreviate-file-name (eldev-external-package-dir t))))
+                    (if eldev-external-package-dir
+                        dir
+                      `(:instead-of-default ,(eldev-format-message "(default would be `%s')" dir))))
+  (setf eldev-external-package-dir (or dir t)))
+
 
 
 ;; Filesets.
@@ -709,40 +738,56 @@ Used by Eldev startup script."
                         (condition-case error
                             (eldev--set-up)
                           (eldev-too-old (setf eldev-too-old (cdr error))))
-                        (setf command-line (eldev-parse-options command-line nil t))
-                        (if command-line
-                            (progn
-                              (setf command (intern (car command-line)))
-                              (let* ((real-command (or (cdr (assq command eldev--command-aliases)) command))
-                                     (handler      (or (cdr (assq real-command eldev--commands)))))
-                                (if handler
-                                    (let ((hook (eldev-get handler :command-hook)))
-                                      (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
-                                        (signal 'eldev-too-old eldev-too-old))
-                                      (setf command-line (if (eldev-get handler :custom-parsing)
-                                                             (cdr command-line)
-                                                           (eldev-parse-options (cdr command-line) real-command)))
-                                      (if (eq real-command command)
-                                          (eldev-verbose "Executing command `%s'..." command)
-                                        (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
-                                      (when eldev-executing-command-hook
-                                        (eldev-trace "Executing `eldev-executing-command-hook'...")
-                                        (run-hook-with-args 'eldev-executing-command-hook real-command))
-                                      (when (symbol-value hook)
-                                        (eldev-trace "Executing `%s'..." hook)
-                                        (run-hooks hook))
-                                      ;; We want `message' output on stdout universally, but
-                                      ;; older Emacses are very verbose and having additional
-                                      ;; unexpected messages in our stdout would screw up
-                                      ;; tests.  So we set the target to stdout only now.
-                                      (let ((eldev-message-rerouting-destination :stdout))
-                                        (apply handler command-line))
-                                      (setf exit-code 0))
-                                  (eldev-error "Unknown command `%s'" command)
-                                  (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
-                          (eldev-usage)
-                          (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
-                          (setf exit-code 0))))))
+                        (let* ((external-dir     (eldev-external-package-dir))
+                               (package-user-dir (or external-dir package-user-dir)))
+                          (setf command-line (eldev-parse-options command-line nil t))
+                          (if command-line
+                              (let (archive-files-to-delete)
+                                ;; If we are using external directory, maybe rename
+                                ;; archives so that they don't clash with what is
+                                ;; retrieved in that directory already.
+                                (when external-dir
+                                  (dolist (entry package-archives)
+                                    (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
+                                  (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
+                                (unwind-protect
+                                    (progn
+                                      (setf command (intern (car command-line)))
+                                      (let* ((real-command (or (cdr (assq command eldev--command-aliases)) command))
+                                             (handler      (or (cdr (assq real-command eldev--commands)))))
+                                        (if handler
+                                            (let ((hook (eldev-get handler :command-hook)))
+                                              (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
+                                                (signal 'eldev-too-old eldev-too-old))
+                                              (setf command-line (if (eldev-get handler :custom-parsing)
+                                                                     (cdr command-line)
+                                                                   (eldev-parse-options (cdr command-line) real-command)))
+                                              (if (eq real-command command)
+                                                  (eldev-verbose "Executing command `%s'..." command)
+                                                (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
+                                              (when eldev-executing-command-hook
+                                                (eldev-trace "Executing `eldev-executing-command-hook'...")
+                                                (run-hook-with-args 'eldev-executing-command-hook real-command))
+                                              (when (symbol-value hook)
+                                                (eldev-trace "Executing `%s'..." hook)
+                                                (run-hooks hook))
+                                              ;; We want `message' output on stdout universally, but
+                                              ;; older Emacses are very verbose and having additional
+                                              ;; unexpected messages in our stdout would screw up
+                                              ;; tests.  So we set the target to stdout only now.
+                                              (let ((eldev-message-rerouting-destination :stdout))
+                                                (apply handler command-line))
+                                              (setf exit-code 0))
+                                          (eldev-error "Unknown command `%s'" command)
+                                          (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
+                                  (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
+                                    (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
+                                                 (eldev-message-enumerate nil archive-files-to-delete))
+                                    (dolist (archive archive-files-to-delete)
+                                      (ignore-errors (delete-directory (eldev--package-archive-dir archive external-dir) t))))))
+                            (eldev-usage)
+                            (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
+                            (setf exit-code 0)))))))
               (eldev-error (let* ((arguments (cdr error))
                                   hint
                                   hint-about-command)
@@ -770,6 +815,16 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+(defun eldev--maybe-rename-archive (archive external-dir)
+  (catch 'renamed-as
+    (let (k)
+      (while t
+        (let* ((new-name (if k (format "%s-%03d" archive k) archive))
+               (filename (eldev--package-archive-dir new-name external-dir)))
+          (unless (file-exists-p filename)
+            (throw 'renamed-as new-name))
+          (setf k (if k (1+ k) 1)))))))
 
 (defun eldev--maybe-inform-about-setup-step ()
   (when eldev--setup-step
@@ -820,7 +875,7 @@ Since 0.2."
                          (setf loaded-project-config t))))
             (eldev-verbose (cdr config) filename)))))
     (dolist (form (reverse eldev-setup-forms))
-      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line..." form))
+      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line" form))
       (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
       (eval form t))
     (setf eldev--setup-step nil)
@@ -1377,11 +1432,14 @@ If COMMAND is nil, list global options instead."
     (unless (cond ((eq hidden-if :default) default)
                   (hidden-if               (eval hidden-if t)))
       (when default
-        (setf documentation (format (if documentation (format "%s [%%s]" documentation) "[%s]") default-string)))
+        (setf documentation (if documentation (format "%s [%s]" documentation default-string) (format "[%s]" default-string))))
       (when default-value
         (setf default-value (eval default-value t))
         (unless (eq default-value :no-default)
-          (setf documentation (format (if documentation (format "%s [%%s: %%s]" documentation) "[%s: %s]") default-string default-value))))
+          (setf default-string (pcase default-value
+                                 (`(:instead-of-default ,value) value)
+                                 (_                             (format "[%s: %s]" default-string default-value))))
+          (setf documentation (if documentation (format "%s %s" documentation default-string) default-string))))
       (when (symbolp command-or-option)
         (setf command-or-option (symbol-name command-or-option)))
       (if documentation
@@ -1488,6 +1546,9 @@ remote copy to be upgraded, make it non-local first (e.g. by
 commenting out `eldev-use-local-dependency' in `Eldev-local')
 before upgrading."
   :parameters     "[PACKAGE...]"
+  (when (eldev-external-package-dir)
+    (signal 'eldev-error `(:hint "Use global option `--isolated' (`-I')"
+                                 "Cannot upgrade when using external package directory")))
   (eldev--load-installed-runtime-dependencies)
   (eldev--install-or-upgrade-dependencies 'project (mapcar #'car eldev--extra-dependencies) (or (mapcar #'intern parameters) t) eldev-upgrade-dry-run-mode nil t))
 
@@ -1517,6 +1578,19 @@ sources will be replaced with a package downloaded from MELPA."
    :options       --do-upgrade
    :hidden-if     :default)
   :for-command    (upgrade upgrade-self))
+
+
+(defun eldev-external-package-dir (&optional force)
+  (let ((user-emacs-directory eldev-real-user-emacs-directory))
+    (if (stringp eldev-external-package-dir)
+        eldev-external-package-dir
+      (when (or eldev-external-package-dir force)
+        ;; Check if we can get original value like this first.
+        (or (let ((package-user-dir package-user-dir))
+              (require 'custom)
+              (custom-theme-recalc-variable 'package-user-dir)
+              package-user-dir)
+            (locate-user-emacs-file "elpa"))))))
 
 
 (defun eldev-load-project-dependencies (&optional additional-sets no-error-if-missing load-only)
@@ -1641,6 +1715,7 @@ Since 0.2."
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
          (self                              (eq core 'eldev))
+         (external-dir                      (unless self (eldev-external-package-dir)))
          (package-name                      (if self 'eldev (package-desc-name (eldev-package-descriptor))))
          ;; The following global variables will be altered inside the `let' form.
          (package-archives                  package-archives)
@@ -1675,7 +1750,7 @@ Since 0.2."
                 (dolist (archive (eldev--package-plist-get-archives plist))
                   (eldev-use-package-archive archive))))))))
     (eldev--adjust-stable/unstable-archive-priorities)
-    (let ((archive-statuses     (or (eldev--determine-archives-to-fetch to-be-upgraded t) '((nil . t))))
+    (let ((archive-statuses     (or (unless external-dir (eldev--determine-archives-to-fetch to-be-upgraded t)) '((nil . t))))
           (all-package-archives package-archives))
       (while (catch 'refetch-archives
                (package-load-all-descriptors)
@@ -1793,10 +1868,11 @@ Since 0.2."
                  (if (> non-local-plan-size 0)
                      (when (memq 'runtime (eldev-listify additional-sets))
                        (eldev--save-installed-runtime-dependencies))
-                   (if additional-sets
-                       (eldev-verbose "All project dependencies (including those for %s) have been installed already or are local"
-                                      (eldev-message-enumerate "set" additional-sets))
-                     (eldev-verbose "All project dependencies have been installed already or are local")))
+                   (let ((installed-how (if external-dir (eldev-format-message "in `%s'" external-dir) "already")))
+                     (if additional-sets
+                         (eldev-verbose "All project dependencies (including those for %s) have been installed %s or are local"
+                                        (eldev-message-enumerate "set" additional-sets) installed-how)
+                       (eldev-verbose "All project dependencies have been installed %s or are local" installed-how))))
                  (when main-command-effect
                    (unless dry-run
                      (let ((inhibit-message t)
@@ -2000,16 +2076,26 @@ Since 0.2."
                           (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
                 (setf package already-installed))
               (unless package
-                (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
-                                                          ,@(or package-disabled
-                                                                (cond ((and best-version (not (eq best-version built-in-version)))
-                                                                       `("Dependency `%s' version %s is required, but at most %s is available"
-                                                                         ,package-name ,(eldev-message-version required-version) ,(eldev-message-version best-version)))
-                                                                      (built-in-version
-                                                                       `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
-                                                                         ,package-name ,(eldev-message-version required-version) ,(eldev-message-version built-in-version)))
-                                                                      (t
-                                                                       `("Dependency `%s' %s is not available" ,package-name ,(eldev-message-version required-version t))))))))))
+                (let* ((version-string (eldev-message-version required-version t))
+                       (external-dir   (unless self (eldev-external-package-dir)))
+                       (hint           (funcall required-by-hint))
+                       (message        (or package-disabled
+                                           (cond ((and best-version (not (eq best-version built-in-version)))
+                                                  (if external-dir
+                                                      `("Dependency `%s' version %s is required, but only %s is installed in `%s'"
+                                                        ,package-name ,version-string ,(eldev-message-version best-version) ,external-dir)
+                                                    `("Dependency `%s' version %s is required, but at most %s is available"
+                                                      ,package-name ,version-string ,(eldev-message-version best-version))))
+                                                 (built-in-version
+                                                  `("Dependency `%s' is built-in, but required version %s is too new (only %s available)"
+                                                    ,package-name ,version-string ,(eldev-message-version built-in-version)))
+                                                 (external-dir
+                                                  `("Dependency `%s' is not installed in `%s'" ,package-name ,external-dir))
+                                                 (t
+                                                  `("Dependency `%s' is not available" ,package-name))))))
+                  (when external-dir
+                    (setf hint (concat (eldev-format-message "Either install it there, or use global option `--isolated' (`-I')") (if hint (concat "\n" hint) ""))))
+                  (signal 'eldev-missing-dependency `(:hint ,hint ,@message))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
                                             default-archives plan fail-if-too-new considered highest-requirements (cons package-name required-by)))
@@ -2019,10 +2105,13 @@ Since 0.2."
       (puthash package-name (or required-version `(,most-negative-fixnum)) considered))))
 
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
-  (let ((dir (expand-file-name eldev--internal-pseudoarchive (expand-file-name "archives" package-user-dir))))
+  (let ((dir (eldev--package-archive-dir eldev--internal-pseudoarchive)))
     (when ensure-exists
       (make-directory dir t))
     dir))
+
+(defun eldev--package-archive-dir (archive &optional base-dir)
+  (expand-file-name archive (expand-file-name "archives" (or base-dir package-user-dir))))
 
 (defun eldev--create-internal-pseudoarchive-descriptor ()
   ;; Create our fake pseudoarchive.  We do each time anew to avoid tracking local
@@ -2044,8 +2133,7 @@ Since 0.2."
   "Return a list of archives that need to be (re)fetched.
 If RETURN-ALL is non-nil, return a list of (ARCHIVE . UP-TO-DATE)
 for all archives instead."
-  (let ((archive-dir (expand-file-name "archives" package-user-dir))
-        result)
+  (let (result)
     (dolist (archive (sort (copy-sequence package-archives)
                            (lambda (a b) (or (and (eldev--stable/unstable-preferred-archive a)
                                                   (not (eldev--stable/unstable-preferred-archive b)))
@@ -2054,7 +2142,7 @@ for all archives instead."
         (let (up-to-date)
           ;; I don't see a way to find if package archive contents is fetched already
           ;; without going into internals.
-          (when (file-exists-p (expand-file-name "archive-contents" (expand-file-name (car archive) archive-dir)))
+          (when (file-exists-p (expand-file-name "archive-contents" (eldev--package-archive-dir (car archive))))
             (if refetch-contents
                 (eldev-trace "Will refetch contents of package archive `%s' in case it has changed" (car archive))
               (setf up-to-date t)

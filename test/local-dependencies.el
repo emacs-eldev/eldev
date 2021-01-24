@@ -143,4 +143,23 @@
       (should (= exit-code 1)))))
 
 
+;; Make sure that local dependencies are still honored even when an external directory is
+;; specified.
+(ert-deftest eldev-local-dependencies-overwrite-external-dir-1 ()
+  (eldev--test-with-external-dir "project-a" 'dependency-a
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ((format "--external=%s" external-dir)
+                          "eval" `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+      (should (string= stdout (eldev--test-lines "t" "(1 0)")))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a") (format "--external=%s" external-dir)
+                          "eval" `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+      (should (string= stdout (eldev--test-lines "nil" "(1 0 99)")))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ((format "--external=%s" external-dir)
+                          "eval" `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+      (should (string= stdout (eldev--test-lines "t" "(1 0)")))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/local-dependencies)

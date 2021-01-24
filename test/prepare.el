@@ -1,26 +1,9 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-prepare-1 ()
-  (let ((eldev--test-project "trivial-project"))
-    (eldev--test-delete-cache)
-    (eldev--test-run nil ("prepare")
-      (should (= exit-code 0)))))
-
-(ert-deftest eldev-prepare-2 ()
-  (let ((eldev--test-project "project-a"))
-    (eldev--test-delete-cache)
-    (eldev--test-run nil ("prepare")
-      (should (= exit-code 0)))))
-
-(ert-deftest eldev-prepare-3 ()
-  (let ((eldev--test-project "project-b"))
-    (eldev--test-delete-cache)
-    (eldev--test-run nil ("prepare")
-      (should (= exit-code 0)))))
-
-(ert-deftest eldev-prepare-4 ()
-  (let ((eldev--test-project "project-c"))
+(eldev-ert-defargtest eldev-prepare-1 (test-project)
+                      ("trivial-project" "project-a" "project-b"  "project-c")
+  (let ((eldev--test-project test-project))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("prepare")
       (should (= exit-code 0)))))
@@ -64,6 +47,24 @@
                           "--setup" `(eldev-add-extra-dependencies 'test 'dependency-b)
                           "version" "dependency-b")
       (should (string= stdout "dependency-b 1.1\n"))
+      (should (= exit-code 0)))))
+
+
+(eldev-ert-defargtest eldev-prepare-external-1 (test-project dependencies &optional clashing-archives)
+                      (("trivial-project" ())
+                       ("project-a"       '(dependency-a))
+                       ("project-a"       '(dependency-a) '("--eldev--" "archive-a")))
+  (eldev--test-with-external-dir test-project dependencies
+    ;; Shouldn't matter, but just to make sure Eldev doesn't look at it.
+    (eldev--test-delete-cache)
+    (dolist (archive clashing-archives)
+      ;; Make sure Eldev can rename its archives to avoid clashes with archives already
+      ;; used in the external directory.
+      (let ((fake-archive-file (eldev--package-archive-dir archive external-dir)))
+        (with-temp-file fake-archive-file
+          (insert "dummy"))
+        (push (file-relative-name fake-archive-file external-dir) preexisting-files)))
+    (eldev--test-run nil ((format "--external=%s" external-dir) "prepare")
       (should (= exit-code 0)))))
 
 

@@ -38,28 +38,32 @@
 
 (defmacro eldev--test-call-process (program-name executable command-line &rest body)
   (declare (indent 3) (debug (sexp body)))
-  (let ((no-errors             (make-symbol "$no-errors"))
+  (let ((actual-command-line `(list ,@command-line))
+        (no-errors           (make-symbol "$no-errors"))
         process-input-form
         important-files)
+    (pcase command-line
+      (`(:eval ,expression) (setf actual-command-line expression)))
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:process-input   (setf process-input-form (pop body)))
         (:important-files (setf important-files    (eldev-listify (pop body))))))
-    `(with-temp-buffer
-       (let* ((process-input      ,process-input-form)
-              (process-input-file (when process-input (make-temp-file "eldev-test")))
-              (stderr-file        (make-temp-file "eldev-stderr-")))
-         (when process-input-file
-           (with-temp-file process-input-file
-             (insert process-input)))
-         (unwind-protect
-             (let* ((prepared-command-line (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) (list ,@command-line)))
-                    (exit-code             (apply #'call-process ,executable process-input-file (list (current-buffer) stderr-file) nil prepared-command-line))
-                    (stdout                (buffer-string))
-                    (stderr                (with-temp-buffer
-                                             (insert-file-contents stderr-file)
-                                             (buffer-string)))
-                    ,no-errors)
+    `(let* ((process-input      ,process-input-form)
+            (process-input-file (when process-input (make-temp-file "eldev-test")))
+            (stderr-file        (make-temp-file "eldev-stderr-")))
+       (when process-input-file
+         (with-temp-file process-input-file
+           (insert process-input)))
+       (unwind-protect
+           ;; Using `eldev-call-process' here mostly for a bit of testing for it.
+           (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) ,actual-command-line)
+             :destination `(t ,stderr-file)
+             :infile      process-input-file
+             (let ((stdout (buffer-string))
+                   (stderr (with-temp-buffer
+                             (insert-file-contents stderr-file)
+                             (buffer-string)))
+                   ,no-errors)
                (goto-char 1)
                (unwind-protect
                    (condition-case error
@@ -68,7 +72,7 @@
                      (ert-test-skipped (setf ,no-errors t)
                                        (signal (car error) (cdr error))))
                  (unless ,no-errors
-                   (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (mapconcat #'eldev-quote-sh-string (cons ,executable prepared-command-line) " ") default-directory)
+                   (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (eldev-message-command-line executable command-line) default-directory)
                    (when process-input-file
                      (eldev-warn "Process input:\n%s" (eldev-colorize process-input 'verbose)))
                    (eldev-warn "Stdout contents:\n%s" (eldev-colorize stdout 'verbose))
@@ -80,10 +84,10 @@
                          (dolist (data (sort (mapcar (lambda (file) (cons file (nth 5 (file-attributes file)))) ',important-files)
                                              (lambda (a b) (< (if (cdr a) (float-time (cdr a)) 0) (if (cdr b) (float-time (cdr b)) 0)))))
                            ;; Not using `current-time-string' as not precise enough.
-                           (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing"))))))))
-           (when process-input-file
-             (ignore-errors (delete-file process-input-file)))
-           (ignore-errors (delete-file stderr-file)))))))
+                           (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing")))))))))
+         (when process-input-file
+           (ignore-errors (delete-file process-input-file)))
+         (ignore-errors (delete-file stderr-file))))))
 
 (defmacro eldev--test-run (test-project command-line &rest body)
   "Execute child Eldev process.
@@ -174,6 +178,39 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
             (eldev-call-process executable `("add" ,@all-files) :die-on-error t))
           (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
       copy-dir)))
+
+
+(defmacro eldev--test-with-external-dir (test-project packages &rest body)
+  (declare (indent 2) (debug (stringp sexp body)))
+  (let ((enabled t))
+    (while (keywordp (car body))
+      (eldev-pcase-exhaustive (pop body)
+        (:enabled (setf enabled (pop body)))))
+    `(let* ((eldev--test-project (or ,test-project eldev--test-project))
+            (external-dir        (when ,enabled (eldev--test-create-external-dir ,packages)))
+            ;; User-accessible variable so that it can be modified.
+            (preexisting-files   (when external-dir (eldev--test-find-files external-dir))))
+       (prog1 (progn ,@body)
+         ;; Eldev must not modify contents of the external directory.
+         (when external-dir
+           (eldev--test-assert-files external-dir preexisting-files))
+         ;; Delete the directory if there are no errors.
+         (ignore-errors (when external-dir (delete-directory external-dir t)))))))
+
+(defun eldev--test-create-external-dir (packages)
+  (setf packages (eldev-listify packages))
+  (let ((external-dir (make-temp-file "eldev-" t "-test")))
+    ;; Certainly not the fastest way, but at least robust.  Call a child process to
+    ;; install the dependencies and then copy them to the temporary external directory.
+    (when packages
+      (eldev--test-run nil ("exec" `(dolist (dependency ',(eldev-listify packages))
+                                      (copy-directory (package-desc-dir (eldev-find-package-descriptor dependency)) ,(file-name-as-directory external-dir))))
+        (unless (= exit-code 0)
+          (error "Unable to create external dependency directory"))))
+    ;; Just create an empty directory to simplify some tests; in real use this directory
+    ;; will be present and even not empty.
+    (make-directory (expand-file-name "archives" external-dir))
+    external-dir))
 
 
 (defun eldev--test-file-contents (test-project file &optional not-required)
@@ -309,6 +346,18 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     (dolist (line (eldev--test-line-list stderr))
       (when (string-match-p (rx "Emacs version" (+ any) "required" (+ any) "cannot use linter") line)
         (ert-skip line)))))
+
+
+(defmacro eldev-ert-defargtest (name arguments values &rest body)
+  (declare (indent 3))
+  (let ((function (make-symbol (format "%s:impl" name))))
+    `(progn
+       ;; Apparently we cannot get away with unnamed lambdas here.
+       (defun ,function ,arguments ,@body)
+       ,@(mapcar (lambda (arg-values)
+                   `(ert-deftest ,(intern (format "%s/%s" name (downcase (replace-regexp-in-string " " "/" (replace-regexp-in-string (rx (not (any word "-" " "))) "" (prin1-to-string arg-values)))))) ()
+                      (,function ,@(if (= (length arguments) 1) (list arg-values) arg-values))))
+                 values))))
 
 
 (provide 'test/common)
