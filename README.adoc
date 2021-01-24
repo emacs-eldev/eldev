@@ -46,6 +46,8 @@ endif::[]
 :since-0-4: image:https://img.shields.io/badge/since-0.4-8be[Since 0.4,float=right]
 :since-0-5: image:https://img.shields.io/badge/since-0.5-8be[Since 0.5,float=right]
 :since-0-6: image:https://img.shields.io/badge/since-0.6-8be[Since 0.6,float=right]
+:since-0-7: image:https://img.shields.io/badge/since-0.7-8be[Since 0.7,float=right]
+:since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
 
 = Eldev
 
@@ -297,7 +299,8 @@ Two most important global options to remember are `--trace` (`-t`) and
 information about what it is doing to stdout.  With the second, Eldev
 prints stacktraces for most errors.  These options will often help you
 figure out what’s going wrong without requesting any external
-assistance.
+assistance.  Also check out section on <<debugging-features,various
+debugging features>> discussed later.
 
 Eldev mostly follows GNU conventions in its command line.  Perhaps the
 only exception is that global options must be specified before command
@@ -398,6 +401,38 @@ from affecting your Emacs and, finally, to simplify testing of certain
 
 * Eldev supports <<different-emacs-versions,executing on different
   Emacs version>> for the same project without any additional steps.
+
+=== Using preinstalled dependencies
+
+{since-0-8} Starting with version 0.8 you can opt out of some of the
+default project isolation features and use preinstalled dependencies,
+e.g. those from your normal Emacs.  To activate this mode, use global
+option `--external` (`-X`), e.g.:
+
+    $ eldev -X test
+
+In this mode Eldev will expect dependencies to be installed in given
+directory (standard Emacs location — `~/.emacs.d/elpa` — is only the
+default: you can use another directory).  If a dependency is not
+installed, Eldev _will not_ install it on its own: it doesn’t know
+which package archives should be used.  Likewise, it will not upgrade
+anything.  In all such cases, i.e. when required dependencies are not
+correctly preinstalled in the specified external directory, Eldev will
+simply fail.
+
+<<local-dependencies,Local dependencies>> discussed later take
+precedence even in this mode: anything declared as local will override
+dependencies available from an external directory, just like it will
+in usual full isolation mode.
+
+This mode can be useful to load exactly the same dependency versions
+as those installed in your normal Emacs.  However, it is not suitable
+for continuous integration or for working on packages that you do not
+have — for whatever reason — installed normally.  It is also difficult
+to test on <<different-emacs-versions,different Emacs versions>> in
+external directory mode.  Therefore, it is not the default.  But, as
+usual in Eldev, you can make it the default in file `~/.eldev/config`
+if you want.
 
 
 == Project dependencies
@@ -594,9 +629,9 @@ dependencies, but also with common development tools used by the
 project during development, for example <<buttercup,Buttercup>> or
 <<linting,various linters>>.  This works exactly the same as for
 project dependencies, with the only exception that the tool must be
-installed first.  E.g, for Buttercup you need to <<testing,test>> your
-project at least once, so that Eldev knows about the need for this
-tool.
+installed first.  E.g., for Buttercup you need to <<testing,test>>
+your project at least once, so that Eldev knows about the need for
+this tool.
 
 Development tools are installed from package archives hardcoded inside
 Eldev, regardless of which archives you have configured for your
@@ -1087,8 +1122,10 @@ When a test is failing, a backtrace of the failure is printed.  You
 can affect its readability and completeness using options `-b`
 (`--print-backtrace`, the default) and `-B` (`--omit-backtraces`).
 The first option accepts your screen width as an optional parameter;
-backtrace lines get cut to the specified width.  Special value of 0
-(the default in Eldev) disables truncation of backtrace lines.  Second
+backtrace lines get cut to the specified width.  (Since 0.7 this can
+also be specified as a global option that additionally affects all
+other backtraces that are printed by Eldev.)  Special value of 0 (the
+default in Eldev) disables truncation of backtrace lines.  Second
 option, `-B`, is surprisingly useful.  In many cases backtraces don’t
 actually give any useful information, especially when the tests
 contain only a single assertion, and only clutter the output.  If you
@@ -1147,8 +1184,7 @@ Things that won’t work with Buttercup at the moment:
 
 * option `--stop-on-unexpected` (`-s`);
 * specifying screen width with option `--print-backtraces` (`-b`): it
-  will always work as if 80 was specified;
-* option `--omit-backtraces` (`-B`).
+  will always work as if 80 was specified.
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
@@ -1614,6 +1650,60 @@ your source warning-free today, it might detect problems tomorrow.
 `relint` is probably one of the “safer” linters in this regard:
 
     $ eldev -dtT lint re
+
+
+[#debugging-features]
+== Debugging features
+
+Eldev comes with lots of different options and other features that can
+help you debug problems both in your project, Eldev itself or your
+Eldev scripts.
+
+* Global options `-t` (`--trace`), `-v` (`--verbose`) and `-q`
+  (`--quiet`) control the amount of output Eldev generates.  The first
+  one makes Eldev extra verbose, helping you to understand what it is
+  doing and at which step something goes wrong.
+
+* Global option `-d` (`--debug`) makes Eldev print backtrace if it
+  dies with a Elisp signal (except certain well-defined and explained
+  errors like missing dependency).
+
+* {since-0-3} Global option `-Q` (`--backtrace-on-abort`) makes Eldev
+  print backtrace if it is aborted with `^C`.  This is useful if your
+  project freezes or has very bad performance, and you want to figure
+  where exactly this happens.
+
+* {since-0-7} Global option `-b` (`--backtrace`) lets you adapt
+  backtraces to your screen width and thus make them more readable at
+  the expense of completeness (by default, Eldev doesn’t truncate
+  backtrace lines).  It is a good idea to change the default in file
+  `.eldev/config`.
+
+* Global option `-T` (`--time`) prepends timestamps to all lines of
+  Eldev output, making it easier to spot performance problems.
+
+* Command `prepare` can be used to install all project dependencies —
+  and thus check if they and package archives are specified correctly
+  — without doing anything else.
+
+* Commands `deps` (`dependencies`) and `dtree` (`dependency-tree`) can
+  be used to display list or tree of project dependencies, which is
+  especially useful for large projects unfamiliar to you.
+
+* For many errors, Eldev will print additional hints (unless you
+  specify option `--quiet`).  For example: if an error happens during
+  evaluating file `Eldev`, the tool will mention this; if a dependency
+  cannot be installed, Eldev will mention what required this
+  dependency (can be non-obvious in larger packages).
+
+* While not a direct feature of Eldev itself, file `Eldev-local`
+  provides a good place to install temporary advices, overwrite Emacs
+  functions etc. in the process of debugging certain problems.
+
+* You can temporarily add calls to `eldev-warn`, `eldev-backtrace` and
+  other Eldev functions to the tests in your project to provide
+  additional output.  But it is a good idea to do this only while
+  debugging and avoid committing such changes.
 
 
 == Plugins
