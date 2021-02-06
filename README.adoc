@@ -9,7 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
-:uri-search-github: https://github.com/search?q=filename%3AEldev+language%3A%22Emacs+Lisp%22+path%3A%2F
+:uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
