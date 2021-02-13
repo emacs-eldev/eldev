@@ -31,5 +31,21 @@
       (should (string-match-p (rx "version 999.999 is required") stderr))
       (should (= exit-code 1)))))
 
+;; https://github.com/doublep/eldev/issues/32
+;;
+;; Eldev would fail to provide Org snapshot to a project that depends on Org version newer
+;; than what is built into Emacs, even if appropriate package archive was configured.  Was
+;; triggered by the bug in `eldev--global-cache-url-retrieve-synchronously'.
+(ert-deftest eldev-issue-32 ()
+  (let ((eldev--test-project "issue-32-project"))
+    (eldev--test-delete-cache)
+    ;; Test that it fails when no archive is configured.
+    (eldev--test-run nil ("prepare")
+      (should (= exit-code 1)))
+    (eldev--test-delete-cache)
+    ;; But with an appropriate archive it should work.
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("org" . "https://orgmode.org/elpa/")) "prepare")
+      (should (= exit-code 0)))))
+
 
 (provide 'test/integration/misc)

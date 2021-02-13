@@ -28,6 +28,11 @@ package-archive-*/
     makes results more predictable, because real packages in real
     archives could change.
 
+org-pseudoarchive/
+
+    Archive emulating Org snapshot archive, used to test that Eldev
+    knows how to install more recent versions of built-in packages.
+
 dependency-*/
 
     Test "projects" also available from the local test archives above.

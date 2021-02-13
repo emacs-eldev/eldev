@@ -1657,8 +1657,11 @@ Since 0.2."
                                  ;; somehow includes a slash.
                                  (when (string-match-p (rx bos (1+ (any "a-zA-Z0-9" "-" ".+_@")) eos) filename)
                                    (dolist (known eldev--known-package-archives)
-                                     (when (string= archive-url (cdr (nth 1 known)))
-                                       (throw 'dir (symbol-name (car known)))))
+                                     (let ((known-archive-url (cdr (nth 1 known))))
+                                       ;; Because of stable/unstable archive, URL is, in
+                                       ;; fact, not necessarily an URL.
+                                       (when (and (stringp known-archive-url) (string= archive-url known-archive-url))
+                                         (throw 'dir (symbol-name (car known))))))
                                    ;; Contents of other archives also gets cached, but
                                    ;; with encoded URL as directory name in case different
                                    ;; projects use the same archive under different names
