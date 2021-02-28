@@ -176,7 +176,7 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
               (setf .ignore filename))))
       (eldev-verbose "This doesn't appear to be a supported VCS repository"))
     (with-temp-file eldev-file
-      (insert "; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-\n\n")
+      (insert "; -*- mode: emacs-lisp; lexical-binding: t -*-\n\n")
       (cond ((eq archives-to-use t)
              (eldev-trace "Adding a few commented-out calls to `eldev-use-package-archive' to `%s'" eldev-file)
              (insert ";; Uncomment some calls below as needed for your project.\n")

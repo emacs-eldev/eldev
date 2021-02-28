@@ -15,7 +15,7 @@
     (eldev--test-run nil ("init" "--non-interactive")
       (should (string= stdout (eldev-format-message "Created file `%s' for this project\n" eldev-file)))
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
 ;(eldev-use-package-archive 'gnu)
@@ -32,7 +32,7 @@
       ;; Without dependencies Eldev should create the same file, with
       ;; commented out archive lines for possible later use.
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
 ;(eldev-use-package-archive 'gnu)
@@ -48,7 +48,7 @@
       ;; Since `dependency-a' is also available from `archive-c', only this archive should
       ;; be autodetected as the most prioritized one.
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Autodetermined by `eldev init'.
 (eldev-use-package-archive 'archive-c)
@@ -63,7 +63,7 @@
       ;; `stable-unstable' archive is enough, even if `dependency-a' is available also
       ;; from more prioritized `archive-c'.
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Autodetermined by `eldev init'.
 (eldev-use-package-archive 'stable-unstable)
@@ -77,7 +77,7 @@
       (should (string-match-p (eldev-format-message "Created file `%s' for this project" eldev-file) stdout))
       ;; Both archives are needed.
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Autodetermined by `eldev init'.
 (eldev-use-package-archive 'archive-c)
@@ -102,7 +102,7 @@
       (should (string-match-p "Continue anyway\\?" stdout))
       (should (string-match-p (eldev-format-message "Created file `%s' for this project" eldev-file) stdout))
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
 ;(eldev-use-package-archive 'gnu)
@@ -115,7 +115,7 @@
     (eldev--test-run nil ("init" "--non-interactive")
       (should (string= stdout (eldev-format-message "Created file `%s' for this project\n" eldev-file)))
       (should (string= (eldev--test-file-contents nil "Eldev") "\
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
 ;(eldev-use-package-archive 'gnu)

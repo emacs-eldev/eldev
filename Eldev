@@ -1,4 +1,4 @@
-; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-
+; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 (setf eldev-files-to-package (append eldev-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
 
