@@ -1705,7 +1705,8 @@ Since 0.2."
                       ;; Only cache successful replies.
                       (when (and (boundp 'url-http-response-status) (eq url-http-response-status 200))
                         (make-directory (file-name-directory cache-path) t)
-                        (write-region nil nil cache-path nil 'no-message)))
+                        (let ((coding-system-for-write 'binary))
+                          (write-region nil nil cache-path nil 'no-message))))
                     ;; Discard any cached signatures.
                     (unless (string-suffix-p ".sig" filename)
                       (ignore-errors (delete-file (concat cache-path ".sig")))))
@@ -4960,10 +4961,12 @@ possible to build arbitrary targets this way."
                  files-to-tar)
             (condition-case nil
                 (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir))
-              (file-error (error "FIXME: Copy")))
+              (file-error
+               (let ((working-dir-pkg (expand-file-name name-version working-dir)))
+                 (copy-directory eldev-project-dir working-dir-pkg t t t))))
             (make-directory (file-name-directory package-target) t)
             (unless (file-exists-p descriptor-file)
-              (with-temp-file descriptor-file
+              (with-temp-file (expand-file-name descriptor-file (expand-file-name name-version-dir working-dir))
                 (insert "; -*- no-byte-compile: t -*-\n")
                 (pp `(define-package ,(symbol-name (package-desc-name package)) ,(package-version-join pretended-version)
                        ,(package-desc-summary package)

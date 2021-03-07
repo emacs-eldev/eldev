@@ -146,17 +146,22 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                        t)))
     (unless executable
       (ert-skip (eldev-format-message "%s doesn't appear to be installed" (eldev-vc-full-name vc-backend))))
-    (let ((project-dir    (eldev--test-project-dir test-project))
-          (copy-dir       (file-name-as-directory (make-temp-file "eldev-" t (if vc-backend (format "-test-%s" (downcase (symbol-name vc-backend))) "-test"))))
-          (repository-dir (when svnadmin
-                            (file-name-as-directory (make-temp-file "eldev-" t "-test-svnrepo")))))
+    (let* ((project-dir    (eldev--test-project-dir test-project))
+           (copy-dir       (file-name-as-directory (make-temp-file "eldev-" t (if vc-backend (format "-test-%s" (downcase (symbol-name vc-backend))) "-test"))))
+           (repository-dir (when svnadmin
+                             (file-name-as-directory (make-temp-file "eldev-" t "-test-svnrepo"))))
+           (repository-url  (format "file://%s%s"
+                                    ;; windows file paths require the
+                                    ;; extra root node at the front
+                                    (if (eq system-type 'windows-nt) "/" "")
+                                    repository-dir)))
       ;; To avoid copying generated files.
       (eldev--test-run test-project ("clean" "everything")
         (should (= exit-code 0)))
       (when svnadmin
         (eldev-call-process svnadmin   `("create" ,repository-dir) :die-on-error t)
-        (eldev-call-process executable `("mkdir" ,(format "file://%s/trunk" repository-dir) ,(format "file://%s/branches" repository-dir) "--message" "Init") :die-on-error t)
-        (eldev-call-process executable `("checkout" ,(format "file://%s/trunk" repository-dir) ,copy-dir) :die-on-error t))
+        (eldev-call-process executable `("mkdir" ,(format "%s/trunk" repository-url) ,(format "%s/branches" repository-url) "--message" "Init") :die-on-error t)
+        (eldev-call-process executable `("checkout" ,(format "%s/trunk" repository-url) ,copy-dir) :die-on-error t))
       (copy-directory project-dir copy-dir t nil t)
       (when vc-backend
         (let ((default-directory copy-dir))
@@ -256,9 +261,25 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 (defun eldev--test-line-list (multiline-string)
   (split-string multiline-string "\n" t))
 
+(defmacro eldev--test-canonicalize-bin/eldev-path (_result)
+  (let ((result (make-symbol "result")))
+    (if (eq system-type 'windows-nt)
+        `(let ((,result  ,_result))
+           (if (string-match "^\\(.*/bin/eldev\\)" ,result)
+               (let* ((matched (match-string 1 ,result))
+                      (replacement
+                       (replace-regexp-in-string "bin\\\\eldev" "bin\\eldev.bat"
+                                                 (replace-regexp-in-string "/" "\\" matched
+                                                                           nil 'literal)
+                                                 nil 'literal)))
+                 (replace-match replacement nil 'literal ,result 1))
+             ,result))
+      _result)))
+
 (defmacro eldev--test-in-project-environment (&rest body)
   `(let ((eldev-project-dir   (eldev--test-project-dir))
-         (eldev-shell-command eldev--test-shell-command))
+         (eldev-shell-command (eldev--test-canonicalize-bin/eldev-path
+                               eldev--test-shell-command)))
      ,@body))
 
 

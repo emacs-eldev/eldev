@@ -107,3 +107,29 @@ jobs:
         # "" is useful in case `which' returns an empty string.
         test ""`which eldev` = ~/.eldev/bin/eldev
         rm -r ~/.eldev/bin
+
+  test-windows-emacs-latest:
+    # MS-Windows only test job, using latest available Emacs version
+    # from MSYS2.
+    runs-on: windows-latest
+
+    steps:
+    - name: Set up Emacs
+      uses: msys2/setup-msys2@v2
+      with:
+        release: false
+        install: mingw64/mingw-w64-x86_64-emacs
+    - run: git config --global core.autocrlf input
+
+    - name: Check out the source code
+      uses: actions/checkout@v2
+
+    - name: Test the project
+      shell: cmd
+      run: |
+        %EMACS% --version
+        set "ELDEV_LOCAL=%cd%"
+        call bin\eldev.bat -p -dtTC test --omit-backtraces --expect 200
+        call bin\eldev.bat -p -dtTC test --test-type integration --omit-backtraces --expect 5
+      env:
+        EMACS: "c:\\msys64\\mingw64\\bin\\emacs"

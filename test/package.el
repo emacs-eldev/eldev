@@ -61,6 +61,8 @@
 (ert-deftest eldev-package-3 ()
   ;; This project comes with an Info "manual".  Make sure it gets
   ;; installed.
+  (skip-unless (eldev-makeinfo-executable t))
+
   (eldev--test-packaging "project-b" (info "project-b")))
 
 (ert-deftest eldev-package-4 ()
