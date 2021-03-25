@@ -3761,7 +3761,9 @@ obligations."
 (defvar eldev-emacs-default-command-line '("--no-init-file" "--no-site-file" "--no-site-lisp" "--no-splash")
   "Options added to Emacs command line by default.")
 
-(defvar eldev-emacs-forward-variables '(user-emacs-directory package-archives package-archive-priorities)
+;; Because `package-user-dir' became autoloaded in Emacs 28, we need to forward it too:
+;; `user-emacs-directory' is set too late for the default value to be correct.
+(defvar eldev-emacs-forward-variables '(user-emacs-directory package-user-dir package-archives package-archive-priorities)
   "Variables to forward to Emacs launched by `emacs' command.")
 
 (defvar eldev-emacs-required-features :default
