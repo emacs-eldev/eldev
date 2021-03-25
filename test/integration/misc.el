@@ -28,7 +28,9 @@
   (let ((eldev--test-project "issue-18-project"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("prepare")
-      (should (string-match-p (rx "version 999.999 is required") stderr))
+      ;; Can be a couple of different messages, but they must all mention the insane
+      ;; requirement.
+      (should (string-match-p (rx "version 999.999") stderr))
       (should (= exit-code 1)))))
 
 ;; https://github.com/doublep/eldev/issues/32
