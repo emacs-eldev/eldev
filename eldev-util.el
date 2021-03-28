@@ -293,6 +293,44 @@ altered."
     (or url (when (stringp (car-safe (cdr error))) (cadr error)))))
 
 
+(defmacro eldev--lazy-scope (spec &rest body)
+  "Execute BODY with a named value set up for lazy evaluation.
+Evaluation can be performed as `(funcall NAME)' inside the body
+as many times as wanted (including zero).  If you call it
+as `(funcall NAME NEW-VALUE)', evaluated value is replaced.
+Actual EXPRESSION is evaluated only the first time, after which
+its value is remembered and returned unchanged.  If the value has
+been evaluated or replaced using a call with an argument, CLEANUP
+form is executed at the end.
+
+\(fn (NAME EXPRESSION [CLEANUP [AS-UNWIND-PROTECT]]) BODY...)"
+  (declare (indent 1))
+  (let ((name              (nth 0 spec))
+        (expression        (nth 1 spec))
+        (cleanup           (nth 2 spec))
+        (as-unwind-protect (nth 3 spec))
+        (evaluated         (make-symbol "$evaluated"))
+        (value             (make-symbol "$value")))
+    (setf cleanup (when cleanup `(if ,evaluated ,cleanup)))
+    `(let* (,evaluated
+            ,value
+            (,name (lambda (&rest new-value)
+                     (cond (new-value
+                            (when (cdr new-value)
+                              (error "Must be called with zero or one argument only"))
+                            (setf ,value     (car new-value)
+                                  ,evaluated t))
+                           ((not ,evaluated)
+                            (setf ,value     ,expression
+                                  ,evaluated t)))
+                     ,value)))
+       ,@(if cleanup
+             (if as-unwind-protect
+                 `((unwind-protect ,(macroexp-progn body) ,cleanup))
+               `(,@body ,cleanup))
+           body))))
+
+
 
 ;; Output.
 

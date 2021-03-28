@@ -1,0 +1,5 @@
+(1
+ ;; This package requires an insanely new Emacs.
+ (uninstallable-a . [(1 0) ((emacs (999999))) "Uninstallable package A" single nil])
+ ;; This archive provides `uninstallable-b', but not its dependency.
+ (uninstallable-b . [(1 0) ((unknown-dependency (0))) "Uninstallable package B" single nil]))

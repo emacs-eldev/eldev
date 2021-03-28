@@ -1005,7 +1005,8 @@ EXPECTED-VERSION, else it is discarded.
 
 If loading succeeds, BODY is executed with loaded Elisp object
 bound as `contents'.  Version of stored data is bound as
-`version'."
+`version'.  Returned value is that of BODY, or nil if the file is
+not loaded."
   (declare (indent 3) (debug (stringp stringp numberp body)))
   `(condition-case error
        (if (file-exists-p ,file)
@@ -1016,9 +1017,11 @@ bound as `contents'.  Version of stored data is bound as
                (let* ((contents (read (current-buffer)))
                       (version  (cdr (assq 'version contents))))
                  (if (> version ,expected-version)
-                     (eldev-verbose "Ignoring %s in file `%s': version %d must be from the future (expected at most %d)" ,description ,file version ,expected-version)
+                     (progn (eldev-verbose "Ignoring %s in file `%s': version %d must be from the future (expected at most %d)" ,description ,file version ,expected-version)
+                            nil)
                    ,@body))))
-         (eldev-trace "No file `%s', not reading %s" (file-relative-name ,file eldev-project-dir) ,description))
+         (eldev-trace "No file `%s', not reading %s" (file-relative-name ,file eldev-project-dir) ,description)
+         nil)
      ;; Since this is not overly important, just print a verbose-level message.
      (error (eldev-verbose "Failed to load %s: %s" ,description (error-message-string error)))))
 
@@ -1725,174 +1728,202 @@ Since 0.2."
          (package-archive-priorities        (when (boundp 'package-archive-priorities) package-archive-priorities))
          (eldev--package-archive-priorities eldev--package-archive-priorities)
          (package-pinned-packages           package-pinned-packages)
+         (uninstallable-cache-file          (expand-file-name "uninstallable.list" (eldev-cache-dir t)))
          plan
          default-archives
-         all-packages)
-    (if self
-        (setf package-archives `(,(if eldev--upgrade-self-from-forced-pa
-                                      `("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa))
-                                    (eldev--resolve-package-archive (if eldev-prefer-stable-archives 'melpa-stable 'melpa-unstable))))
-              all-packages     '((:package eldev)))
-      (eldev--create-internal-pseudoarchive-descriptor)
-      (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
-      (setf default-archives package-archives)
-      (when (eq core 'project)
-        (push `(:package ,package-name :archives ,default-archives) all-packages))
-      (dolist (set (eldev-listify additional-sets))
-        (let ((extra-dependencies (cdr (assq set eldev--extra-dependencies))))
-          (when extra-dependencies
-            (setf extra-dependencies (mapcar #'eldev--create-package-plist extra-dependencies))
-            (eldev-verbose "Need the following extra dependencies for set `%s': %s" set
-                           (eldev-message-enumerate nil extra-dependencies
-                                                    (lambda (plist)
-                                                      (eldev-format-message "%s %s" (plist-get plist :package) (eldev-message-version (plist-get plist :version))))
-                                                    t))
-            (setf all-packages (append all-packages extra-dependencies))
-            (let ((eldev-verbosity-level nil))
-              (dolist (plist extra-dependencies)
-                (dolist (archive (eldev--package-plist-get-archives plist))
-                  (eldev-use-package-archive archive))))))))
-    (eldev--adjust-stable/unstable-archive-priorities)
-    (let ((archive-statuses     (or (unless external-dir (eldev--determine-archives-to-fetch to-be-upgraded t)) '((nil . t))))
-          (all-package-archives package-archives))
-      (while (catch 'refetch-archives
-               (package-load-all-descriptors)
-               (unless self
-                 ;; This removes local dependencies that have been installed as packages
-                 ;; (e.g. because `Eldev-local' used to be different) from
-                 ;; `package-alist'.  Otherwise package manager will prefer the installed
-                 ;; versions even if we pin the packages to our pseudoarchive.  This
-                 ;; doesn't quite feel right, but I don't see a better way.
-                 (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
-               ;; Retry for as long as we have archives to fetch contents of.
-               (let ((pass-archive-statuses archive-statuses))
-                 (while pass-archive-statuses
-                   (let ((next-archive (pop pass-archive-statuses)))
-                     (unless (cdr next-archive)
-                       (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)
-                       (setf (cdr next-archive) 'fetched-now))
-                     ;; Don't use archives we haven't fetched yet.
-                     (setf package-archives (eldev-filter (not (assoc it pass-archive-statuses)) all-package-archives))
-                     (package-read-all-archive-contents)
-                     (condition-case error
-                         (let ((considered           (make-hash-table :test #'eq))
-                               (highest-requirements (make-hash-table :test #'eq)))
-                           ;; If during planning we find a situation where package X is
-                           ;; required at a higher version than what has been considered
-                           ;; already, remember this and restart planning.  This looks
-                           ;; like a cleaner way than trying to rewrite what has been
-                           ;; planned already.  See test `eldev-issue-18' for an example
-                           ;; of such situation.
-                           (while (catch 'restart-planning
-                                    (setf plan (cons nil nil))
-                                    (dolist (package-plist all-packages)
-                                      (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan (and pass-archive-statuses (not eldev-upgrade-downgrade-mode))
-                                                                      considered highest-requirements))))
-                           (when pass-archive-statuses
-                             (eldev-trace "Not fetching contents of other archive(s) as redundant")
-                             (setf pass-archive-statuses nil)))
-                       (eldev-error (unless pass-archive-statuses
-                                      ;; If we don't have anything more to fetch, give up.
-                                      (if no-error-if-missing
-                                          (eldev-verbose "%s" (error-message-string error))
-                                        (signal (car error) (cdr error)))))))))
-               (let ((planned-packages    (nreverse (car plan)))
-                     (up-to-date-packages (cdr plan))
-                     (non-local-plan-size 0)
-                     (dependency-index    0)
-                     unknown-packages
-                     refetching-wanted)
-                 (when (and to-be-upgraded (not (eq to-be-upgraded t)))
-                   (dolist (package-to-be-upgraded to-be-upgraded)
-                     (unless (or (eldev-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
-                                 (memq package-to-be-upgraded up-to-date-packages))
-                       (push package-to-be-upgraded unknown-packages)))
-                   (when unknown-packages
-                     (signal 'eldev-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(eldev-shell-command t)))
-                                                  "Cannot upgrade %s: `%s' has no such dependencies" ,(eldev-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
-                 (dolist (dependency planned-packages)
-                   (when (or self (null (eldev--loading-mode (car dependency))))
-                     (setf non-local-plan-size (1+ non-local-plan-size))
-                     ;; If we determine that archive X has to be used for installing or
-                     ;; upgrading, always fetch more prioritized archives first: maybe we
-                     ;; skipped them only because cached contents files are too old.
-                     (let ((used-archive (package-desc-archive (car dependency)))
-                           (archive-scan archive-statuses))
-                       (while archive-scan
-                         (let ((archive (pop archive-scan)))
-                           (cond ((string= used-archive (caar archive))
-                                  (setf archive-scan nil))
-                                 ((not (eq (cdr archive) 'fetched-now))
-                                  (setf (cdr archive) nil
-                                        refetching-wanted t)
-                                  (eldev-verbose "Will refetch contents of package archive `%s' to make sure that `%s' really needs to be used" (caar archive) used-archive))))))))
-                 (when refetching-wanted
-                   (throw 'refetch-archives t))
-                 (when (and dry-run (> non-local-plan-size 0))
-                   (eldev-verbose "In dry-run mode Eldev only pretends it is upgrading, installing or deleting dependencies"))
-                 (dolist (dependency planned-packages)
-                   (let ((previous-version (cdr dependency))
-                         (dependency       (car dependency)))
-                     (if (and (not self) (eldev--loading-mode dependency))
-                         (eldev--load-local-dependency dependency)
-                       (setf dependency-index (1+ dependency-index))
-                       (if previous-version
-                           (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
-                                                    "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
-                                                  "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
+         all-packages
+         uninstallable-list-changed)
+    (eldev--lazy-scope (uninstallable
+                        (eldev-do-load-cache-file uninstallable-cache-file "list of uninstallable optional packages" 1
+                          (assq 'packages contents))
+                        (when uninstallable-list-changed
+                          (eldev-do-save-cache-file uninstallable-cache-file "list of uninstallable optional packages" 1
+                            `((packages . ,(funcall uninstallable))))))
+      (if self
+          (setf package-archives `(,(if eldev--upgrade-self-from-forced-pa
+                                        `("bootstrap-pa" . ,(file-name-as-directory eldev--upgrade-self-from-forced-pa))
+                                      (eldev--resolve-package-archive (if eldev-prefer-stable-archives 'melpa-stable 'melpa-unstable))))
+                all-packages     '((:package eldev)))
+        (eldev--create-internal-pseudoarchive-descriptor)
+        (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
+        (setf default-archives package-archives)
+        (when (eq core 'project)
+          (push `(:package ,package-name :archives ,default-archives) all-packages))
+        (dolist (set (eldev-listify additional-sets))
+          (let ((extra-dependencies (cdr (assq set eldev--extra-dependencies)))
+                not-retrying-optionals)
+            (setf extra-dependencies
+                  (eldev-filter (let ((dependency-name (plist-get it :package)))
+                                  (not (when (and (not (or (eq to-be-upgraded t) (memq dependency-name to-be-upgraded)))
+                                                  (plist-get it :optional) (memq dependency-name (funcall uninstallable)))
+                                         (eldev-verbose "Dependency `%s' is optional and has been found uninstallable before, skipping" dependency-name)
+                                         (setf not-retrying-optionals t))))
+                                (mapcar #'eldev--create-package-plist extra-dependencies)))
+            (when not-retrying-optionals
+              (eldev-trace "Use `eldev upgrade' to force checking if the skipped dependencies are still uninstallable"))
+            (when extra-dependencies
+              (eldev-verbose "Need the following extra dependencies for set `%s': %s" set
+                             (eldev-message-enumerate nil extra-dependencies
+                                                      (lambda (plist)
+                                                        (eldev-format-message "%s %s" (plist-get plist :package) (eldev-message-version (plist-get plist :version))))
+                                                      t))
+              (setf all-packages (append all-packages extra-dependencies))
+              (let ((eldev-verbosity-level nil))
+                (dolist (plist extra-dependencies)
+                  (dolist (archive (eldev--package-plist-get-archives plist))
+                    (eldev-use-package-archive archive))))))))
+      (eldev--adjust-stable/unstable-archive-priorities)
+      (let ((archive-statuses     (or (unless external-dir (eldev--determine-archives-to-fetch to-be-upgraded t)) '((nil . t))))
+            (all-package-archives package-archives))
+        (while (catch 'refetch-archives
+                 (package-load-all-descriptors)
+                 (unless self
+                   ;; This removes local dependencies that have been installed as packages
+                   ;; (e.g. because `Eldev-local' used to be different) from
+                   ;; `package-alist'.  Otherwise package manager will prefer the installed
+                   ;; versions even if we pin the packages to our pseudoarchive.  This
+                   ;; doesn't quite feel right, but I don't see a better way.
+                   (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
+                 ;; Retry for as long as we have archives to fetch contents of.
+                 (let ((pass-archive-statuses archive-statuses))
+                   (while pass-archive-statuses
+                     (let ((next-archive (pop pass-archive-statuses)))
+                       (unless (cdr next-archive)
+                         (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)
+                         (setf (cdr next-archive) 'fetched-now))
+                       ;; Don't use archives we haven't fetched yet.
+                       (setf package-archives (eldev-filter (not (assoc it pass-archive-statuses)) all-package-archives))
+                       (package-read-all-archive-contents)
+                       (condition-case error
+                           (let ((considered           (make-hash-table :test #'eq))
+                                 (highest-requirements (make-hash-table :test #'eq)))
+                             ;; If during planning we find a situation where package X is
+                             ;; required at a higher version than what has been considered
+                             ;; already, remember this and restart planning.  This looks
+                             ;; like a cleaner way than trying to rewrite what has been
+                             ;; planned already.  See test `eldev-issue-18' for an example
+                             ;; of such situation.
+                             (while (catch 'restart-planning
+                                      (setf plan (cons nil nil))
+                                      (dolist (package-plist all-packages)
+                                        (let ((dependency-name  (plist-get package-plist :package))
+                                              (can-be-installed (catch 'skip-uninstallable-optionals
+                                                                  (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan
+                                                                                                  (and pass-archive-statuses (not eldev-upgrade-downgrade-mode))
+                                                                                                  considered highest-requirements))))
+                                          (when (plist-get package-plist :optional)
+                                            (let* ((list-of-uninstallable (funcall uninstallable))
+                                                   (was-uninstallable     (memq dependency-name list-of-uninstallable)))
+                                              (when (eq (not was-uninstallable) (not can-be-installed))
+                                                (funcall uninstallable (if can-be-installed
+                                                                           (delq dependency-name (funcall uninstallable))
+                                                                         `(,dependency-name . ,list-of-uninstallable)))
+                                                (setf uninstallable-list-changed t))))))))
+                             (when pass-archive-statuses
+                               (eldev-trace "Not fetching contents of other archive(s) as redundant")
+                               (setf pass-archive-statuses nil)))
+                         (eldev-error (unless pass-archive-statuses
+                                        ;; If we don't have anything more to fetch, give up.
+                                        (if no-error-if-missing
+                                            (eldev-verbose "%s" (error-message-string error))
+                                          (signal (car error) (cdr error)))))))))
+                 (let ((planned-packages    (nreverse (car plan)))
+                       (up-to-date-packages (cdr plan))
+                       (non-local-plan-size 0)
+                       (dependency-index    0)
+                       unknown-packages
+                       refetching-wanted)
+                   (when (and to-be-upgraded (not (eq to-be-upgraded t)))
+                     (dolist (package-to-be-upgraded to-be-upgraded)
+                       (unless (or (eldev-any-p (eq (package-desc-name (car it)) package-to-be-upgraded) planned-packages)
+                                   (memq package-to-be-upgraded up-to-date-packages))
+                         (push package-to-be-upgraded unknown-packages)))
+                     (when unknown-packages
+                       (signal 'eldev-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(eldev-shell-command t)))
+                                                    "Cannot upgrade %s: `%s' has no such dependencies" ,(eldev-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
+                   (dolist (dependency planned-packages)
+                     (when (or self (null (eldev--loading-mode (car dependency))))
+                       (setf non-local-plan-size (1+ non-local-plan-size))
+                       ;; If we determine that archive X has to be used for installing or
+                       ;; upgrading, always fetch more prioritized archives first: maybe we
+                       ;; skipped them only because cached contents files are too old.
+                       (let ((used-archive (package-desc-archive (car dependency)))
+                             (archive-scan archive-statuses))
+                         (while archive-scan
+                           (let ((archive (pop archive-scan)))
+                             (cond ((string= used-archive (caar archive))
+                                    (setf archive-scan nil))
+                                   ((not (eq (cdr archive) 'fetched-now))
+                                    (setf (cdr archive) nil
+                                          refetching-wanted t)
+                                    (eldev-verbose "Will refetch contents of package archive `%s' to make sure that `%s' really needs to be used" (caar archive) used-archive))))))))
+                   (when refetching-wanted
+                     (throw 'refetch-archives t))
+                   (when (and dry-run (> non-local-plan-size 0))
+                     (eldev-verbose "In dry-run mode Eldev only pretends it is upgrading, installing or deleting dependencies"))
+                   (dolist (dependency planned-packages)
+                     (let ((previous-version (cdr dependency))
+                           (dependency       (car dependency)))
+                       (if (and (not self) (eldev--loading-mode dependency))
+                           (eldev--load-local-dependency dependency)
+                         (setf dependency-index (1+ dependency-index))
+                         (if previous-version
+                             (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
+                                                      "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
+                                                    "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
+                                          dependency-index non-local-plan-size
+                                          (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
+                                          (package-desc-archive dependency))
+                           (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
                                         dependency-index non-local-plan-size
-                                        (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
-                                        (package-desc-archive dependency))
-                         (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
-                                      dependency-index non-local-plan-size
-                                      (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
-                       (unless dry-run
-                         (let ((inhibit-message t))
-                           (eldev--with-pa-access-workarounds (lambda ()
-                                                                (eldev-using-global-package-archive-cache
-                                                                  (condition-case error
-                                                                      (package-install-from-archive dependency)
-                                                                    (file-error (let ((url (eldev--guess-url-from-file-error error)))
-                                                                                  (when (stringp url)
-                                                                                    (dolist (archive archive-statuses)
-                                                                                      (when (and (string= (caar archive) (package-desc-archive dependency))
-                                                                                                 (string-prefix-p (cdar archive) url))
-                                                                                        ;; It is possible that package archive contents is cached and is deemed
-                                                                                        ;; up-to-date, but some packages cannot be fetched.  In this case, refresh the
-                                                                                        ;; contents file (but don't do it more than once).
-                                                                                        (when (eq (cdr archive) 'fetched-now)
-                                                                                          (signal 'eldev-error `(:hint ,(eldev-format-message "When accessing package archive `%s'" (caar archive))
-                                                                                                                       "%s" ,(error-message-string error))))
-                                                                                        (eldev-print :stderr "Contents of package archive `%s' seems out-of-date, will refetch..." (caar archive))
-                                                                                        (setf (cdr archive) nil)
-                                                                                        (throw 'refetch-archives t)))))
-                                                                                (signal (car error) (cdr error))))))
-                                                              t))))))
-                 (if (> non-local-plan-size 0)
-                     (when (memq 'runtime (eldev-listify additional-sets))
-                       (eldev--save-installed-runtime-dependencies))
-                   (let ((installed-how (if external-dir (eldev-format-message "in `%s'" external-dir) "already")))
-                     (if additional-sets
-                         (eldev-verbose "All project dependencies (including those for %s) have been installed %s or are local"
-                                        (eldev-message-enumerate "set" additional-sets) installed-how)
-                       (eldev-verbose "All project dependencies have been installed %s or are local" installed-how))))
-                 (when main-command-effect
-                   (unless dry-run
-                     (let ((inhibit-message t)
-                           (num-deleted     0))
-                       (dolist (dependency planned-packages)
-                         (unless (or (null (cdr dependency)) (and (not self) (eldev--loading-mode (car dependency))))
-                           ;; Argument FORCE was added only in 25.x.  Always force package
-                           ;; deletion, otherwise package manager won't let us downgrade
-                           ;; dependencies when we choose to do so.
-                           (apply #'package-delete (cdr dependency) (when (>= emacs-major-version 25) '(t)))
-                           (setf num-deleted (1+ num-deleted))))
-                       (when (> num-deleted 0)
-                         (eldev-verbose "Deleted %s" (eldev-message-plural num-deleted (if self "obsolete package version" "obsolete dependency version"))))))
+                                        (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
+                         (unless dry-run
+                           (let ((inhibit-message t))
+                             (eldev--with-pa-access-workarounds (lambda ()
+                                                                  (eldev-using-global-package-archive-cache
+                                                                    (condition-case error
+                                                                        (package-install-from-archive dependency)
+                                                                      (file-error (let ((url (eldev--guess-url-from-file-error error)))
+                                                                                    (when (stringp url)
+                                                                                      (dolist (archive archive-statuses)
+                                                                                        (when (and (string= (caar archive) (package-desc-archive dependency))
+                                                                                                   (string-prefix-p (cdar archive) url))
+                                                                                          ;; It is possible that package archive contents is cached and is deemed
+                                                                                          ;; up-to-date, but some packages cannot be fetched.  In this case, refresh the
+                                                                                          ;; contents file (but don't do it more than once).
+                                                                                          (when (eq (cdr archive) 'fetched-now)
+                                                                                            (signal 'eldev-error `(:hint ,(eldev-format-message "When accessing package archive `%s'" (caar archive))
+                                                                                                                         "%s" ,(error-message-string error))))
+                                                                                          (eldev-print :stderr "Contents of package archive `%s' seems out-of-date, will refetch..." (caar archive))
+                                                                                          (setf (cdr archive) nil)
+                                                                                          (throw 'refetch-archives t)))))
+                                                                                  (signal (car error) (cdr error))))))
+                                                                t))))))
                    (if (> non-local-plan-size 0)
-                       (eldev-print "Upgraded or installed %s" (eldev-message-plural non-local-plan-size (if self "package" "dependency package")))
-                     (eldev-print (if self "Eldev is up-to-date" "All dependencies are up-to-date")))))
-               nil)))
+                       (when (memq 'runtime (eldev-listify additional-sets))
+                         (eldev--save-installed-runtime-dependencies))
+                     (let ((installed-how (if external-dir (eldev-format-message "in `%s'" external-dir) "already")))
+                       (if additional-sets
+                           (eldev-verbose "All project dependencies (including those for %s) have been installed %s or are local"
+                                          (eldev-message-enumerate "set" additional-sets) installed-how)
+                         (eldev-verbose "All project dependencies have been installed %s or are local" installed-how))))
+                   (when main-command-effect
+                     (unless dry-run
+                       (let ((inhibit-message t)
+                             (num-deleted     0))
+                         (dolist (dependency planned-packages)
+                           (unless (or (null (cdr dependency)) (and (not self) (eldev--loading-mode (car dependency))))
+                             ;; Argument FORCE was added only in 25.x.  Always force package
+                             ;; deletion, otherwise package manager won't let us downgrade
+                             ;; dependencies when we choose to do so.
+                             (apply #'package-delete (cdr dependency) (when (>= emacs-major-version 25) '(t)))
+                             (setf num-deleted (1+ num-deleted))))
+                         (when (> num-deleted 0)
+                           (eldev-verbose "Deleted %s" (eldev-message-plural num-deleted (if self "obsolete package version" "obsolete dependency version"))))))
+                     (if (> non-local-plan-size 0)
+                         (eldev-print "Upgraded or installed %s" (eldev-message-plural non-local-plan-size (if self "package" "dependency package")))
+                       (eldev-print (if self "Eldev is up-to-date" "All dependencies are up-to-date")))))
+                 nil))))
     (when activate
       (eldev--do-activate-dependencies package-name all-packages additional-sets no-error-if-missing)
       ;; See e.g. `eldev-test-utility-files-in-package-mode-1'.  Basically, test files
@@ -1968,13 +1999,16 @@ Since 0.2."
                                          (pop recursing-for)))))))))
       (dolist (plist dependencies)
         (unless (package-activate (plist-get plist :package))
-          ;; We don't report the required version, but if you look at
-          ;; `package-activate-1' (as of 2019-11-24), it also has problems with versions
-          (if no-error-if-missing
-              (eldev-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
-            (signal 'eldev-missing-dependency `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency))))))))
+          (if (plist-get plist :optional)
+              (eldev-trace "Failed to activate `%s', but as the package is optional, just continuing" (plist-get plist :package))
+            ;; We don't report the required version, but if you look at
+            ;; `package-activate-1' (as of 2019-11-24), it also has problems with
+            ;; versions.
+            (if no-error-if-missing
+                (eldev-verbose "Unable to load project dependencies: package `%s' is unavailable" missing-dependency)
+              (signal 'eldev-missing-dependency `("Unable to load project dependencies: package `%s' is unavailable" ,missing-dependency)))))))))
 
-(defun eldev--create-package-plist (package &optional default-archives)
+(defun eldev--create-package-plist (package &optional default-archives optional)
   (setf package (pcase package
                   ((pred symbolp)                   `(:package ,package))
                   (`(,(pred symbolp))               `(:package . ,package))
@@ -1982,6 +2016,8 @@ Since 0.2."
                   (_                                (copy-sequence package))))
   (unless (or (null default-archives) (plist-member package :archive) (plist-member package :archives))
     (setf package (plist-put package :archives default-archives)))
+  (when optional
+    (setf package (plist-put package :optional t)))
   package)
 
 (defun eldev--package-plist-get-archives (package-plist &optional resolved)
@@ -1991,15 +2027,20 @@ Since 0.2."
                 (when archive
                   (list archive))))))
 
+;; Returns non-nil.
 (defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new considered highest-requirements &optional required-by)
   (let* ((package-name        (plist-get package-plist :package))
          (required-version    (plist-get package-plist :version))
+         (optional            (plist-get package-plist :optional))
          (highest-requirement (gethash package-name highest-requirements))
          (real-required-by    required-by)
-         (required-by-hint    (lambda ()
+         (required-by-hint    (lambda (&optional upcase)
                                 (when required-by
-                                  (eldev-format-message "Required by package %s"
-                                                        (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- ")))))
+                                  (let ((hint (eldev-format-message "required by package %s"
+                                                                    (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- "))))
+                                    (if upcase
+                                        (eldev-message-upcase-first hint)
+                                      hint)))))
          (considered-version  (gethash package-name considered)))
     (when (stringp required-version)
       (setf required-version (version-to-list required-version)))
@@ -2015,7 +2056,11 @@ Since 0.2."
     (unless (and considered-version (version-list-<= required-version considered-version))
       (unless (package-built-in-p package-name required-version)
         (when (eq package-name 'emacs)
-          (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint)
+          (when optional
+            (eldev-verbose "Emacs version %s (this is %s) is %s; skipping the optional dependency"
+                           (eldev-message-version required-version) emacs-version (funcall required-by-hint))
+            (throw 'skip-uninstallable-optionals nil))
+          (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint t)
                                                     "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
                (already-installed         (unless local (eldev-find-package-descriptor package-name)))
@@ -2079,9 +2124,15 @@ Since 0.2."
                           (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
                 (setf package already-installed))
               (unless package
+                (when optional
+                  (eldev-verbose "Dependency `%s' is not available, but as it is optional, just continuing" package-name)
+                  (let ((hint (funcall required-by-hint)))
+                    (when hint
+                      (eldev-trace "Note: it is %s" hint)))
+                  (throw 'skip-uninstallable-optionals nil))
                 (let* ((version-string (eldev-message-version required-version t))
                        (external-dir   (unless self (eldev-external-package-dir)))
-                       (hint           (funcall required-by-hint))
+                       (hint           (funcall required-by-hint t))
                        (message        (or package-disabled
                                            (cond ((and best-version (not (eq best-version built-in-version)))
                                                   (if external-dir
@@ -2100,7 +2151,7 @@ Since 0.2."
                     (setf hint (concat (eldev-format-message "Either install it there, or use global option `--isolated' (`-I')") (if hint (concat "\n" hint) ""))))
                   (signal 'eldev-missing-dependency `(:hint ,hint ,@message))))))
           (dolist (requirement (package-desc-reqs package))
-            (eldev--plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives))
+            (eldev--plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives) optional)
                                             default-archives plan fail-if-too-new considered highest-requirements (cons package-name required-by)))
           (if (eq package already-installed)
               (push package-name (cdr plan))
