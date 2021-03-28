@@ -48,6 +48,7 @@ endif::[]
 :since-0-6: image:https://img.shields.io/badge/since-0.6-8be[Since 0.6,float=right]
 :since-0-7: image:https://img.shields.io/badge/since-0.7-8be[Since 0.7,float=right]
 :since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
+:since-0-9: image:https://img.shields.io/badge/since-0.9-8be[Since 0.9,float=right]
 
 = Eldev
 
@@ -547,6 +548,50 @@ The following commands make use of additional dependencies: `build`,
 `emacs`, `eval`, `exec` and `test`.  Commands you define yourself can
 also take advantage of this mechanism, see function
 `eldev-load-project-dependencies`.
+
+==== Extended dependency format
+
+Normally to specify an additional dependency you just need to provide
+its package name as a symbol.  However, Eldev also supports “extended”
+format, that lets you specify other details.  In this format,
+dependency is specified as a property list (plist):
+
+[source]
+----
+(:package  DEPENDENCY-NAME
+ :version  REQUIRED-VERSION
+ :archive  PACKAGE-ARCHIVE
+ :archives (PACKAGE-ARCHIVE...)
+ :optional OPTIONAL)
+----
+
+All keywords except `:package` can be omitted.  In the extended format
+you can specify which version of the dependency is required (normally,
+any version will do) and which package archive(s) to use (by default,
+the same archives as for normal dependencies are used).  In values
+associated with `:archive`/`:archives` standard shortcuts `gnu` (for
+GNU ELPA) and `melpa` (for MELPA; also `melpa-stable` and
+`melpa-unstable`) can be used.  Dependencies can also be marked as
+optional, see the next subsection.
+
+==== Optional additional dependencies
+
+{since-0-9} Suppose you want to test your project’s integration with a
+third-party package, but don’t strictly _need_ it.  And, additionally,
+relevant tests are written in such a way as to simply be skipped if
+said package is not available, e.g. using `ert-skip` or
+`buttercup-skip`.  In this case you may want to declare the package as
+an _optional additional dependency_, so that you don't need to care if
+it can be installed during continuous integration or not:
+
+[source]
+----
+(eldev-add-extra-dependencies 'test '(:package helm :optional t))
+----
+
+In this example, we declare that we want Helm for testing, but don't
+care much if it cannot be installed, e.g. because of too old Emacs
+version.
 
 === Examining dependencies
 
