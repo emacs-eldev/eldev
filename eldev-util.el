@@ -613,6 +613,13 @@ Since 0.6.1."
        ,@body)))
 
 
+(defun eldev-shrink-screen-width-as-needed (width)
+  (if (and eldev-output-time-diffs (integerp width) (> width 0))
+      ;; 13 is the time diff width, probably no need to evaluate it.
+      (max (- width 13) 1)
+    width))
+
+
 (defun eldev-read-wholly (string &optional description)
   "Read STRING as Elisp expression.
 This is basically a wrapper over `read-from-string', but issues
@@ -636,8 +643,8 @@ human-readable errors if there are any problems."
 This is similar to built-in function `backtrace', but respects
 `eldev-backtrace-style' value.  Since 0.8."
   ;; Not using newer functions for compatibility reasons.
-  (let ((limit eldev-backtrace-style))
-    (setf limit (when (and (integerp limit) (> limit 1)) (1- limit)))
+  (let ((limit (eldev-shrink-screen-width-as-needed eldev-backtrace-style)))
+    (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
     (with-temp-buffer
       (let ((standard-output       (current-buffer))
             ;; Emacs' `backtrace' module can die if this value is too small or nil.

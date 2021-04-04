@@ -45,14 +45,14 @@
   (when eldev-test-stop-on-unexpected
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Buttercup framework"))
   (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color)
-    (pcase eldev-test-print-backtraces
-      (`nil            (setf buttercup-stack-frame-style 'omit))
+    (pcase (eldev-shrink-screen-width-as-needed eldev-test-print-backtraces)
+      (`nil                        (setf buttercup-stack-frame-style 'omit))
       ;; Just always use `crop' for now: Buttercup doesn't support varying width yet.
-      ((pred integerp) (setf buttercup-stack-frame-style (if (> eldev-test-print-backtraces 1) 'crop 'full)))
+      ((and (pred integerp) width) (setf buttercup-stack-frame-style (if (> width 0) 'crop 'full)))
       ;; Otherwise use value of `eldev-backtrace-style', but only if test runner doesn't
       ;; specify anything.
-      (_               (unless (assq 'buttercup-stack-frame-style environment)
-                         (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full)))))
+      (_                           (unless (assq 'buttercup-stack-frame-style environment)
+                                     (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full)))))
     (when selectors
       (buttercup-mark-skipped selectors t))
     (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))

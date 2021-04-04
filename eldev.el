@@ -3171,7 +3171,7 @@ global option `-b'"
   :optional-value WIDTH
   :default-value  (pcase eldev-test-print-backtraces
                     (`nil            :no-default)
-                    ((pred integerp) (if (> eldev-test-print-backtraces 1) eldev-test-print-backtraces "untruncated"))
+                    ((pred integerp) (if (> eldev-test-print-backtraces 0) eldev-test-print-backtraces "untruncated"))
                     (_               "use global style"))
   (setf eldev-test-print-backtraces (if width (string-to-number width) t)))
 
