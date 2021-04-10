@@ -76,34 +76,54 @@ jobs:
         # Eldev--relint integration, because we use `rx' macro.
         ELDEV_LOCAL=. ./bin/eldev -p -dtTC lint re
 
-    # Method 1: if you have a catch-all directory for executables.  We
-    # don't test bootstrapping, as that is supposed to have been
-    # tested by normal ERT tests.
+    # Method 1: if you have a catch-all directory for executables.
+    # Calling the eldev script will test that it will be bootstraped
+    # correctly when downloaded from the RAW URL.
     - name: Test installation 1
-      run: |
-        mkdir ~/fake-bin
-        cd ~/fake-bin
-        curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
-        test -x ~/fake-bin/eldev
+      uses: actions/github-script@v3
+      with:
+        script: |
+          const exec = require('util').promisify(require('child_process').exec);
+          const {downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
+
+          const fakeBin = expandTilde('~/fake-bin');
+          await io.mkdirP(fakeBin);
+          const script = await downloadScript(github, context, "bin/eldev", fakeBin);
+          const eldev_out = await exec(script);
+          console.log(eldev_out.stdout);
 
     # Method 2: general case, with Eldev script installed to
     # `~/.eldev/bin'.  We don't add it to `$PATH' as we never run it.
     - name: Test installation 2
-      run: |
-        ! test -x ~/.eldev/bin/eldev
-        curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
-        test -x ~/.eldev/bin/eldev
-        rm -r ~/.eldev/bin
+      uses: actions/github-script@v3
+      with:
+        script: |
+          const fs = require('fs');
+          const exec = require('util').promisify(require('child_process').exec);
+          const {downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
+
+          if (fs.existsSync(expandTilde("~/.eldev/bin/eldev")))
+              throw("~/.eldev/bin/eldev already exists");
+          await io.mkdirP('tmp');
+          const script = await downloadScript(github, context, "webinstall/eldev", 'tmp');
+          await exec(script);
+          const eldev_out = await exec(expandTilde("~/.eldev/bin/eldev"));
+          console.log(eldev_out.stdout);
+          await io.rmRF(expandTilde("~/.eldev/bin"));
 
     # GitHub-specific installation specifically for workflows.
     - name: Test GitHub-specific installation
-      run: |
-        ! test -x ~/.eldev/bin/eldev
-        curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
-        test -x ~/.eldev/bin/eldev
-
-    - name: ...continued
-      run: |
-        # "" is useful in case `which' returns an empty string.
-        test ""`which eldev` = ~/.eldev/bin/eldev
-        rm -r ~/.eldev/bin
+      uses: actions/github-script@v3
+      with:
+        script: |
+          const fs = require('fs');
+          const exec = require('util').promisify(require('child_process').exec);
+          const {downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
+          if (fs.existsSync(expandTilde("~/.eldev/bin/eldev")))
+              throw("~/.eldev/bin/eldev already exists");
+          await io.mkdirP('tmp');
+          const script = await downloadScript(github, context, "webinstall/github-eldev", 'tmp');
+          await exec(script);
+          const eldev_out = await exec(expandTilde("~/.eldev/bin/eldev"));
+          console.log(eldev_out.stdout);
+          await io.rmRF(expandTilde("~/.eldev/bin"));
