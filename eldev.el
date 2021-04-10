@@ -1702,7 +1702,10 @@ Since 0.2."
                 (let ((buffer (apply original url arguments)))
                   (when buffer
                     (with-current-buffer buffer
-                      ;; Only cache successful replies.
+                      ;; Only cache successful replies.  In particular, if the archive
+                      ;; doesn't provide `.sig' files (e.g. MELPA doesn't), we don't cache
+                      ;; 404 responses.  Emacs will keep retrying, but its default is to
+                      ;; allow unsigned packages.
                       (when (and (boundp 'url-http-response-status) (eq url-http-response-status 200))
                         (make-directory (file-name-directory cache-path) t)
                         (write-region nil nil cache-path nil 'no-message)))
@@ -2695,7 +2698,16 @@ or evaluating (`eval') registered in the project's `Eldev' file."
       (let (remarks
             important-remarks)
         (cond ((package-built-in-p package-name)
-               (push "built-in" remarks))
+               (push (if descriptor
+                         (eldev-format-message "built-in is overriden by installed %s" (eldev-message-version descriptor t))
+                       (let ((available (eldev-find-built-in-version package-name)))
+                         (if available
+                             (let ((message (eldev-format-message "built-in version is %s" (eldev-message-version available))))
+                               (if (version-list-< available version)
+                                   (eldev-colorize (upcase message) 'warn)
+                                 message))
+                           "built-in")))
+                     remarks))
               ((null descriptor)
                (push (eldev-colorize "UNAVAILABLE" 'warn) important-remarks))
               (repeated

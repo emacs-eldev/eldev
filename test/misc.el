@@ -28,6 +28,9 @@
     (eldev--test-delete-cache)
     ;; But with an appropriate archive it should work.
     (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("org-pseudoarchive" . ,(expand-file-name "../org-pseudoarchive"))) "prepare")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("dependency-tree" "--list-built-ins")
+      (should (eldev-any-p (string-match-p "\\<org\\>.+overriden.+99999999.9999" it) (eldev--test-line-list stdout)))
       (should (= exit-code 0)))))
 
 
