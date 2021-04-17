@@ -59,5 +59,13 @@
     (should (string= stderr (eldev-format-message "Linter `elisp' is disabled (see variable `eldev-lint-disabled')\n")))
     (should (= exit-code 1))))
 
+;; This file should be ignored, even when mentioned explicitly on the command line (we
+;; treat command line arguments as a fileset, and don't distinguish between explicit names
+;; and e.g. wildcards).  See issue #34.
+(ert-deftest eldev-lint-ignores-pkg-file ()
+  (eldev--test-run "project-c" ("lint" "checkdoc" "project-c-pkg.el")
+    (should (string= stdout "Linter has no complaints\n"))
+    (should (= exit-code 0))))
+
 
 (provide 'test/lint)

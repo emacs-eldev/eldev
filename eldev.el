@@ -3252,6 +3252,13 @@ and `eldev-lint-disabled' take precedence.")
   "Lint only files that match one of these patterns.
 Should normally be specified only from command line.")
 
+(defvar eldev-lint-ignored-fileset '(eldev-package-descriptor-file-name)
+  "Never lint files matching this fileset.
+Default value includes only the package descriptor file,
+i.e. `PACKAGE-pkg.el'.
+
+Since 0.9.")
+
 (defvar eldev-lint-stop-mode nil
   "Whether and when Eldev should stop early when linting.
 Possible modes:
@@ -3615,9 +3622,15 @@ change `elisp-lint's configuration."
 (defun eldev-lint-find-files (filter &optional fileset filter-description)
   "Find files to lint matching given FILTER in the FILESET."
   (let ((files (eldev-find-and-trace-files `(:and ,(or fileset (eldev-lint-fileset)) ,filter) (or filter-description "file%s to lint"))))
-    (when (and files eldev-lint-file-patterns)
-      (setf files (eldev-filter-files files eldev-lint-file-patterns))
-      (eldev-trace "%s" (eldev-message-enumerate-files "Remaining file%s to lint after applying `--file' filter(s): %s (%d)" files)))
+    (when files
+      (when eldev-lint-file-patterns
+        (setf files (eldev-filter-files files eldev-lint-file-patterns))
+        (eldev-trace "%s" (eldev-message-enumerate-files "Remaining file%s to lint after applying `--file' filter(s): %s (%d)" files)))
+      (when eldev-lint-ignored-fileset
+        (let ((ignored (eldev-filter-files files eldev-lint-ignored-fileset)))
+          (when ignored
+            (setf files (eldev-filter (not (member it ignored)) files))
+            (eldev-trace "%s" (eldev-message-enumerate-files "Ignored potential file%s to lint: %s (%d)" ignored))))))
     files))
 
 
@@ -3938,6 +3951,15 @@ Can be either a list of filenames or symbol t, meaning “all of
 them”.  Targets that are built from these sources or depend on
 them will never be found up-to-date.")
 
+(defvar eldev-build-ignored-target-fileset '(concat (eldev-package-descriptor-file-name) "c")
+  "Fileset of apparent targets that should be ignored.
+If a builder specifies a target that matches this fileset, it is
+ignored completely: not even listed in `eldev targets' output.
+Default value includes byte-compiled file for package descriptor
+file, i.e. `PACKAGE-pkg.elc'.
+
+Since 0.9.")
+
 (defvar eldev-build-dry-run-mode nil
   "If non-nil, don't build anything, just pretend to do so.")
 
@@ -4056,31 +4078,44 @@ information past the list of sources.  For this, use function
   eldev--build-targets)
 
 (defun eldev--build-find-builder-invocations (sources builder builder-name)
-  (let ((target-rule (eldev-get builder :targets)))
+  (let ((target-rule (eldev-get builder :targets))
+        invocations
+        ignored-targets)
     (when (functionp target-rule)
       (setf target-rule (funcall target-rule sources)))
-    (pcase target-rule
-      ((pred stringp)
-       `((,sources . (,target-rule))))
-      ((pred eldev-string-list-p)
-       `((,sources . ,target-rule)))
-      (`(,(and (or (pred stringp) (pred eldev-string-list-p)) source-suffixes) -> ,(and (pred stringp) target-suffix))
-       (setf source-suffixes (eldev-listify source-suffixes))
-       (let (result)
-         (dolist (source sources)
-           (let ((scan source-suffixes)
-                 found)
-             (while scan
-               (let ((source-suffix (pop scan)))
-                 (when (string-suffix-p source-suffix source)
-                   (push `((,source) . (,(eldev-replace-suffix source source-suffix target-suffix))) result)
-                   (setf scan  nil
-                         found t))))
-             (unless found
-               (error "Builder `%s': name of source file `%s' doesn't end with %s as `:targets' wants"
-                      builder-name source (eldev-message-enumerate nil source-suffixes nil nil "or")))))
-         (nreverse result)))
-      (_ (error "Invalid `:targets' (or its return value) %S in builder `%s'" target-rule builder-name)))))
+    (dolist (invocation (pcase target-rule
+                          ((pred stringp)
+                           `((,sources . (,target-rule))))
+                          ((pred eldev-string-list-p)
+                           `((,sources . ,target-rule)))
+                          (`(,(and (or (pred stringp) (pred eldev-string-list-p)) source-suffixes) -> ,(and (pred stringp) target-suffix))
+                           (setf source-suffixes (eldev-listify source-suffixes))
+                           (let (result)
+                             (dolist (source sources)
+                               (let ((scan source-suffixes)
+                                     found)
+                                 (while scan
+                                   (let ((source-suffix (pop scan)))
+                                     (when (string-suffix-p source-suffix source)
+                                       (push `((,source) . (,(eldev-replace-suffix source source-suffix target-suffix))) result)
+                                       (setf scan  nil
+                                             found t))))
+                                 (unless found
+                                   (error "Builder `%s': name of source file `%s' doesn't end with %s as `:targets' wants"
+                                          builder-name source (eldev-message-enumerate nil source-suffixes nil nil "or")))))
+                             (nreverse result)))
+                          (_ (error "Invalid `:targets' (or its return value) %S in builder `%s'" target-rule builder-name))))
+      ;; Discard builder's wishes that match `eldev-build-ignored-target-fileset'.
+      (let* ((targets (cdr invocation))
+             (ignored (when eldev-build-ignored-target-fileset
+                        (eldev-filter-files targets eldev-build-ignored-target-fileset))))
+        (when ignored
+          (setf ignored-targets (append ignored-targets ignored)))
+        (when (> (length targets) (length ignored))
+          (push `(,(car invocation) . ,(eldev-filter (not (member it ignored)) targets)) invocations))))
+    (when ignored-targets
+      (eldev-trace "%s" (eldev-message-enumerate-files "Ignored potential target%s: %s (%d)" ignored-targets)))
+    (nreverse invocations)))
 
 (defun eldev--build-target-entries (targets builder builder-name sources)
   (let ((sorted-targets (sort (copy-sequence targets) #'string<))
@@ -4967,7 +5002,7 @@ possible to build arbitrary targets this way."
           (let* ((name-version     (eldev--package-name-version))
                  (name-version-dir (file-name-as-directory name-version))
                  (working-dir      (make-temp-file "eldev-packaging-" t))
-                 (descriptor-file  (format "%s-pkg.el" (package-desc-name package)))
+                 (descriptor-file  (eldev-package-descriptor-file-name))
                  temporary-descriptor
                  files-to-tar)
             (condition-case nil

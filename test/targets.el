@@ -65,10 +65,7 @@
     "        project-c-pkg.el"
     "        project-c.el"
     ":compile"
-    ;; We currently don't exclude `no-byte-compile' files from
-    ;; targets, but they will not really be built.
-    "    project-c-pkg.elc  [ELC]"
-    "        project-c-pkg.el"
+    ;; `project-c-pkg.elc' is now omitted because of `eldev-build-ignored-target-fileset'.
     "    project-c.elc  [ELC]"
     "        project-c.el"
     ":package-archive-entry"

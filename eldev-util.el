@@ -976,7 +976,7 @@ Also, eat up several options from BODY if present:
                    (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
                      (unless (= (point-min) (point-max))
                        (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
-                     (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description)))))))
+                     (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
            ,@(or body '(exit-code)))))))
 
 (defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
@@ -1092,6 +1092,18 @@ Try evaluating `(package-buffer-info)' in a buffer with the file" "%s" ,message)
         (run-hooks 'eldev--project-validated-hook)
         (setf eldev--project-validated t)))
     descriptor))
+
+(defun eldev-package-descriptor-file-name (&optional project-dir skip-cache)
+  "Return the file with definition of the package in PROJECT-DIR.
+Usually, most projects don't include this file, it gets built
+automatically.  However, more complicated projects often provide
+a prewritten file.  If not inside a project, return nil, don't
+signal any errors.
+
+Since 0.9."
+  (let ((package (ignore-errors (eldev-package-descriptor project-dir skip-cache))))
+    (when package
+      (format "%s-pkg.el" (package-desc-name package)))))
 
 (defun eldev-find-package-descriptor (package-name &optional version only-if-activated)
   "Find descriptor of the package with given name."
