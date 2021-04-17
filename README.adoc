@@ -90,9 +90,11 @@ Drawbacks:
   include dozens of other packages.
 * Eldev depends much more on Emacs internals.  It is more likely to
   break with future Emacs versions than Cask.
-* Eldev is a recent development and is {uri-search-github}[not widely
-  used], so there can be bugs.  However, Eldev contains a reasonably
-  large regression test collection, so it is not completely untested.
+
+Eldev is not widely used, but as of April 2021 there are
+{uri-search-github}[around 50 projects on GitHub] that include file
+`Eldev`, so it is quite well tested in the wild.  Additionally, Eldev
+contains a fairly large regression test collection.
 
 TIP: If you are using {uri-flycheck}[Flycheck], check out
 {uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
