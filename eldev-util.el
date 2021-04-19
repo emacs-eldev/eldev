@@ -218,6 +218,83 @@ parameter, but it's not needed in noninteractive use."
     (if (> (length value) 0) value if-empty-or-not-set)))
 
 
+(defun eldev-bat-quote (mode &optional string)
+  "Helper function to quote data in a batch file using Delayed
+  Expansion. The :init MODE result has to be inserted first in a
+  batch file to prepare the ground for the other MODEs to work.
+
+  Available MODEs:
+
+  :init
+
+    Returns the prolog required to support the rest of the quoting
+    modes. Basically this sets the ARGS variable to the batch
+    command line arguments, enables delayed expansion and creates
+    the NL variable containing the newline character.
+
+  :args
+
+    Returns the delayed expansion reference to the ARGS variable
+    which holds the command line arguments of the batch file.
+
+  :string
+
+    Returns the quoted STRING using delayed expansion tricks to
+    support multiline text."
+  (pcase mode
+    (`:init
+     (concat "set ARGS=%*\n"
+             "setlocal EnableDelayedExpansion\n"
+             "set NL= ^\n"
+             "\n\nREM the newline variable above MUST be followed by two empty lines."))
+    (`:args "!ARGS!")
+    (`:string
+     (with-temp-buffer
+       ;; begin by opening a double quote while tricking the batch
+       ;; reader to believe that the opening double quote has been
+       ;; closed by using a delayed expansion to the non-existent
+       ;; variable =" which includes a " in its name.
+       ;;
+       ;; Then open a new line and insert STRING.
+       (let ((start "\"!=\"!\n"))
+         (insert start string)
+         (goto-char (length start)))
+
+       ;; escape any double quotes by tripling them.
+       (while (search-forward "\"" nil t)
+         (insert "\"\""))
+
+       ;; close the quoted text with a double quote.
+       (goto-char (point-max))
+       (insert "\n\"")
+
+       ;; escape special characters with ^
+       (goto-char (point-min))
+       (while (re-search-forward "&\\|<" nil t)
+         (replace-match "^\\&"))
+
+       ;; escape % with %%
+       (goto-char (point-min))
+       (while (search-forward "%" nil t)
+         (replace-match "%%"))
+
+       ;; replace any newlines with the delayed expansion of the NL
+       ;; variable followed by the new line escape character ^.
+       ;;
+       ;; The ^ escapes newlines only visually, i.e. the recipient of
+       ;; the quoted string will only see the quoted text as a single
+       ;; line.
+       ;;
+       ;; The delayed expansion of the NL variable though will insert
+       ;; a new line physically, which is the desired behavior when
+       ;; the quoted line is a lisp program with comments in it, since
+       ;; they need to be on dedicated lines.
+       (goto-char (point-min))
+       (while (search-forward "\n" nil t)
+         (replace-match " !NL!^\n"))
+
+       (buffer-substring-no-properties (point-min) (point-max))))))
+
 (defun eldev-quote-sh-string (string &optional always-quote)
   "Quote given STRING for use in a shell command.
 Unlike standard `shell-quote-argument', this function uses single
@@ -1462,5 +1539,9 @@ absolute paths, but are traced without them.  See
           (eldev--do-path-matches actual-path pattern-path-rest)
           (and actual-path-rest (eldev--do-path-matches actual-path-rest pattern-path))))))
 
+(defun eldev--shell-script-name ()
+  (if (eq system-type 'windows-nt)
+      "eldev.bat"
+    "eldev"))
 
 (provide 'eldev-util)

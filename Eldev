@@ -78,7 +78,8 @@ be executed via `install.sh'."
         (eldev-print "  %s" directory)))
     (eldev-print "\nIf you use a different directory, make sure to add it to `PATH'\nenvironment variable.")
     (signal 'eldev-quit 1))
-  (let ((directory (car parameters)))
+  (let ((directory (car parameters))
+        (shell-script-name (eldev--shell-script-name)))
     (if (file-exists-p directory)
         (unless (file-directory-p directory)
           (signal 'eldev-error `("File `%s' exists, but is not a directory" ,directory)))
@@ -87,14 +88,15 @@ be executed via `install.sh'."
               (make-directory directory t)
             (error (eldev--install-self-error error (file-name-directory directory) "When creating directory `%s': %s" directory)))
         (signal 'eldev-error `("Installation aborted"))))
-    (when (file-exists-p (expand-file-name "eldev" directory))
-      (signal 'eldev-error `("File `eldev' already exists in directory `%s'" ,directory)))
+    (when (file-exists-p (expand-file-name shell-script-name directory))
+      (signal 'eldev-error `("File `%s' already exists in directory `%s'" ,shell-script-name ,directory)))
     ;; Unless verbosity level is set explicitly, make it `quiet' for
     ;; building process.
     (let ((eldev-verbosity-level (or eldev-verbosity-level 'quiet)))
       (eldev-build ":package"))
     (condition-case error
-        (copy-file "bin/eldev" (file-name-as-directory directory))
+        (copy-file (format "bin/%s" shell-script-name)
+                   (file-name-as-directory directory))
       (error (eldev--install-self-error error (file-name-as-directory directory) "When copying file `eldev' to directory `%s': %s" directory)))
     ;; Several duplicates with bootstrapping code, but I think it's
     ;; one of those rare cases where this is fine.
