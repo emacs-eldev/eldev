@@ -249,6 +249,21 @@ normal interface, but can be set in a `--setup-first' form.
 
 Since 0.5")
 
+(defvar eldev-known-tool-packages
+  '((buttercup    :version "1.24" :archive  melpa)
+    (package-lint                 :archives (melpa gnu))
+    (relint       :version "1.18" :archive  gnu)
+    (elisp-lint                   :archives (melpa gnu))
+    ;; This is for a plugin, but probably no reason not to have it unconditionally.
+    (undercover   :version "0.8"  :archive  melpa))
+  "Alist of known external tool packages.
+Packages listed here can be referred to as `(:tool PACKAGE-NAME)'
+in places where package alists are understood.  Users can
+customize this variable to influence how Eldev picks up external
+tools.
+
+Since 0.9.")
+
 
 (defvar eldev-force-override nil
   "Set to non-nil to disable all command and option duplicate checks.")
@@ -2017,6 +2032,16 @@ Since 0.2."
                   (`(,(pred symbolp))               `(:package . ,package))
                   (`(,(pred symbolp) ,(pred listp)) `(:package ,(car package) :version ,(cadr package)))
                   (_                                (copy-sequence package))))
+  (let ((tool (plist-get package :tool)))
+    (when tool
+      (unless (equal package `(:tool ,tool))
+        (signal 'eldev-error `("Invalid package specification `%S': `:tool' may not be combined with other keywords" ,package)))
+      (let ((specification (cdr (assq tool eldev-known-tool-packages))))
+        (unless specification
+          (signal 'eldev-error `("Unknown tool `%s'" ,tool)))
+        (setf package `(:package ,tool ,@specification)))))
+  (unless (and (listp package) (plist-get package :package))
+    (signal 'eldev-error `("Invalid package specification `%S': there is no package name in it" ,package)))
   (unless (or (null default-archives) (plist-member package :archive) (plist-member package :archives))
     (setf package (plist-put package :archives default-archives)))
   (when optional
@@ -2878,7 +2903,7 @@ Should normally be specified only from command line.")
                                                                               (eldev-test-ert-save-results)))))
                                       (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
                                                     (features             . buttercup)
-                                                    (packages             . ((:package buttercup :archive melpa :version "1.24")))
+                                                    (packages             . ((:tool buttercup)))
                                                     (require              . eldev-buttercup)
                                                     (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
                                                     (run-tests            . (lambda (selectors _runner environment)
@@ -3539,7 +3564,7 @@ least one warning."
   :aliases        (package-lint pack)
   :default        t
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
-  (eldev-add-extra-dependencies 'runtime '(:package package-lint :archives (melpa gnu)))
+  (eldev-add-extra-dependencies 'runtime '(:tool package-lint))
   (eldev-load-extra-dependencies 'runtime)
   ;; This linter needs access to package archive contents, so at least fetch all archives
   ;; we have never fetched yet.
@@ -3573,7 +3598,7 @@ least one warning."
   "Find errors, deprecated syntax etc. in regular expressions."
   :aliases        (relint regex regexp)
   :default        t
-  (eldev-add-extra-dependencies 'runtime '(:package relint :archive gnu :version "1.18"))
+  (eldev-add-extra-dependencies 'runtime '(:tool relint))
   (eldev-load-extra-dependencies 'runtime)
   (require 'relint)
   ;; I see no way to avoid diving into internals.
@@ -3597,7 +3622,7 @@ also runs `package-lint', so you either shouldn't run both or
 change `elisp-lint's configuration."
   :aliases        (elisp-lint el)
   ;; Need GNU ELPA for `let-alist' on older Emacs versions.
-  (eldev-add-extra-dependencies 'runtime '(:package elisp-lint :archives (melpa gnu)))
+  (eldev-add-extra-dependencies 'runtime '(:tool elisp-lint))
   ;; This linter might need access to package dependencies for byte-compilation.
   (eldev-load-project-dependencies 'runtime nil t)
   ;; This linter might invoke `package-lint' that needs access to package archive

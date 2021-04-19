@@ -34,4 +34,19 @@
       (should (= exit-code 0)))))
 
 
+;; Not a bug, just doesn't seem to fit anywhere else.  Test that
+;; `eldev-known-tool-packages' can be customized.
+(ert-deftest eldev-known-tool-packages-1 ()
+  (let ((eldev--test-project "trivial-project"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(push '(relint :archive relint-pseudoarchive) eldev-known-tool-packages)
+                          "--setup" `(setf eldev--known-package-archives '((relint-pseudoarchive ("relint-pseudoarchive" . ,(expand-file-name "../relint-pseudoarchive")) 0)))
+                          "eval" `(progn (eldev-add-extra-dependencies 'runtime '(:tool relint))
+                                         (eldev-load-extra-dependencies 'runtime)
+                                         (require 'relint)
+                                         (relint-hello)))
+      (should (string= stdout "\"Hello, I'm a fake\"\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/integration/misc)

@@ -316,7 +316,7 @@ plugin documentation for more information."
           (t
            (let ((files (eldev-find-and-trace-files '(:and (eldev-standard-filesets 'main) eldev-undercover-fileset) "file%s for `undercover' to instrument" 'dont-trace)))
              (when files
-               (eldev-add-extra-dependencies 'runtime '(:package undercover :version "0.8" :archives melpa))
+               (eldev-add-extra-dependencies 'runtime '(:tool undercover))
                (eldev-load-extra-dependencies 'runtime)
                (require 'undercover)
                (setf undercover-force-coverage (not (eq mode 'auto)))
