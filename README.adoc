@@ -167,11 +167,14 @@ There are several ways to install Eldev.
 
 [discrete]
 ==== Bootstrapping from MELPA: if you have a catch-all directory for executables
-
-. From this directory (e.g. `~/bin`) execute:
-+
 --
+* On Unix, from this directory (e.g. `~/bin`) execute:
++
     $ curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
+
+* On Windows, from this directory (e.g. `%USERPROFILE%\bin`) execute:
++
+    $ curl.exe -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev.bat > eldev.bat
 
 You can even do this from `/usr/local/bin` provided you have the
 necessary permissions.
@@ -182,6 +185,8 @@ first invocation.
 
 [discrete]
 ==== Bootstrapping from MELPA: general case
+
+===== Unix
 
 . Execute:
 +
@@ -194,6 +199,21 @@ This will install `eldev` script to `~/.eldev/bin`.
 . Add the directory to your `$PATH`; e.g. in `~/.profile` add this:
 +
       export PATH="$HOME/.eldev/bin:$PATH"
+
+===== Windows
+
+. Execute:
++
+--
+    $ curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd
+
+This will install `eldev.bat` script to `%USERPROFILE%\.eldev\bin`.
+--
+
+. Add the directory to your `%PATH%`:
++
+      reg add HKCU\Environment /v Path /d "%USERPROFILE%\.eldev\bin;%PATH%" /f
+
 
 Afterwards Eldev will bootstrap itself as needed on first invocation.
 
