@@ -21,14 +21,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', 'snapshot']
+        emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', '27.2', 'snapshot']
         include:
           - os: macos-latest
-            emacs_version: '26.3'
+            emacs_version: '27.2'
           - os: macos-latest
             emacs_version: 'snapshot'
           - os: windows-latest
-            emacs_version: '27.1'
+            emacs_version: '27.2'
 
     steps:
     - name: Set up Emacs
