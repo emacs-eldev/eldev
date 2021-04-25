@@ -48,6 +48,7 @@ endif::[]
 :since-0-6: image:https://img.shields.io/badge/since-0.6-8be[Since 0.6,float=right]
 :since-0-7: image:https://img.shields.io/badge/since-0.7-8be[Since 0.7,float=right]
 :since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
+:since-0-9: image:https://img.shields.io/badge/since-0.9-8be[Since 0.9,float=right]
 
 = Eldev
 
@@ -79,6 +80,7 @@ Eldev features:
 * You can use local dependencies, even those that don’t use Eldev
   (though some restrictions do apply, of course).  This is similar to
   Cask linking, but with more flexibility.
+* Runs on all major operating systems: Linux, macOS, Windows.
 * Eldev is fast.
 
 Drawbacks:
@@ -89,9 +91,12 @@ Drawbacks:
   include dozens of other packages.
 * Eldev depends much more on Emacs internals.  It is more likely to
   break with future Emacs versions than Cask.
-* Eldev is a recent development and is {uri-search-github}[not widely
-  used], so there can be bugs.  However, Eldev contains a reasonably
-  large regression test collection, so it is not completely untested.
+
+Eldev is not widely used, but as of April 2021 there are
+{uri-search-github}[around 50 projects on GitHub] that include file
+`Eldev`, so it is already quite well tested in the wild.
+Additionally, Eldev contains a fairly large regression test
+collection.
 
 TIP: If you are using {uri-flycheck}[Flycheck], check out
 {uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
@@ -149,10 +154,10 @@ files `Eldev` in these projects are documented below.
 Eldev runs on Emacs 24.4 and up.  On earlier Emacs versions it will be
 overly verbose, but this is rather an Emacs problem.
 
-Linux, macOS or other POSIX-like system is currently required.
-However, since there is only a small shell script that is really
-OS-dependent, porting to other systems should not be difficult
-(volunteers welcome).
+Any “typical” OS — Linux, macOS, Windows or any POSIX-like system not
+listed earlier — will do.  Additionally, since there is only a small
+shell script (`.bat` file for Windows) that is really OS-dependent,
+porting to other systems should not be difficult, volunteers welcome.
 
 Eldev intentionally has no dependencies, at least currently: otherwise
 your project would also see them, which could in theory lead to some
@@ -165,6 +170,7 @@ There are several ways to install Eldev.
 [discrete]
 ==== Bootstrapping from MELPA: if you have a catch-all directory for executables
 
+* On Linux, macOS, etc.:
 . From this directory (e.g. `~/bin`) execute:
 +
 --
@@ -174,12 +180,20 @@ You can even do this from `/usr/local/bin` provided you have the
 necessary permissions.
 --
 
+* On Windows:
+. From this directory (e.g. `%USERPROFILE%\bin`) execute:
++
+--
+    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev.bat > eldev.bat
+--
+
 No further steps necessary — Eldev will bootstrap itself as needed on
 first invocation.
 
 [discrete]
 ==== Bootstrapping from MELPA: general case
 
+* On Linux, macOS, etc.:
 . Execute:
 +
 --
@@ -188,49 +202,64 @@ first invocation.
 This will install `eldev` script to `~/.eldev/bin`.
 --
 
-. Add the directory to your `$PATH`; e.g. in `~/.profile` add this:
+. Add the directory to your `PATH`; e.g. in `~/.profile` add this:
 +
-      export PATH="$HOME/.eldev/bin:$PATH"
+    export PATH="$HOME/.eldev/bin:$PATH"
+
+* On Windows:
+. Execute:
++
+--
+    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd
+
+This will install `eldev.bat` script to `%USERPROFILE%\.eldev\bin`.
+--
+
+. Add this directory to your `PATH`:
++
+    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.eldev\bin;%PATH%" /f
 
 Afterwards Eldev will bootstrap itself as needed on first invocation.
 
-TIP: `eldev` doesn’t _really_ need to be findable through `$PATH` — it
+TIP: `eldev` doesn’t _really_ need to be findable through `PATH` — it
 will work regardless.  This is rather for your convenience, so that
 you don’t need to type the full path again and again.
-
 
 [discrete]
 ==== Installing from sources
 
 . Clone the source tree from GitHub.
 
-. In the cloned working directory execute:
+. In the cloned working directory execute,
+* on Linux, macOS, etc.:
 +
---
     $ ./install.sh DIRECTORY
++
+* on Windows:
++
+    > install.bat DIRECTORY
 
 Here `DIRECTORY` is the location of `eldev` executable should be put.
-It should be in `$PATH` environment variable, or else you will need to
+It should be in `PATH` environment variable, or else you will need to
 specify full path each time you invoke Eldev.  You probably have
-sth. like `~/bin` in your `$PATH` already, which would be a good value
+sth. like `~/bin` in your `PATH` already, which would be a good value
 for `DIRECTORY`.  You could even install in e.g. `/usr/local/bin` —
 but make sure you have permissions first.
---
 
 [discrete]
 ==== Mostly for developing Eldev itself
 
 . Clone the source tree from GitHub.
 
-. Set environment variable `$ELDEV_LOCAL` to the full path of the
+. Set environment variable `ELDEV_LOCAL` to the full path of the
   working directory.
 
 . Make sure executable `eldev` is available.  Either follow any of the
   first way to install Eldev, or symlink/copy file `bin/eldev` from
-  the cloned directory to somewhere on your `$PATH`.
+  the cloned directory to somewhere on your `PATH`.
 
 Now each time Eldev is executed, it will use the sources at
-`$ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
+`ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
 immediately.
 
 === Upgrading Eldev
@@ -548,6 +577,56 @@ The following commands make use of additional dependencies: `build`,
 also take advantage of this mechanism, see function
 `eldev-load-project-dependencies`.
 
+[#extended-dependency-format]
+==== Extended dependency format
+
+{since-0-2} Normally to specify an additional dependency you just need
+to provide its package name as a symbol.  However, Eldev also supports
+“extended” format, that lets you specify other details.  In this
+format, dependency is specified as a property list (plist):
+
+[source]
+----
+(:package  DEPENDENCY-NAME
+ :version  REQUIRED-VERSION
+ :archive  PACKAGE-ARCHIVE
+ :archives (PACKAGE-ARCHIVE...)
+ :optional OPTIONAL)
+----
+
+All keywords except `:package` can be omitted.  In the extended format
+you can specify which version of the dependency is required (normally,
+any version will do) and which package archive(s) to use (by default,
+the same archives as for normal dependencies are used).  In values
+associated with `:archive`/`:archives` standard shortcuts `gnu` (for
+GNU ELPA) and `melpa` (for MELPA; also `melpa-stable` and
+`melpa-unstable`) can be used.  Dependencies can also be marked as
+optional, see the next subsection.
+
+{since-0-9} There is also a special format for referring to certain
+tools like <<buttercup,Buttercup>>: `(:tool TOOL-NAME)`.  For details,
+refer to section <<development-tool-sources,Development tool
+sources>>.
+
+==== Optional additional dependencies
+
+{since-0-9} Suppose you want to test your project’s integration with a
+third-party package, but don’t strictly _need_ it.  And, additionally,
+relevant tests are written in such a way as to simply be skipped if
+said package is not available, e.g. using `ert-skip` or
+`buttercup-skip`.  In this case you may want to declare the package as
+an _optional additional dependency_, so that you don't need to care if
+it can be installed during continuous integration or not:
+
+[source]
+----
+(eldev-add-extra-dependencies 'test '(:package helm :optional t))
+----
+
+In this example, we declare that we want Helm for testing, but don't
+care much if it cannot be installed, e.g. because of too old Emacs
+version.
+
 === Examining dependencies
 
 Sometimes it is useful to check what a project depends on, especially
@@ -634,13 +713,46 @@ your project at least once, so that Eldev knows about the need for
 this tool.
 
 Development tools are installed from package archives hardcoded inside
-Eldev, regardless of which archives you have configured for your
-project.  For example, even if you use `melpa-unstable` archive,
-Buttercup will still be installed from MELPA Stable (unless, of
-course, you use `--unstable` global option).  If you need, you can
-switch to unstable version of the tool later:
+Eldev (but see <<development-tool-sources,the next section>>),
+regardless of which archives you have configured for your project.
+For example, even if you use `melpa-unstable` archive, Buttercup will
+still be installed from MELPA Stable (unless, of course, you use
+`--unstable` global option).  If you need, you can switch to unstable
+version of the tool later:
 
     $ eldev --unstable upgrade buttercup
+
+[#development-tool-sources]
+=== Development tool sources
+
+Eldev knows how to install certain development tools and also uses
+predefined package archives for this, not the ones you specify in
+project’s configuration.  This means you don’t need to list archives
+for tools like <<buttercup,Buttercup>>: only list them if they are
+needed to look up real dependencies.
+
+{since-0-9} There is a simple way to customize where exactly Eldev
+finds the tools: use variable `eldev-known-tool-packages` for this.
+The value of the variable is an alist keyed by tool names and
+containing <<extended-dependency-format,package descriptor plists>> as
+values.  By default it already contains information about the tools
+Eldev knows about.  You can add more or replace existing ones if you
+need: just `push` more entries at the beginning of the list, there is
+no need to actually remove anything.
+
+You can also use the tools as e.g. runtime dependencies if needed
+(though in most cases you should leave this to Eldev).  Just specify
+package plist as `(:tool TOOL-NAME)` for this.  Both tools with
+built-in support and any new you add to `eldev-known-tool-packages`
+can be referred this way.
+
+Current list of the known tools:
+
+* `buttercup`
+* `package-lint`
+* `relint`
+* `elisp-lint`
+* `undercover`
 
 [#global-cache]
 === Global package archive cache
@@ -1439,7 +1551,7 @@ Emacs, it will not use dependencies or previous test results, but
 rather install or recompute them from scratch.
 
 Normally, Eldev uses command `emacs` that is supposed to be resolvable
-through `$PATH` environment variable.  However, you can always tell it
+through `PATH` environment variable.  However, you can always tell it
 to use a different Emacs version by setting either `ELDEV_EMACS` or
 just `EMACS` in the environment, e.g.:
 
@@ -1488,7 +1600,7 @@ version is to use {uri-setup-emacs}[`purcell/setup-emacs`] action
 provides), it is likely unsuitable for GitHub workflows.
 
 There is a short shell script that installs Eldev itself for use on
-GitHub runners.  Modifying `$PATH` there is a bit tricky, so you
+GitHub runners.  Modifying `PATH` there is a bit tricky, so you
 probably should just go with the script, as demonstrated below.
 
 A basic workflow file (you can e.g. name it
@@ -1578,7 +1690,7 @@ script:
 ==== nix-emacs-ci
 
 A newer tool to install Emacs is {uri-nix-emacs}[nix-emacs-ci].  Using
-it is easy: define environment variable `$EMACS_CI` with the desired
+it is easy: define environment variable `EMACS_CI` with the desired
 Emacs version and `curl` a single shell script — whether on Linux or
 macOS.  With one more line you can also install Eldev.  It appears to
 be slower than EVM, but for continuous integration that’s not terribly
@@ -1610,7 +1722,7 @@ be used to install Emacs on it.  Some projects successfully use
 {uri-docker}[Docker] images.
 
 Regardless of how you install Emacs, adding Eldev is yet another
-one-liner.  It is handy to use, because propagating `$PATH`
+one-liner.  It is handy to use, because propagating `PATH`
 modifications between different commands on CircleCI is somewhat
 non-obvious.  To use it, add the following lines in the relevant place
 in file `.circleci/config.yml`:
@@ -2356,7 +2468,7 @@ A few environment variables can affect Eldev’s behavior.
 
     Use given Emacs executable (also for any child processes).  If not
     specified, this defaults to just `emacs`, which is expected
-    somewhere in `$PATH`.
+    somewhere in `PATH`.
 
 `ELDEV_LOCAL`::
 
