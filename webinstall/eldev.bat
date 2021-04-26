@@ -3,7 +3,7 @@ rem This script downloads Eldev startup script as `%USERPROFILE%/.eldev/bin/elde
 
 rem optionally pass download URL as paramater to allow testing in PRs
 set URL=https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev.bat
-IF [%1] == [] IF NOT %1 == "%1" set URL=%1
+IF NOT "%~1" == "" set URL=%1
 
 set ELDEV_BIN_DIR=%USERPROFILE%\.eldev\bin
 
