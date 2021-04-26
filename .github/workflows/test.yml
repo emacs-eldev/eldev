@@ -39,13 +39,9 @@ jobs:
 
     - name: Set up Emacs on Windows
       if: startsWith (matrix.os, 'windows')
-      run: |
-        Set-ExecutionPolicy RemoteSigned -scope CurrentUser
-        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-        scoop update
-        scoop bucket add extras
-        scoop install emacs@${{ matrix.emacs_version }}
-        echo "$env:PATH" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+      uses: jcs090218/setup-emacs-windows@master
+      with:
+        version: ${{matrix.emacs_version}}
 
     - name: Set up additional packages (Ubuntu)
       if: startsWith (matrix.os, 'ubuntu')
