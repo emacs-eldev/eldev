@@ -25,7 +25,7 @@
           (setf package-archives `(("bootstrap-pa" . ,(file-name-as-directory (substring eldev-local (length ":pa:")))))
                 archive-name     "a local package archive")
         (with-temp-buffer
-          (insert-file-contents-literally (expand-file-name "eldev.el" eldev-local))
+          (insert-file-contents (expand-file-name "eldev.el" eldev-local))
           (setf eldev-pkg                    (package-buffer-info)
                 (package-desc-dir eldev-pkg) (expand-file-name eldev-local))
           ;; Currently Eldev has no external dependencies, but let's be generic.

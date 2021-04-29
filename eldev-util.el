@@ -407,6 +407,49 @@ form is executed at the end.
                `(,@body ,cleanup))
            body))))
 
+(defmacro with-eldev-normalized-package-file (file &rest body)
+  "If FILE is an .el file with DOS CRLF line endings, convert it
+to Unix LF endings in a temporary file and rebind FILE to it, so
+that is used instead as an argument to `package-install-file'
+somewhere in BODY.
+
+This is to get around Emacs bug#48137 which errors out when the
+argument to `package-install-file' is a file with DOS line
+endings."
+  (let ((file* file)) ; the symbol name to rebind if necessary
+    `(if (not (string-match "\\.el\\'" ,file))
+         (progn
+           ,@body)
+
+       ;; load package file and check if it contains CRLFs
+       (with-temp-buffer
+         (insert-file-contents-literally ,file)
+         (goto-char (point-min))
+         (if (not (search-forward "\r\n" nil t))
+             (progn ;; no CRLFs
+               ,@body)
+
+           ;; CRLF found
+           (let* ((nondir (file-name-nondirectory ,file))
+                  (temp-dir (make-temp-file "eldev" t))
+                  (temp-file (expand-file-name nondir temp-dir)))
+
+             (unwind-protect
+                 ;; replace CRLFs with LFs and write to new temporary
+                 ;; package file
+                 (progn
+                   (replace-match "\n" nil t)
+                   (while (search-forward "\r\n" nil t)
+                     (replace-match "\n" nil t))
+                   (write-region (point-min) (point-max) temp-file)
+
+                   ;; re-bind FILE to temp package file and eval BODY
+                   (let ((,file* temp-file))
+                     (progn
+                       ,@body)))
+
+               ;; clean up temporary file
+               (delete-directory temp-dir t))))))))
 
 
 ;; Output.
@@ -1231,7 +1274,8 @@ is non-nil when this function is called."
                                          ;; `package--load-files-for-activation' in newer versions.
                                          (let ((pkg-dir (expand-file-name (package-desc-full-name pkg-desc) package-user-dir)))
                                            (eldev--package--load-files-for-activation (package-load-descriptor pkg-dir) :reload)))))
-      (package-install-file file))))
+      (with-eldev-normalized-package-file file
+        (package-install-file file)))))
 
 
 ;; The following four functions are copied over from Emacs source.  They appeared in 25.1.
