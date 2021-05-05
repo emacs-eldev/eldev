@@ -27,30 +27,30 @@
          (should (= exit-code 0))
          (setf descriptor (read stdout)))
        (ignore-errors (delete-directory test-emacs-dir t))
-       (with-eldev-normalized-package-file package-file
-         (eldev--test-call-process "Emacs" eldev-emacs-executable
-                                   ("--batch" "--no-site-file" "--no-site-lisp" "--execute"
-                                    `(progn
-                                       (require 'package)
-                                       (let ((package-user-dir ,test-emacs-dir)
-                                             ;; Just use all we have, no need to
-                                             ;; tailor for each test specifically.
-                                             (package-archives '(("archive-a" . ,(expand-file-name "package-archive-a/" (eldev--test-dir)))
-                                                                 ("archive-b" . ,(expand-file-name "package-archive-b/" (eldev--test-dir))))))
-                                         (package-initialize t)
-                                         (package-refresh-contents)
-                                         (package-install-file ,package-file)
-                                         (package-activate ',(package-desc-name descriptor))
-                                         (prin1 (cadr (assq ',(package-desc-name descriptor) package-alist)))
-                                         ,',child-emacs-form)))
-           (should (= exit-code 0))
-           ;; Cannot compare just like that.
-           (let ((installed-desciptor (read stdout)))
-             (should (equal (package-desc-name    descriptor) (package-desc-name    installed-desciptor)))
-             (should (equal (package-desc-version descriptor) (package-desc-version installed-desciptor)))
-             (should (equal (package-desc-reqs    descriptor) (package-desc-reqs    installed-desciptor)))
-             (should (equal (package-desc-extras  descriptor) (package-desc-extras  installed-desciptor))))
-           ,@body)))))
+       (eldev--test-call-process "Emacs" eldev-emacs-executable
+                                 ("--batch" "--no-site-file" "--no-site-lisp" "--execute"
+                                  `(progn
+                                     (require 'package)
+                                     (let ((package-user-dir ,test-emacs-dir)
+                                           ;; Just use all we have, no need to
+                                           ;; tailor for each test specifically.
+                                           (package-archives '(("archive-a" . ,(expand-file-name "package-archive-a/" (eldev--test-dir)))
+                                                               ("archive-b" . ,(expand-file-name "package-archive-b/" (eldev--test-dir))))))
+                                       (package-initialize t)
+                                       (package-refresh-contents)
+                                       (load (expand-file-name "./eldev-util.el"))
+                                       (eldev--package-install-file ,package-file)
+                                       (package-activate ',(package-desc-name descriptor))
+                                       (prin1 (cadr (assq ',(package-desc-name descriptor) package-alist)))
+                                       ,',child-emacs-form)))
+         (should (= exit-code 0))
+         ;; Cannot compare just like that.
+         (let ((installed-desciptor (read stdout)))
+           (should (equal (package-desc-name    descriptor) (package-desc-name    installed-desciptor)))
+           (should (equal (package-desc-version descriptor) (package-desc-version installed-desciptor)))
+           (should (equal (package-desc-reqs    descriptor) (package-desc-reqs    installed-desciptor)))
+           (should (equal (package-desc-extras  descriptor) (package-desc-extras  installed-desciptor))))
+         ,@body))))
 
 
 (ert-deftest eldev-package-1 ()
