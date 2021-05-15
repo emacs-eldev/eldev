@@ -16,7 +16,7 @@ if "%ELDEV_EMACS%" == "" (
    )
 )
 
-set ELDEV_CMD=%0
+set ELDEV_CMD=%~0
 
 set ELDEV_TTY=
 call :CON_ANSI_SUPPORT? %CMDCMDLINE%

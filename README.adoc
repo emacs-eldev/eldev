@@ -210,7 +210,7 @@ This will install `eldev` script to `~/.eldev/bin`.
 . Execute:
 +
 --
-    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd
+    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
 
 This will install `eldev.bat` script to `%USERPROFILE%\.eldev\bin`.
 --

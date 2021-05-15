@@ -1126,6 +1126,39 @@ Since 0.2.")
               (error "No .el files with package headers in `%s'" default-directory))
             info))))))
 
+;; Compatibility function.
+(defun eldev--package-install-file (file)
+  ;; Workaround: `package-install-file' fails when FILE is .el and contains CRLF EOLs:
+  ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48137
+  (if (not (string-match "\\.el\\'" file))
+      (package-install-file file)
+
+    ;; load package file and check if it contains CRLFs
+    (with-temp-buffer
+      (insert-file-contents-literally file)
+      (goto-char (point-min))
+      (if (not (search-forward "\r\n" nil t))
+          (package-install-file file) ;; no cllf
+
+        ;; CRLF found
+        (let* ((nondir (file-name-nondirectory file))
+               (temp-dir (make-temp-file "eldev" t))
+               (temp-file (expand-file-name nondir temp-dir)))
+
+          (unwind-protect
+              ;; replace CRLFs with LFs and write to new temporary
+              ;; package file
+              (progn
+                (replace-match "\n" nil t)
+                (while (search-forward "\r\n" nil t)
+                  (replace-match "\n" nil t))
+                (write-region (point-min) (point-max) temp-file)
+
+                (package-install-file temp-file))
+
+            ;; clean up temporary file
+            (delete-directory temp-dir t)))))))
+
 (declare-function eldev--cross-project-internal-eval "eldev" (project-dir form &optional use-caching))
 
 (defvar eldev--project-validated nil)
@@ -1231,7 +1264,7 @@ is non-nil when this function is called."
                                          ;; `package--load-files-for-activation' in newer versions.
                                          (let ((pkg-dir (expand-file-name (package-desc-full-name pkg-desc) package-user-dir)))
                                            (eldev--package--load-files-for-activation (package-load-descriptor pkg-dir) :reload)))))
-      (package-install-file file))))
+      (eldev--package-install-file file))))
 
 
 ;; The following four functions are copied over from Emacs source.  They appeared in 25.1.

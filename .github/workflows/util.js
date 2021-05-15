@@ -7,8 +7,8 @@ const suffix = (os.type() === 'Windows_NT') ? '.bat' : '';
 // (depending on context) automatically adds (.bat) extension to path
 // if running on windows to make Github actions steps platform agnostic
 function getRawUrl(context, path) {
-    const {repository, pull_request} = context.payload;
-    const branch = pull_request ? pull_request.head.ref : repository.default_branch;
+    const {repository, pull_request, ref} = context.payload;
+    const branch = pull_request ? pull_request.head.ref : ref.replace(/refs\/.+?\//, "");
     const repo_full_name = pull_request ? pull_request.head.repo.full_name : repository.full_name;
     return `https://raw.github.com/${repo_full_name}/${branch}/${path}${suffix}`;
 }

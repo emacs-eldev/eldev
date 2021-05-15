@@ -16,7 +16,7 @@ if "%ELDEV_EMACS%" == "" (
    )
 )
 
-set ELDEV_CMD=%0
+set ELDEV_CMD=%~0
 
 set ELDEV_TTY=
 call :CON_ANSI_SUPPORT? %CMDCMDLINE%
@@ -59,7 +59,7 @@ REM the newline variable above MUST be followed by two empty lines.
           (setf package-archives `(("""bootstrap-pa""" . ,(file-name-as-directory (substring eldev-local (length """:pa:"""))))) !NL!^
                 archive-name     """a local package archive""") !NL!^
         (with-temp-buffer !NL!^
-          (insert-file-contents-literally (expand-file-name """eldev.el""" eldev-local)) !NL!^
+          (insert-file-contents (expand-file-name """eldev.el""" eldev-local)) !NL!^
           (setf eldev-pkg                    (package-buffer-info) !NL!^
                 (package-desc-dir eldev-pkg) (expand-file-name eldev-local)) !NL!^
           ;; Currently Eldev has no external dependencies, but let's be generic. !NL!^
