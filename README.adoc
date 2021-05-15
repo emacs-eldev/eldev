@@ -2083,14 +2083,17 @@ specific project that you maintain.
 === Hooks
 
 Eldev defines several hooks executed at different times (more might be
-added later).
+added later).  Due to historical reasons, Eldev doesn’t follow Emacs
+naming convention on using `-hook` only for standard hooks (i.e. those
+not accepting any arguments) and `-functions` in other cases.
+Functions for many of the hooks listed below do receive arguments.
 
-`eldev-executing-command-hook`::
+`eldev-executing-command-hook (COMMAND)`::
 
     Run before executing any command.  Command name (as a symbol) is
     passed to the hook’s functions as the only argument.  This is
-    always the “canonical” command name, even if it is run using an
-    alias.
+    always the “canonical” command name, even if it is executed using
+    an alias.
 
 `eldev-COMMAND-hook`::
 
@@ -2098,7 +2101,7 @@ added later).
     arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
     print a disclaimer about its fairly slow tests.
 
-{since-0-2} `eldev-load-dependencies-hook`::
+{since-0-2} `eldev-load-dependencies-hook (TYPE ADDITIONAL-SETS)`::
 
     Executed after successfully loading dependencies.  Functions are
     called with arguments `TYPE` and `ADDITIONAL-SETS`.  `TYPE` is
@@ -2109,7 +2112,7 @@ added later).
     loaded at all: only some additional sets).  The second is a list
     of <<additional-dependencies,additional dependency sets>>.
 
-{since-0-6} `eldev-before-loading-dependencies-hook`::
+{since-0-6} `eldev-before-loading-dependencies-hook (TYPE ADDITIONAL-SETS)`::
 
     Similar to the previous hook, but called _before_ dependencies are
     loaded.  Function arguments are the same.
@@ -2121,7 +2124,7 @@ added later).
     build system: it would be impractical to add the same function to
     all three hooks.
 
-{since-0-2} `eldev-test-FRAMEWORK-hook`::
+{since-0-2} `eldev-test-FRAMEWORK-hook (SELECTORS)`::
 
     Called immediately before executing tests with given framework
     (<<ert,ERT>> or <<buttercup,Buttercup>>).  Functions on the hook
