@@ -1634,6 +1634,7 @@ be executed."
   ;; dependencies, which of course fails.
   (when eldev-too-old
     (signal 'eldev-too-old eldev-too-old))
+  (setf additional-sets (eldev-listify additional-sets))
   (run-hook-with-args 'eldev-before-loading-dependencies-hook (if load-only 'load-only t) additional-sets)
   (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing)
   (run-hook-with-args 'eldev-load-dependencies-hook (if load-only 'load-only t) additional-sets))
@@ -1645,6 +1646,7 @@ that the project itself and its normal dependencies are not
 loaded.  Mostly useful to load runtime dependencies.
 
 Since 0.2."
+  (setf sets (eldev-listify sets))
   (run-hook-with-args 'eldev-before-loading-dependencies-hook nil sets)
   (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing)
   (run-hook-with-args 'eldev-load-dependencies-hook nil sets))
