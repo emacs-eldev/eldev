@@ -1969,8 +1969,11 @@ Since 0.2."
         (add-to-list 'load-path eldev-project-dir t)))))
 
 (defun eldev--unload-self ()
-  (dolist (feature (eldev-filter (string-match-p (rx bol "eldev" (? "-" (1+ any)) eol) (symbol-name it)) features))
-    (unload-feature feature t)))
+  ;; We don't really unload ourselves, because this causes hard to understand problems due
+  ;; to hooks etc., even if we don't directly call any functions before loading again.
+  ;; However, the intent is not really to unload, but rather to _reload_ the package, so
+  ;; just removing the features from the list of loaded ones should be enough.
+  (setf features (eldev-filter (not (string-match-p (rx bol "eldev" (? "-" (1+ any)) eol) (symbol-name it))) features)))
 
 (defun eldev--do-activate-dependencies (package-name dependencies additional-sets no-error-if-missing)
   ;; Also add the additional loading roots here.
