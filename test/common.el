@@ -359,7 +359,8 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
       (prin1 `(1 ,(with-temp-buffer
                     (insert-file-contents-literally (expand-file-name (format "eldev-%s.entry" (or forced-version (eldev-message-version (eldev-package-descriptor)))) archive-dir))
                     (read (current-buffer))))
-             (current-buffer)))))
+             (current-buffer)))
+    archive-dir))
 
 
 (defun eldev--test-skip-if-missing-linter (exit-code stderr)

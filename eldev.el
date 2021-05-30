@@ -1883,8 +1883,9 @@ Since 0.2."
                    (when (and dry-run (> non-local-plan-size 0))
                      (eldev-verbose "In dry-run mode Eldev only pretends it is upgrading, installing or deleting dependencies"))
                    (dolist (dependency planned-packages)
-                     (let ((previous-version (cdr dependency))
-                           (dependency       (car dependency)))
+                     (let* ((previous-version (cdr dependency))
+                            (dependency       (car dependency))
+                            (dependency-name  (package-desc-name dependency)))
                        (if (and (not self) (eldev--loading-mode dependency))
                            (eldev--load-local-dependency dependency)
                          (setf dependency-index (1+ dependency-index))
@@ -1893,17 +1894,29 @@ Since 0.2."
                                                       "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
                                                     "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
                                           dependency-index non-local-plan-size
-                                          (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
+                                          (eldev-colorize dependency-name 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
                                           (package-desc-archive dependency))
                            (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
                                         dependency-index non-local-plan-size
-                                        (eldev-colorize (package-desc-name dependency) 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
+                                        (eldev-colorize dependency-name 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
                          (unless dry-run
                            (let ((inhibit-message t))
                              (eldev--with-pa-access-workarounds (lambda ()
                                                                   (eldev-using-global-package-archive-cache
                                                                     (condition-case error
-                                                                        (package-install-from-archive dependency)
+                                                                        (let ((original-load-path load-path))
+                                                                          (unwind-protect
+                                                                              (progn
+                                                                                ;; See `eldev-upgrade-self-new-macros-1'.
+                                                                                (when (eq dependency-name 'eldev)
+                                                                                  (eldev--unload-self))
+                                                                                (package-install-from-archive dependency))
+                                                                            (when (eq dependency-name 'eldev)
+                                                                              ;; Reload the current package again, so that we
+                                                                              ;; don't mix old and new function invocations.
+                                                                              (eldev--unload-self)
+                                                                              (let ((load-path original-load-path))
+                                                                                (require 'eldev)))))
                                                                       (file-error (let ((url (eldev--guess-url-from-file-error error)))
                                                                                     (when (stringp url)
                                                                                       (dolist (archive archive-statuses)
@@ -1954,6 +1967,10 @@ Since 0.2."
       ;; from `eval' command), but at _the end_.
       (when (eq core 'project)
         (add-to-list 'load-path eldev-project-dir t)))))
+
+(defun eldev--unload-self ()
+  (dolist (feature (eldev-filter (string-match-p (rx bol "eldev" (? "-" (1+ any)) eol) (symbol-name it)) features))
+    (unload-feature feature t)))
 
 (defun eldev--do-activate-dependencies (package-name dependencies additional-sets no-error-if-missing)
   ;; Also add the additional loading roots here.
