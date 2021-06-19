@@ -81,6 +81,9 @@
 ;; incorrectly, against old (or missing) definitions.
 (eldev-ert-defargtest eldev-upgrade-self-new-macros-1 (mode)
                       ('normal 'external)
+  (when (eq system-type 'windows-nt)
+    ;; The issue is in editing `.tar' archive with Emacs.
+    (ert-skip "this test is known to fail on Windows because of an issue unrelated to Eldev"))
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (let ((inhibit-message t)
         (archive-2-dir   (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"))
