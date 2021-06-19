@@ -377,9 +377,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
        ;; Apparently we cannot get away with unnamed lambdas here.
        (defun ,function ,arguments ,@body)
        ,@(mapcar (lambda (arg-values)
-                   `(ert-deftest ,(intern (format "%s/%s" name (downcase (replace-regexp-in-string " " "/" (replace-regexp-in-string (rx (not (any word "-" " "))) "" (prin1-to-string arg-values)))))) ()
+                   `(ert-deftest ,(intern (format "%s/%s" name (eldev--ert-defargtest-format-arguments arg-values))) ()
                       (,function ,@(if (= (length arguments) 1) (list arg-values) arg-values))))
                  values))))
+
+(defun eldev--ert-defargtest-format-arguments (arguments)
+  (let ((print-quoted t))
+    (downcase (replace-regexp-in-string " " "/" (replace-regexp-in-string (rx (not (any word "-" " "))) "" (prin1-to-string arguments))))))
 
 
 (provide 'test/common)
