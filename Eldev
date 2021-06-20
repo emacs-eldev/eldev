@@ -60,7 +60,7 @@ to Eldev itself."
 
 
 (defmacro eldev--install-self-error (error directory format-string &rest arguments)
-  `(signal 'eldev-error (append (unless (file-writable-p directory) '(:hint "You probably need to log in as root"))
+  `(signal 'eldev-error (append (unless (file-writable-p ,directory) '(:hint "You probably need to log in as root"))
                                 (list ,format-string ,@arguments (error-message-string ,error)))))
 
 (eldev-defcommand eldev-install-self (&rest parameters)
@@ -78,7 +78,7 @@ be executed via `install.sh'."
         (eldev-print "  %s" directory)))
     (eldev-print "\nIf you use a different directory, make sure to add it to `PATH'\nenvironment variable.")
     (signal 'eldev-quit 1))
-  (let ((directory (car parameters))
+  (let ((directory         (car parameters))
         (shell-script-name (eldev--shell-script-name)))
     (if (file-exists-p directory)
         (unless (file-directory-p directory)
