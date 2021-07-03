@@ -850,6 +850,16 @@ Since 0.2."
                                                       arguments))))
             ,@body)))
 
+;; Hack: make Emacs 24.x shut up.  We don't do it in most places, but
+;; some are important for our tests.
+(defmacro eldev--silence-file-writing-message (filename &rest body)
+  (declare (indent 1) (debug (sexp body)))
+  `(eldev-advised (#'message :around (when (< emacs-major-version 25)
+                                       (lambda (original &rest arguments)
+                                         (unless (and (member (car arguments) '("Wrote %s" "Saving file %s...")) (equal (cadr arguments) ,filename))
+                                           (apply original arguments)))))
+     ,@body))
+
 
 
 ;; Child processes.

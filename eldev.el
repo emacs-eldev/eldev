@@ -2256,7 +2256,8 @@ Since 0.2."
                 (erase-buffer)
                 (insert updated-script)
                 (condition-case error
-                    (save-buffer)
+                    (eldev--silence-file-writing-message installed
+                      (save-buffer))
                   (error (signal 'eldev-error (append (unless (file-writable-p installed) '(:hint "You probably need to log in as root"))
                                                       (list (eldev-format-message "When updating script `%s': %s" abbreviated (error-message-string error)))))))
                 (eldev-print "Upgraded script `%s'" abbreviated)))))))))
@@ -4951,13 +4952,7 @@ possible to build arbitrary targets this way."
                                                                                   (lambda (original &rest arguments)
                                                                                     (unless eldev-build-suppress-warnings
                                                                                       (apply original arguments)))))
-                                       ;; Hack: make Emacs 24.x shut up.  We don't do it in various
-                                       ;; other places, but this one is important for our tests.
-                                       (eldev-advised (#'message :around
-                                                                 (when (< emacs-major-version 25)
-                                                                   (lambda (original &rest arguments)
-                                                                     (unless (equal arguments `("Wrote %s" ,(expand-file-name target)))
-                                                                       (apply original arguments)))))
+                                       (eldev--silence-file-writing-message (expand-file-name target)
                                          (byte-compile-file source))))))
                     (cond ((eq result 'no-byte-compile)
                            (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
