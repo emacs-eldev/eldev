@@ -82,29 +82,11 @@
 (eldev-ert-defargtest eldev-upgrade-self-new-macros-1 (mode)
                       ('normal 'external)
   (eldev--test-create-eldev-archive "eldev-archive-1")
-  (let ((inhibit-message        t)
-        ;; This is a workaround for Emacs bug, else produced `.tar' file is corrupt on
-        ;; Windows.
-        (inhibit-eol-conversion t)
-        (archive-2-dir          (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"))
-        tar-buffers)
-    ;; Inject a macro for testing purposes.  We can edit `.tar' archives with Elisp
-    ;; functions, though in quite an ugly way.
-    (unwind-protect
-        (with-current-buffer (car (push (find-file-noselect (expand-file-name "eldev-999.9.tar" archive-2-dir)) tar-buffers))
-          ;; If the macro and its usage were in the same file, bug would not be triggered.
-          (dolist (entry '(("eldev.el"      "(defun eldev--test-function () (eldev--test-new-macro))")
-                           ("eldev-util.el" "(defmacro eldev--test-new-macro () 1)")))
-            (goto-char 1)
-            (search-forward (format "/%s" (car entry)))
-            (with-current-buffer (car (push (tar-extract) tar-buffers))
-              (search-forward "\n(provide 'eldev")
-              (forward-line)
-              (insert (cadr entry) "\n")
-              (save-buffer)))
-          (save-buffer))
-      (dolist (buffer tar-buffers)
-        (kill-buffer buffer))))
+  ;; Inject a macro for testing purposes.  If the macro and its usage were in the same
+  ;; file, bug would not be triggered.
+  (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"
+                                    `("eldev.el"      ,(rx "\n(provide 'eldev)\n")      "(defun eldev--test-function () (eldev--test-new-macro))\n")
+                                    `("eldev-util.el" ,(rx "\n(provide 'eldev-util)\n") "(defmacro eldev--test-new-macro () 1)\n"))
   (eldev--test-with-external-dir "trivial-project" ()
     :enabled (eq mode 'external)
     (let ((eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
@@ -124,6 +106,44 @@
       (eldev--test-run nil ("eval" `(eldev--test-function))
         (should (string= stdout "1\n"))
         (should (= exit-code 0))))))
+
+
+(eldev-ert-defargtest eldev-upgrade-self-scripts-1 (mode)
+                      ('normal 'external)
+  (eldev--test-with-temp-script-copy
+    (eldev--test-create-eldev-archive "eldev-archive-1")
+    ;; Modify our scripts for testing purposes only.
+    (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"
+                                      `("bin/eldev"     ,(rx "#! /bin/sh\n") "# TEST-COMMENT\n")
+                                      `("bin/eldev.ps1" nil                  "# TEST-COMMENT\n")
+                                      `("bin/eldev.bat" ,(rx "@echo off")    "REM TEST-COMMENT\n"))
+    (eldev--test-with-external-dir "trivial-project" ()
+      :enabled (eq mode 'external)
+      (let ((eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
+            (eldev--test-eldev-dir   (eldev--test-tmp-subdir "upgrade-self-root")))
+        (ignore-errors (delete-directory eldev--test-eldev-dir t))
+        (eldev--test-run nil ("version")
+          (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
+          (should (= exit-code 0)))
+        (eldev--test-run nil (:eval `("--setup" ,`(setf eldev--upgrade-self-from-forced-pa ,(eldev--test-tmp-subdir "eldev-archive-2"))
+                                      ,@(when (eq mode 'external) `(,(format "--external=%s" external-dir)))
+                                      "upgrade-self"))
+          (let ((lines   (eldev--test-line-list stdout))
+                (scripts (list (eldev--shell-script-name))))
+            ;; Special case for Windows, where we actually have _two_ scripts.
+            (when (string= (car scripts) "eldev.bat")
+              (push "eldev.ps1" scripts))
+            (should (string= (car lines) "Upgraded or installed 1 package"))
+            (should (= (length lines) (1+ (length scripts))))
+            (should (eldev-all-p (string-match-p "Upgraded script" it) (cdr lines)))
+            (dolist (script scripts)
+              (with-temp-buffer
+                (insert-file-contents (expand-file-name (format "bin/%s" script) temp-script-dir))
+                (should (search-forward "TEST-COMMENT" nil t)))))
+          (should (= exit-code 0)))
+        (eldev--test-run nil ("version")
+          (should (string= stdout "eldev 999.9\n"))
+          (should (= exit-code 0)))))))
 
 
 (provide 'test/upgrade-self)

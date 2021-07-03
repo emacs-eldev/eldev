@@ -1062,6 +1062,11 @@ the data."
      ;; Since this is not overly important, just print a verbose-level message.
      (error (eldev-verbose "Failed to save %s: %s" ,description (error-message-string error)))))
 
+(defun eldev--shell-script-name ()
+  (if (eq system-type 'windows-nt)
+      "eldev.bat"
+    "eldev"))
+
 
 
 ;; Functions for `Eldev' and `Eldev-local'.
@@ -1508,6 +1513,12 @@ replaced with a stable version even if it is older.
 
 Since 0.5.")
 
+(defvar eldev-upgrade-self-script t
+  "Upgrade the shell script used to start Eldev.
+Script is upgraded after upgrading the package.
+
+Since 0.9.2.")
+
 (defvar eldev--upgrade-self-from-forced-pa nil
   "Should remain unset; used for testing.")
 
@@ -1580,7 +1591,9 @@ sources will be replaced with a package downloaded from MELPA."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) eldev-dir)))
-    (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t)))
+    (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t))
+  (when eldev-upgrade-self-script
+    (eldev--upgrade-self-script)))
 
 (eldev-defbooloptions eldev-upgrade-downgrade-mode eldev-upgrade-keep-installed-mode eldev-upgrade-downgrade-mode
   ("Downgrade installed packages if necessary to use a higher priority archive"
@@ -1588,6 +1601,13 @@ sources will be replaced with a package downloaded from MELPA."
   ("Keep installed packages if no higher version is available"
    :options       (-k --keep-installed))
   :for-command    (upgrade upgrade-self))
+
+(eldev-defbooloptions eldev-upgrade-self-script eldev-upgrade-self-keep-script eldev-upgrade-self-script
+  ("Also upgrade the script used to start Eldev"
+   :options       (-s --upgrade-script))
+  ("Don't upgrade the script"
+   :options       --keep-script)
+  :for-command    upgrade-self)
 
 (eldev-defbooloptions eldev-upgrade-dry-run-mode eldev-upgrade-do-upgrade-mode eldev-upgrade-dry-run-mode
   ("Don't actually install anything, just print what would be performed"
@@ -2208,6 +2228,38 @@ Since 0.2."
               (push package-name (cdr plan))
             (push `(,package . ,already-installed) (car plan)))))
       (puthash package-name (or required-version `(,most-negative-fixnum)) considered))))
+
+(defun eldev--upgrade-self-script ()
+  (let ((scripts (list (eldev--shell-script-name))))
+    ;; Special case for Windows, where we actually have _two_ scripts.
+    (when (string= (car scripts) "eldev.bat")
+      (push "eldev.ps1" scripts))
+    (dolist (script scripts)
+      (catch 'continue
+        (let* ((installed      (eldev-shell-command))
+               (installed-name (file-name-base installed)))
+          (unless (string= installed-name script)
+            (if (member installed-name scripts)
+                (setf installed (expand-file-name script (file-name-directory installed)))
+              (eldev-warn "Cannot locate installed script `%s', skipping" script)
+              (throw 'continue nil)))
+          (let* ((abbreviated    (abbreviate-file-name installed))
+                 (updated-file   (locate-file (format "bin/%s" script) load-path))
+                 (updated-script (with-temp-buffer
+                                   (eldev-trace "Reading updated script from file `%s'" updated-file)
+                                   (insert-file-contents updated-file)
+                                   (buffer-string))))
+            (with-temp-buffer
+              (insert-file-contents installed t)
+              (if (string= (buffer-string) updated-script)
+                  (eldev-verbose "Installed script `%s' appears to be up-to-date" abbreviated)
+                (erase-buffer)
+                (insert updated-script)
+                (condition-case error
+                    (save-buffer)
+                  (error (signal 'eldev-error (append (unless (file-writable-p installed) '(:hint "You probably need to log in as root"))
+                                                      (list (eldev-format-message "When updating script `%s': %s" abbreviated (error-message-string error)))))))
+                (eldev-print "Upgraded script `%s'" abbreviated)))))))))
 
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
   (let ((dir (eldev--package-archive-dir eldev--internal-pseudoarchive)))

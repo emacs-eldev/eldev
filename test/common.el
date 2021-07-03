@@ -184,6 +184,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
           (eldev-call-process executable `("commit" "--message" "Copy") :die-on-error t)))
       copy-dir)))
 
+(defmacro eldev--test-with-temp-script-copy (&rest body)
+  (declare (indent 0) (debug (body)))
+  `(let* ((temp-script-dir           (make-temp-file "eldev-" t "-test-bin"))
+          (eldev--test-shell-command (expand-file-name "bin/eldev" temp-script-dir)))
+     (copy-directory (expand-file-name "bin" eldev-project-dir) (file-name-as-directory temp-script-dir))
+     ,@body))
+
 
 (defmacro eldev--test-with-external-dir (test-project packages &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
@@ -345,7 +352,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     (when problems
       (ert-fail (format "%s: %s" (or error-header "Expectations failed") (eldev-message-enumerate nil problems nil t t))))))
 
-(defun eldev--test-create-eldev-archive (archive-name &optional forced-version)
+;; Optional modification entries should have the form of (FILE AFTER INSERTED-TEXT), where
+;; AFTER is an optional regexp.  The regexp and INSERTED-TEXT should contain whitespace as
+;; needed, this function doesn't add any.
+(defun eldev--test-create-eldev-archive (archive-name &optional forced-version &rest modifications)
   (let ((archive-dir (eldev--test-tmp-subdir archive-name)))
     (ignore-errors (delete-directory archive-dir t))
     (if forced-version
@@ -357,9 +367,30 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (should (= exit-code 0))))
     (with-temp-file (expand-file-name "archive-contents" archive-dir)
       (prin1 `(1 ,(with-temp-buffer
-                    (insert-file-contents-literally (expand-file-name (format "eldev-%s.entry" (or forced-version (eldev-message-version (eldev-package-descriptor)))) archive-dir))
+                    (insert-file-contents-literally (expand-file-name (format "eldev-%s.entry" (or forced-version (eldev-message-version (eldev-find-package-descriptor 'eldev)))) archive-dir))
                     (read (current-buffer))))
              (current-buffer)))
+    (when modifications
+      ;; We can edit `.tar' archives with Elisp functions, though in quite an ugly way.
+      (let ((inhibit-message        t)
+            ;; This is a workaround for Emacs bug, else produced `.tar' file is corrupt on
+            ;; Windows.
+            (inhibit-eol-conversion t)
+            (tar-file-name          (format "eldev-%s.tar" (or forced-version (eldev-message-version (eldev-package-descriptor)))))
+            tar-buffers)
+        (unwind-protect
+            (with-current-buffer (car (push (find-file-noselect (expand-file-name tar-file-name archive-dir)) tar-buffers))
+              (dolist (entry modifications)
+                (goto-char 1)
+                (search-forward (format "/%s" (nth 0 entry)))
+                (with-current-buffer (car (push (tar-extract) tar-buffers))
+                  (when (nth 1 entry)
+                    (search-forward-regexp (nth 1 entry)))
+                  (insert (nth 2 entry))
+                  (save-buffer)))
+              (save-buffer))
+          (dolist (buffer tar-buffers)
+            (kill-buffer buffer)))))
     archive-dir))
 
 
