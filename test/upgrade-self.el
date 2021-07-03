@@ -1,4 +1,3 @@
-(require 'tar-mode)
 (require 'test/common)
 
 

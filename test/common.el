@@ -2,6 +2,7 @@
 (require 'eldev-vc)
 (require 'ert)
 (require 'subr-x)
+(require 'tar-mode)
 
 
 (defvar eldev--test-project nil
