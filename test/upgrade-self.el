@@ -115,7 +115,7 @@
     (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"
                                       `("bin/eldev"     ,(rx "#! /bin/sh\n") "# TEST-COMMENT\n")
                                       `("bin/eldev.ps1" nil                  "# TEST-COMMENT\n")
-                                      `("bin/eldev.bat" ,(rx "@echo off")    "REM TEST-COMMENT\n"))
+                                      `("bin/eldev.bat" ,(rx line-start "exit /b" line-end)    "\nREM TEST-COMMENT\n"))
     (eldev--test-with-external-dir "trivial-project" ()
       :enabled (eq mode 'external)
       (let ((eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
