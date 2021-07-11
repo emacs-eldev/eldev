@@ -84,8 +84,8 @@
   ;; Inject a macro for testing purposes.  If the macro and its usage were in the same
   ;; file, bug would not be triggered.
   (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"
-                                    `("eldev.el"      ,(rx "\n(provide 'eldev)\n")      "(defun eldev--test-function () (eldev--test-new-macro))\n")
-                                    `("eldev-util.el" ,(rx "\n(provide 'eldev-util)\n") "(defmacro eldev--test-new-macro () 1)\n"))
+                                    `("eldev.el"      ,(rx line-start "(provide 'eldev)")      "(defun eldev--test-function () (eldev--test-new-macro))\n")
+                                    `("eldev-util.el" ,(rx line-start "(provide 'eldev-util)") "(defmacro eldev--test-new-macro () 1)\n"))
   (eldev--test-with-external-dir "trivial-project" ()
     :enabled (eq mode 'external)
     (let ((eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
@@ -113,9 +113,9 @@
     (eldev--test-create-eldev-archive "eldev-archive-1")
     ;; Modify our scripts for testing purposes only.
     (eldev--test-create-eldev-archive "eldev-archive-2" "999.9"
-                                      `("bin/eldev"     ,(rx "#! /bin/sh\n") "# TEST-COMMENT\n")
+                                      `("bin/eldev"     ,(rx line-start "#! /bin/sh") "\n# TEST-COMMENT\n")
                                       `("bin/eldev.ps1" nil                  "# TEST-COMMENT\n")
-                                      `("bin/eldev.bat" ,(rx "@echo off")    "REM TEST-COMMENT\n"))
+                                      `("bin/eldev.bat" ,(rx line-start "exit /b")    "\nREM TEST-COMMENT\n"))
     (eldev--test-with-external-dir "trivial-project" ()
       :enabled (eq mode 'external)
       (let ((eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))

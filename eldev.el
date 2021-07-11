@@ -2237,7 +2237,7 @@ Since 0.2."
     (dolist (script scripts)
       (catch 'continue
         (let* ((installed      (eldev-shell-command))
-               (installed-name (file-name-base installed)))
+               (installed-name (file-name-nondirectory installed)))
           (unless (string= installed-name script)
             (if (member installed-name scripts)
                 (setf installed (expand-file-name script (file-name-directory installed)))
