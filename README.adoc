@@ -1552,8 +1552,14 @@ rather install or recompute them from scratch.
 
 Normally, Eldev uses command `emacs` that is supposed to be resolvable
 through `PATH` environment variable.  However, you can always tell it
-to use a different Emacs version by setting either `ELDEV_EMACS` or
-just `EMACS` in the environment, e.g.:
+to use a different Emacs version, though in this case, Eldev cannot
+install it for you, since this is much more complicated than
+installing _Elisp packages_.  You need to make sure that Emacs of
+desired version is available on your machine (and can be looked up via
+`PATH`) as an executable — either by installing via your OS’s package
+manager, compiling from sources or maybe using <<evm,EVM>>.  Once you
+have it installed, you can tell Eldev to use it by setting either
+`ELDEV_EMACS` or just `EMACS` in the environment, e.g.:
 
     $ EMACS=emacs25 eldev eval emacs-version
 
@@ -1657,6 +1663,7 @@ CI is to install Emacs binary of the desired version.  Luckily, there
 are tools that can be used for this: at least {uri-evm}[EVM] and
 {uri-nix-emacs}[nix-emacs-ci].
 
+[#evm]
 ==== EVM
 
 One of the tools to install Emacs is {uri-evm}[EVM].  Steve Purcell
