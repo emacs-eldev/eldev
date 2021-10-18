@@ -990,6 +990,10 @@ through `executable-find' if possible.  Since Eldev 0.8.")
 Can be set explicitly or left to t, in which case it is located
 through `executable-find' if possible.  Since Eldev 0.8.")
 
+(defvar eldev-docker-executable t
+  "Docker executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.")
 
 (defmacro eldev-find-executable (cache-var not-required finder-form error-message &rest error-arguments)
   "Find and executable using FINDER-FORM.
@@ -1071,6 +1075,13 @@ See also variable `eldev-svnadmin-executable'."
   (eldev-find-executable eldev-svnadmin-executable not-required
     (executable-find "svnadmin")
     "Subversion is not installed (cannot find `svnadmin' executable)"))
+
+(defun eldev-docker-executable (&optional not-required)
+  "Find `docker' executable.
+See also variable `eldev-docker-executable'."
+  (eldev-find-executable eldev-docker-executable not-required
+    (executable-find "docker")
+    "Docker is not installed (cannot find `docker' executable)"))
 
 (defvar vc-svn-program)
 (with-eval-after-load 'vc-svn
@@ -1164,7 +1175,7 @@ Also, eat up several options from BODY if present:
       (eldev-verbose header-message))
     (if only-when-verbose
         (eldev-verbose "%s" (buffer-string))
-      (eldev-output "%s" (buffer-string)))))
+      (eldev-output :nolf "%s" (buffer-string)))))
 
 
 
