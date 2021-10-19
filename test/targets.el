@@ -202,14 +202,17 @@
     "        [inh] project-g.elc"))
 
 
+(defsubst eldev--test-targets-dependency-line-p (line)
+  (string-match-p (rx "[" (or "dep" "inh") "]") line))
+
 (defmacro eldev--test-project-dependencies (test-project sets &rest targets)
   `(let ((eldev--test-project (or ,test-project eldev--test-project))
          (expected            ,(if (= (length targets) 1) (car targets) `(eldev--test-targets-combine ,@targets))))
      (eldev--test-run nil ("targets" ,@sets "--no-dependencies")
-       (should (string= stdout (eldev--test-lines (eldev-filter (not (string-match-p (rx "[" (or "dep" "inh") "]") it)) expected))))
+       (should (string= stdout (eldev--test-lines (eldev-filter (not (eldev--test-targets-dependency-line-p it)) expected))))
        (should (= exit-code 0)))
      (eldev--test-run nil ("targets" ,@sets "--no-dependencies" "--no-sources")
-       (should (string= stdout (eldev--test-lines (eldev-filter (and (not (string-match-p (rx "[" (or "dep" "inh") "]") it))
+       (should (string= stdout (eldev--test-lines (eldev-filter (and (not (eldev--test-targets-dependency-line-p it))
                                                                      (string-match-p (rx (or ":" "[")) it))
                                                                 expected))))
        (should (= exit-code 0)))
@@ -217,15 +220,32 @@
      ;; Otherwise we could fail when trying to compile tests in
      ;; "projects" that have no tests.
      (when (eldev-any-p (member ":compile" it) (list ,@targets))
-       (eldev--test-run nil ("clean" ".elc")
+       ;; Cleaning Eldev cache also removes all previously collected information about
+       ;; target dependencies.
+       (eldev--test-run nil ("clean" ".elc" "eldev-cache")
          (should (= exit-code 0)))
-       ;; In certain test projects compilation fails, so don't test `exit-code'.
        (let (compilation)
          (eldev--test-run nil ("compile" ,@(mapcar (lambda (set) (format "--set=%s" set)) sets))
+           ;; In certain test projects compilation fails, so don't test `exit-code' here.
            (setf compilation call-info))
          (eldev--test-run nil ("targets" ,@sets "--dependencies")
            :previous-call "Test project compilation" compilation
-           (should (string= stdout (eldev--test-lines expected)))
+           (if (= (plist-get compilation :exit-code) 0)
+               (should (string= stdout (eldev--test-lines expected)))
+             ;; If compilation hasn't succeeded, don't insist on dependencies having been
+             ;; fully discovered.
+             (let ((actual   (eldev--test-line-list stdout))
+                   ;; To resolve quotes.
+                   (expected (eldev--test-line-list (eldev--test-lines expected))))
+               (while (or actual expected)
+                 (if (and actual expected (string= (car actual) (car expected)))
+                     (setf actual   (cdr actual)
+                           expected (cdr expected))
+                   (if (and expected (eldev--test-targets-dependency-line-p (car expected))
+                            (or (null actual) (not (eldev--test-targets-dependency-line-p (car actual)))))
+                       (setf expected (cdr expected))
+                     (eldev-warn "%S %S" actual expected)
+                     (ert-fail "Unexpected output"))))))
            (should (= exit-code 0)))))))
 
 (defun eldev--test-targets-combine (&rest lists)
