@@ -1930,6 +1930,14 @@ Since 0.2."
                                                                                 ;; See `eldev-upgrade-self-new-macros-1'.
                                                                                 (when (eq dependency-name 'eldev)
                                                                                   (eldev--unload-self))
+                                                                                ;; Ugly workaround for receiving 400 Bad Request responses from GNU
+                                                                                ;; ELPA in poorly understood circumstances, see issue #52.
+                                                                                ;; FIXME: Find a better workaround?
+                                                                                (eval-and-compile (require 'url-http))
+                                                                                (when (and (< emacs-major-version 27)
+                                                                                           (boundp 'url-http-open-connections)
+                                                                                           (hash-table-p url-http-open-connections))
+                                                                                  (clrhash url-http-open-connections))
                                                                                 (package-install-from-archive dependency))
                                                                             (when (eq dependency-name 'eldev)
                                                                               ;; Reload the current package again, so that we
