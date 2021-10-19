@@ -4,7 +4,7 @@
 
 ;; Author:     Paul Pogonyshev <pogonyshev@gmail.com>
 ;; Maintainer: Paul Pogonyshev <pogonyshev@gmail.com>
-;; Version:    0.9.3snapshot
+;; Version:    0.9.3
 ;; Keywords:   maint, tools
 ;; Homepage:   https://github.com/doublep/eldev
 ;; Package-Requires: ((emacs "24.4"))
