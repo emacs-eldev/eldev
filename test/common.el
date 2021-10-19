@@ -42,13 +42,17 @@
   (let ((actual-command-line `(list ,@command-line))
         (no-errors           (make-symbol "$no-errors"))
         process-input-form
-        important-files)
+        important-files
+        previous-calls)
     (pcase command-line
       (`(:eval ,expression) (setf actual-command-line expression)))
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:process-input   (setf process-input-form (pop body)))
-        (:important-files (setf important-files    (eldev-listify (pop body))))))
+        (:important-files (setf important-files    (eldev-listify (pop body))))
+        (:previous-call   (let ((name (pop body))
+                                (call (pop body)))
+                            (push `(cons ,name ,call) previous-calls)))))
     `(let* ((process-input      ,process-input-form)
             (process-input-file (when process-input (make-temp-file "eldev-test")))
             (stderr-file        (make-temp-file "eldev-stderr-")))
@@ -60,10 +64,18 @@
            (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) ,actual-command-line)
              :destination `(t ,stderr-file)
              :infile      process-input-file
-             (let ((stdout (buffer-string))
-                   (stderr (with-temp-buffer
-                             (insert-file-contents stderr-file)
-                             (buffer-string)))
+             (let* ((stdout    (buffer-string))
+                    (stderr    (with-temp-buffer
+                                 (insert-file-contents stderr-file)
+                                 (buffer-string)))
+                    (call-info (list :program      ,program-name
+                                     :executable   executable
+                                     :command-line command-line
+                                     :directory    default-directory
+                                     :input        process-input
+                                     :stdout       stdout
+                                     :stderr       stderr
+                                     :exit-code    exit-code))
                    ,no-errors)
                (goto-char 1)
                (unwind-protect
@@ -73,22 +85,39 @@
                      (ert-test-skipped (setf ,no-errors t)
                                        (signal (car error) (cdr error))))
                  (unless ,no-errors
-                   (eldev-warn "Ran %s as `%s' in directory `%s'" ,program-name (eldev-message-command-line executable command-line) default-directory)
-                   (when process-input-file
-                     (eldev-warn "Process input:\n%s" (eldev-colorize process-input 'verbose)))
-                   (eldev-warn "Stdout contents:\n%s" (eldev-colorize stdout 'verbose))
-                   (unless (string= stderr "")
-                     (eldev-warn "Stderr contents:\n%s" (eldev-colorize stderr 'verbose)))
-                   (eldev-warn "Process exit code: %s" exit-code)
+                   (eldev--test-call-process-show call-info)
                    ,@(when important-files
                        `((eldev-warn "Important files (oldest first):")
                          (dolist (data (sort (mapcar (lambda (file) (cons file (nth 5 (file-attributes file)))) ',important-files)
                                              (lambda (a b) (< (if (cdr a) (float-time (cdr a)) 0) (if (cdr b) (float-time (cdr b)) 0)))))
                            ;; Not using `current-time-string' as not precise enough.
-                           (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing")))))))))
+                           (eldev-warn "    `%s': %s" (car data) (if (cdr data) (float-time (cdr data)) "missing")))))
+                   ,@(when previous-calls
+                       `((eldev--test-call-process-show-previous-calls ,@(nreverse previous-calls))))))))
          (when process-input-file
            (ignore-errors (delete-file process-input-file)))
          (ignore-errors (delete-file stderr-file))))))
+
+(defun eldev--test-call-process-show (call)
+  (eldev-warn "Ran %s as `%s' in directory `%s'"
+              (plist-get call :program)
+              (eldev-message-command-line (plist-get call :executable) (plist-get call :command-line))
+              (plist-get call :directory))
+  (when (plist-get call :input)
+    (eldev-warn "Process input:\n%s" (eldev-colorize (plist-get call :input) 'verbose)))
+  (eldev-warn "Stdout contents:\n%s" (eldev-colorize (plist-get call :stdout) 'verbose))
+  (unless (string= (plist-get call :stderr) "")
+    (eldev-warn "Stderr contents:\n%s" (eldev-colorize (plist-get call :stderr) 'verbose)))
+  (eldev-warn "Process exit code: %s" (plist-get call :exit-code)))
+
+(defun eldev--test-call-process-show-previous-calls (&rest calls)
+  (setf calls (eldev-filter (cdr it) calls))
+  (when calls
+    (eldev-warn "\nImportant previous process calls:")
+    (dolist (entry calls)
+      (eldev-warn "\n%s:" (car entry))
+      (eldev--test-call-process-show (cdr entry))
+      (eldev-warn ""))))
 
 (defmacro eldev--test-run (test-project command-line &rest body)
   "Execute child Eldev process.

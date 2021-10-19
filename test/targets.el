@@ -220,10 +220,13 @@
        (eldev--test-run nil ("clean" ".elc")
          (should (= exit-code 0)))
        ;; In certain test projects compilation fails, so don't test `exit-code'.
-       (eldev--test-run nil ("compile" ,@(mapcar (lambda (set) (format "--set=%s" set)) sets)))
-       (eldev--test-run nil ("targets" ,@sets "--dependencies")
-         (should (string= stdout (eldev--test-lines expected)))
-         (should (= exit-code 0))))))
+       (let (compilation)
+         (eldev--test-run nil ("compile" ,@(mapcar (lambda (set) (format "--set=%s" set)) sets))
+           (setf compilation call-info))
+         (eldev--test-run nil ("targets" ,@sets "--dependencies")
+           :previous-call "Test project compilation" compilation
+           (should (string= stdout (eldev--test-lines expected)))
+           (should (= exit-code 0)))))))
 
 (defun eldev--test-targets-combine (&rest lists)
   (let ((targets (copy-sequence (pop lists)))
