@@ -2326,10 +2326,22 @@ for all archives instead."
     (let ((eldev-message-rerouting-destination         :stderr)
           (eldev-global-cache-archive-contents-max-age (if refetch-contents -1 eldev-global-cache-archive-contents-max-age))
           (package-archives                            archives)
-          (inhibit-message                             t))
+          (inhibit-message                             t)
+          failure)
       (eldev--with-pa-access-workarounds (lambda ()
                                            (eldev-using-global-package-archive-cache
-                                             (package-refresh-contents)))))))
+                                             ;; Emacs package system eats up all errors in `package-refresh-contents',
+                                             ;; unless in debug mode.  Try to work around that and issue a nice error.
+                                             (eldev-advised (#'package--download-one-archive
+                                                             :around (lambda (original archive &rest arguments)
+                                                                       (unless failure
+                                                                         (condition-case-unless-debug error
+                                                                             (apply original archive arguments)
+                                                                           (error (setf failure (cons error (if (consp archive) (car archive) archive))))))))
+                                               (package-refresh-contents)
+                                               (when failure
+                                                 (signal 'eldev-error `(:hint ,(eldev-format-message "When updating contents of package archive `%s'" (cdr failure))
+                                                                              ,(error-message-string (car failure))))))))))))
 
 (defun eldev--with-pa-access-workarounds (callback &optional call-after-working-around)
   ;; This is only to reduce noise from old Emacs versions a bit.
