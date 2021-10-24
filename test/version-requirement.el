@@ -3,7 +3,10 @@
 
 (defmacro eldev--test-require-version (test-project command-line succeeds &rest body)
   (declare (indent 3) (debug (stringp sexp booleanp body)))
-  `(eldev--test-run ,test-project ("--setup" `(eldev-require-version "999.9") ,@command-line)
+  ;; Particular archive is not important, just don't try asking MELPA.
+  `(eldev--test-run ,test-project (:eval `("--setup" ,`(setf eldev--upgrade-self-from-forced-pa ,(expand-file-name "package-archive-a/" (eldev--test-dir)))
+                                           "--setup" (eldev-require-version "999.9")
+                                           ,@',command-line))
      ,@(if succeeds
           `((should (= exit-code 0)))
         `((should (= exit-code 1))
