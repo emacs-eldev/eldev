@@ -27,8 +27,9 @@ jobs:
             emacs_version: '27.2'
           - os: macos-latest
             emacs_version: 'snapshot'
-          - os: windows-latest
-            emacs_version: '27.2'
+          # Currently disabled as failing for reasons unrelated to Eldev, see issue #55.
+          # - os: windows-latest
+          #   emacs_version: '27.2'
 
     steps:
     - name: Set up Emacs
