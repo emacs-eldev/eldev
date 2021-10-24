@@ -1092,6 +1092,9 @@ find the file.
 
 Since 0.2.")
 
+(defvar eldev--project-main-files nil
+  "Cache for `eldev-project-main-file'.")
+
 (defvar eldev--package-descriptors nil
   "Cache for `eldev-package-descriptor'.")
 
@@ -1170,6 +1173,36 @@ Since 0.2.")
             (delete-directory temp-dir t)))))))
 
 (declare-function eldev--cross-project-internal-eval "eldev" (project-dir form &optional use-caching))
+
+(defun eldev-project-main-file (&optional project-dir skip-cache)
+  "Determine the main file of the package in PROJECT-DIR.
+This is either declared in variable `eldev-project-main-file' or
+detected automatically as the `.el' file that has correct package
+headers.
+
+Since 0.10."
+  (unless project-dir
+    (setf project-dir eldev-project-dir))
+  (or (unless skip-cache
+        (cdr (assoc project-dir eldev--project-main-files)))
+      (let ((main-file (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file t)))
+        (setf main-file (if main-file
+                            (expand-file-name main-file project-dir)
+                          (let ((pkg-file (eldev-package-descriptor-file-name project-dir skip-cache)))
+                            (when pkg-file
+                              (setf pkg-file (expand-file-name pkg-file project-dir)))
+                            (if (file-readable-p pkg-file)
+                                pkg-file
+                              (catch 'found
+                                (dolist (file (directory-files project-dir t "\\.el\\'" t))
+                                  (with-temp-buffer
+                                    (insert-file-contents file)
+                                    (when (ignore-errors (package-buffer-info))
+                                      (throw 'found file))))
+                                (signal 'eldev-error `("Cannot determine main file of project in `%s'" ,project-dir)))))))
+        (unless skip-cache
+          (push (cons project-dir main-file) eldev--project-main-files))
+        main-file)))
 
 (defvar eldev--project-validated nil)
 (defvar eldev--project-validated-hook nil)

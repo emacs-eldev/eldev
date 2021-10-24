@@ -251,7 +251,7 @@ Since 0.5")
 
 (defvar eldev-known-tool-packages
   '((buttercup    :version "1.24" :archive  melpa)
-    (package-lint                 :archives (melpa gnu))
+    (package-lint :version "0.14" :archives (melpa gnu))
     (relint       :version "1.18" :archive  gnu)
     (elisp-lint                   :archives (melpa gnu))
     ;; This is for a plugin, but probably no reason not to have it unconditionally.
@@ -3653,6 +3653,7 @@ least one warning."
               (checkdoc-current-buffer t))))))))
 
 
+(defvar package-lint-main-file)
 (declare-function package-lint-buffer "package-lint")
 
 (eldev-deflinter eldev-linter-package ()
@@ -3671,6 +3672,9 @@ least one warning."
     (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch)))
   (eldev--linter-package-present-archives)
   (require 'package-lint)
+  ;; Avoid overriding it if it is already set (presumably in project's `Eldev').
+  (unless package-lint-main-file
+    (setf package-lint-main-file (eldev-project-main-file)))
   (dolist (file (eldev-lint-find-files "*.el"))
     (eldev-lint-linting-file file
       ;; Adapted `package-lint-batch-and-exit-1'.
@@ -3726,6 +3730,9 @@ change `elisp-lint's configuration."
   ;; which might not be enough), here we don't need to fetch archive contents, as it
   ;; should have been done by `eldev-load-project-dependencies' already.
   (eldev--linter-package-present-archives)
+  (with-eval-after-load 'package-lint
+    (unless package-lint-main-file
+      (setf package-lint-main-file (eldev-project-main-file))))
   (require 'elisp-lint)
   ;; I don't see a better way than just replacing its output function completely.
   (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)
