@@ -425,6 +425,13 @@ later.  Any unknown value is treated as t.
 
 Since 0.8")
 
+(defvar eldev-handle-debug-backtrace t
+  "Whether to try and handle backtraces issued by Elisp debugger.
+When non-nil, `eldev-backtrace-style' and highlighting is also
+applied to backtraces printed because of `--debug' option.
+
+ Since 0.10.")
+
 (defvar eldev-coloring-mode 'auto
   "Whether to use coloring on output.
 Special symbol \\='auto means that coloring should be used when
@@ -733,19 +740,23 @@ This is similar to built-in function `backtrace', but respects
         (beginning-of-line)
         (delete-region 1 (point)))
       (eldev-highlight-backtrace)
-      ;; Optionally truncate long lines.
-      (when limit
-        (goto-char 1)
-        (while (not (eobp))
-          (let* ((line-end    (line-end-position))
-                 (line-length (- line-end (point))))
-            (when (> line-length limit)
-              (delete-region (+ (point) limit) line-end)))
-          (forward-line)))
+      (eldev--truncate-backtrace-lines limit)
       (goto-char (point-max))
       (when (eq (char-before) ?\n)
         (delete-char -1))
       (eldev-output :stderr "%s" (buffer-string)))))
+
+(defun eldev--truncate-backtrace-lines (limit)
+  ;; Optionally truncate long lines.
+  (when limit
+    (save-excursion
+      (goto-char 1)
+      (while (not (eobp))
+        (let* ((line-end    (line-end-position))
+               (line-length (- line-end (point))))
+          (when (> line-length limit)
+            (delete-region (+ (point) limit) line-end)))
+        (forward-line)))))
 
 (defun eldev-highlight-backtrace (&optional backtrace)
   "Highlight elements in given BACKTRACE.
@@ -775,6 +786,20 @@ Since 0.8."
     (goto-char 1)
     (while (re-search-forward (rx bol (0+ " ") (group (1+ (not (any "("))))) nil t)
       (add-face-text-property (match-beginning 1) (match-end 1) 'name))))
+
+;; Also handle standard backtraces printed by Emacs debugger.
+(with-eval-after-load 'debug
+  (advice-add 'debugger-setup-buffer :around
+              (lambda (original &rest args)
+                (if eldev-handle-debug-backtrace
+                    (let ((limit (eldev-shrink-screen-width-as-needed eldev-backtrace-style)))
+                      (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
+                      (let ((backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
+                        (prog1 (apply original args)
+                          (let ((inhibit-read-only t))
+                            (eldev--truncate-backtrace-lines limit)
+                            (eldev-highlight-backtrace)))))
+                  (apply original args)))))
 
 
 (defmacro eldev-output-reroute-messages (&rest body)
