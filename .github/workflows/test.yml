@@ -27,9 +27,8 @@ jobs:
             emacs_version: '27.2'
           - os: macos-latest
             emacs_version: 'snapshot'
-          # Currently disabled as failing for reasons unrelated to Eldev, see issue #55.
-          # - os: windows-latest
-          #   emacs_version: '27.2'
+          - os: windows-latest
+            emacs_version: '27.2'
 
     steps:
     - name: Set up Emacs
@@ -40,9 +39,21 @@ jobs:
 
     - name: Set up Emacs on Windows
       if: startsWith (matrix.os, 'windows')
-      uses: jcs090218/setup-emacs-windows@master
+      # Use MSYS2 as a temporary workaround for issue #55 with Emacs
+      # official MS-Windows prebuilt 27.2 binaries.
+      #
+      # uses: purcell/setup-emacs@master
+      # with:
+      #   version: ${{matrix.emacs_version}}
+      uses: msys2/setup-msys2@v2
       with:
-        version: ${{matrix.emacs_version}}
+        release: false
+        path-type: inherit
+        install: mingw64/mingw-w64-x86_64-emacs
+    - name: Add MSYS2 packages directory to PATH
+      if: startsWith (matrix.os, 'windows')
+      run: |
+        echo "c:/msys64/mingw64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Set up additional packages (Ubuntu)
       if: startsWith (matrix.os, 'ubuntu')
