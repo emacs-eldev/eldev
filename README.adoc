@@ -49,6 +49,7 @@ endif::[]
 :since-0-7: image:https://img.shields.io/badge/since-0.7-8be[Since 0.7,float=right]
 :since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
 :since-0-9: image:https://img.shields.io/badge/since-0.9-8be[Since 0.9,float=right]
+:since-0-10: image:https://img.shields.io/badge/since-0.10-8be[Since 0.10,float=right]
 
 = Eldev
 
@@ -485,9 +486,10 @@ init`).  For example:
 (eldev-use-package-archive 'melpa)
 ----
 
-Eldev knows about two “standard” archives, which should cover most of
-your needs: `gnu` and `melpa`.  When using MELPA, you can also
-explicitly choose `melpa-stable` or `melpa-unstable` instead.
+Eldev knows about three “standard” archives, which should cover most
+of your needs: `gnu`, `nongnu` (since 0.10) and `melpa`.  When using
+MELPA, you can also explicitly choose `melpa-stable` or
+`melpa-unstable` instead.
 
 {since-0-5} A better way is provided by two global options: `--stable`
 (the default) and `--unstable`.  Normally, Eldev will try to install
@@ -501,9 +503,9 @@ fallback.
 
 Emacs 25 and up supports package archive priorities.  Eldev backports
 this to Emacs 24 and utilizes the feature to assign the standard
-archives it knows about priorities 300 (for GNU ELPA), 200 and 100
-(for MELPA Stable/Unstable).  A dependency from a package with a lower
-priority is installed only if there are no other options.
+archives it knows about priorities 300 (GNU ELPA), 250 (NonGNU ELPA),
+and 200 and 100 (MELPA Stable/Unstable).  A dependency from a package
+with a lower priority is installed only if there are no other options.
 
 If dependencies for your project are only available from some other
 archive, you can still use the same function.  Just substite the
@@ -1796,7 +1798,9 @@ Eldev scripts.
   backtraces to your screen width and thus make them more readable at
   the expense of completeness (by default, Eldev doesn’t truncate
   backtrace lines).  It is a good idea to change the default in file
-  `.eldev/config`.
+  `.eldev/config`.  Starting with 0.10 this also affects backtraces
+  printed if Eldev or code from the project it executes fails with a
+  signal (see also option `--debug`).
 
 * Global option `-T` (`--time`) prepends timestamps to all lines of
   Eldev output, making it easier to spot performance problems.
