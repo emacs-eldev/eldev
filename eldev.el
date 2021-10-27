@@ -1078,6 +1078,7 @@ the data."
 
 (eval-and-compile
   (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
+                                          (nongnu         ("nongnu"         . "https://elpa.nongnu.org/nongnu/")    250)
                                           (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
                                           (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
                                           (melpa          (:stable melpa-stable :unstable melpa-unstable)))))
@@ -1112,6 +1113,7 @@ of (ID . URL), same as you would use in `package-archives'.
 Standard archives:
 
   - gnu            (https://elpa.gnu.org/packages/)
+  - nongnu         (https://elpa.nongnu.org/nongnu/, since 0.10)
   - melpa-stable   (https://stable.melpa.org/packages/)
   - melpa-unstable (https://melpa.org/packages/)
 
@@ -1122,8 +1124,8 @@ Since 0.5 an archive can also be a plist with properties
 
 If PRIORITY is non-nil, ARCHIVE is given this priority (see
 `package-archive-priorities').  Standard archives get priorities
-300, 200 and 100 in the order they are listed above, unless you
-specify something explicitly.
+300, 250, 200 and 100 in the order they are listed above, unless
+you specify something explicitly.
 
 If archive is stable/unstable plist, given PRIORITY is used for
 the unstable variant, stable receives priority 100 higher (these
