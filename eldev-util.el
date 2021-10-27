@@ -720,6 +720,29 @@ human-readable errors if there are any problems."
     (car result)))
 
 
+(defmacro eldev-output-reroute-messages (&rest body)
+  "Execute BODY while rerouting standard Emacs messages.
+Messages are reformatted through `eldev-output' and sent to
+`eldev-message-rerouting-destination'.  Can be termporarily
+disabled by setting `eldev-disable-message-rerouting' inside
+BODY."
+  (declare (indent 0) (debug (body)))
+  `(eldev-advised (#'message :around
+                             (unless eldev--output-rerouted
+                               (lambda (original &rest args)
+                                 (unless (and (boundp 'inhibit-message) inhibit-message)
+                                   (cond ((or eldev--real-stderr-output eldev-disable-message-rerouting)
+                                          (apply original args))
+                                         (eldev-message-rerouting-wrapper
+                                          (if (functionp eldev-message-rerouting-wrapper)
+                                              (apply eldev-message-rerouting-wrapper args)
+                                            ;; Assume a macro (`eldev-warn' or something like that).
+                                            (eval `(,eldev-message-rerouting-wrapper ,@(mapcar #'eldev-macroexp-quote args)) t)))
+                                         (t
+                                          (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args)))))))
+     ,@body))
+
+
 (defvar backtrace-line-length)
 
 (defun eldev-backtrace ()
@@ -789,6 +812,12 @@ Since 0.8."
 
 ;; Also handle standard backtraces printed by Emacs debugger.
 (with-eval-after-load 'debug
+  (advice-add 'debug :around
+              (lambda (original &rest args)
+                ;; Restore original destination for `message': for
+                ;; backtraces `stderr' fully makes sense.
+                (let ((eldev-message-rerouting-destination :stderr))
+                  (apply original args))))
   (advice-add 'debugger-setup-buffer :around
               (lambda (original &rest args)
                 (if eldev-handle-debug-backtrace
@@ -800,29 +829,6 @@ Since 0.8."
                             (eldev--truncate-backtrace-lines limit)
                             (eldev-highlight-backtrace)))))
                   (apply original args)))))
-
-
-(defmacro eldev-output-reroute-messages (&rest body)
-  "Execute BODY while rerouting standard Emacs messages.
-Messages are reformatted through `eldev-output' and sent either
-to `eldev-message-rerouting-destination'.  Can be termporarily
-disabled by setting `eldev-disable-message-rerouting' inside
-BODY."
-  (declare (indent 0) (debug (body)))
-  `(eldev-advised (#'message :around
-                             (unless eldev--output-rerouted
-                               (lambda (original &rest args)
-                                 (unless (and (boundp 'inhibit-message) inhibit-message)
-                                   (cond ((or eldev--real-stderr-output eldev-disable-message-rerouting)
-                                          (apply original args))
-                                         (eldev-message-rerouting-wrapper
-                                          (if (functionp eldev-message-rerouting-wrapper)
-                                              (apply eldev-message-rerouting-wrapper args)
-                                            ;; Assume a macro (`eldev-warn' or something like that).
-                                            (eval `(,eldev-message-rerouting-wrapper ,@(mapcar #'eldev-macroexp-quote args)) t)))
-                                         (t
-                                          (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args)))))))
-     ,@body))
 
 
 (defun eldev-documentation (function)

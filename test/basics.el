@@ -120,9 +120,8 @@
 (eldev-ert-defargtest eldev-backtrace-length-limit-2 (with-time-diff)
                       (nil t)
   (eldev--test-run "trivial-project" ("--backtrace=30" "--debug" (if with-time-diff "--time" "--no-time") "eval" "this-variable-is-not-bound")
-    ;; FIXME: Is it correct that backtrace is written to stdout?  Even if that's Emacs
-    ;;        behavior, it really feels wrong to me.
-    (let ((lines (eldev-filter (not (string-match-p "Bootstrapping Eldev" it)) (eldev--test-line-list stdout))))
+    (let ((lines (eldev-filter (not (string-match-p "Bootstrapping Eldev" it)) (eldev--test-line-list stderr))))
+      (should (string= stdout ""))
       (should (eldev-all-p (<  (length it) 30) lines))
       (should (eldev-any-p (>= (length it) 29) lines))
       (should (/= exit-code 0)))))
