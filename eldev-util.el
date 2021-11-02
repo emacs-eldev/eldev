@@ -77,14 +77,6 @@
       (cons (nreverse decls) body)))
 
 
-(declare-function backtrace-frame-fun "backtrace" (frame))
-
-(defun eldev-backtrace-frame-function (frame)
-  (cond ((listp frame)                   (nth 1 frame))  ;; Older Emacs versions.
-        ((fboundp #'backtrace-frame-fun) (backtrace-frame-fun frame))
-        (t                               (aref 1 frame))))
-
-
 
 ;; General.
 
@@ -416,22 +408,6 @@ form is executed at the end.
 Can be a symbol `quiet', `verbose' or `trace'.  Any other value,
 including nil, stands for the default verbosity level.")
 
-(defvar eldev-backtrace-style t
-  "Default style for printed backtraces.
-If this value is t, backtrace lines are not truncated and printed
-out fully.  If this is an integer greater than 1 (e.g. 80), lines
-are truncated for that screen width.  Other values can be defined
-later.  Any unknown value is treated as t.
-
-Since 0.8")
-
-(defvar eldev-handle-debug-backtrace t
-  "Whether to try and handle backtraces issued by Elisp debugger.
-When non-nil, `eldev-backtrace-style' and highlighting is also
-applied to backtraces printed because of `--debug' option.
-
- Since 0.10.")
-
 (defvar eldev-coloring-mode 'auto
   "Whether to use coloring on output.
 Special symbol \\='auto means that coloring should be used when
@@ -743,31 +719,147 @@ BODY."
      ,@body))
 
 
+(defun eldev-documentation (function)
+  "Return Elisp documentation of given FUNCTION.
+Strip calling convention from byte-compiled functions, since that
+is not meant for humans."
+  (let ((documentation (documentation function t)))
+    (setf documentation (if documentation (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" documentation) ""))
+    (dolist (preprocessor (reverse (eldev-get function 'doc-preprocessors)))
+      (setf documentation (funcall preprocessor documentation)))
+    (when (> (length documentation) 0)
+      (substitute-command-keys documentation))))
+
+(defun eldev-briefdoc (function)
+  "Return first sentence of Elisp documentation of given FUNCTION."
+  (or (eldev-get function :briefdoc)
+      (when (documentation function)
+        (with-temp-buffer
+          (insert (eldev-documentation function))
+          (goto-char 1)
+          (forward-sentence)
+          ;; `skip-syntax-backward' also skips e.g. quotes.
+          (skip-chars-backward ".;")
+          (buffer-substring 1 (point))))))
+
+(defun eldev-add-documentation-preprocessor (functions preprocessor)
+  "Call PREPROCESSOR on documentation string for each of FUNCTIONS.
+FUNCTIONS can be a single symbol or a list of those.  Since 0.3."
+  (dolist (function (eldev-listify functions))
+    (eldev-put function 'doc-preprocessors `(,preprocessor ,@(eldev-get function 'doc-preprocessors)))))
+
+
+(defmacro eldev-suppress-warning-emacs-text (&rest body)
+  "Execute BODY with “Warning (emacs):” from `warn' suppressed.
+This macro should be used when this text carries no meaning and
+potentially lots of warnings is expected.  A good example is
+`checkdoc' linter, which otherwise prepends this noise to any
+warning it issues.
+
+Since 0.2."
+  (declare (indent 0) (debug (body)))
+  `(progn (eval-and-compile (require 'warnings))
+          (eldev-advised ('display-warning :around
+                                           (lambda (original type message &rest arguments)
+                                             (let* ((suppressing    (eq (if (consp type) (car type) type) 'emacs))
+                                                    (warning-levels (if suppressing `((:warning "") ,@warning-levels) warning-levels)))
+                                               ;; Remove the first newline: it makes no sense with silencing.
+                                               (apply original type
+                                                      (if (and suppressing (string-prefix-p "\n" message)) (substring message 1) message)
+                                                      arguments))))
+            ,@body)))
+
+;; Hack: make Emacs 24.x shut up.  We don't do it in most places, but
+;; some are important for our tests.
+(defmacro eldev--silence-file-writing-message (filename &rest body)
+  (declare (indent 1) (debug (sexp body)))
+  `(eldev-advised (#'message :around (when (< emacs-major-version 25)
+                                       (lambda (original &rest arguments)
+                                         (unless (and (member (car arguments) '("Wrote %s" "Saving file %s...")) (equal (cadr arguments) ,filename))
+                                           (apply original arguments)))))
+     ,@body))
+
+
+
+;; Backtrace handling.
+
+(defvar eldev-backtrace-style t
+  "Default style for printed backtraces.
+If this value is t, backtrace lines are not truncated and printed
+out fully.  If this is an integer greater than 1 (e.g. 80), lines
+are truncated for that screen width.  Other values can be defined
+later.  Any unknown value is treated as t.
+
+Since 0.8")
+
+(defvar eldev-handle-debug-backtrace t
+  "Whether to try and handle backtraces issued by Elisp debugger.
+When non-nil, `eldev-backtrace-style' and highlighting is also
+applied to backtraces printed because of `--debug' option.
+
+ Since 0.10.")
+
 (defvar backtrace-line-length)
 
-(defun eldev-backtrace ()
+(declare-function backtrace-get-frames "backtrace" ())
+(declare-function backtrace-to-string "backtrace" (&optional frames))
+(declare-function backtrace-frame-fun "backtrace" (frame))
+
+
+(defun eldev-backtrace-frames (&optional backtrace-function)
+  "Get current backtrace frames.
+All frames before the innermost call to BACKTRACE-FUNCTION are
+dropped.  This uses either `backtrace-frames' or newer
+`backtrace-get-frames' if available.  Since 0.10"
+  (require 'backtrace nil t)
+  (funcall (if (fboundp #'backtrace-get-frames) #'backtrace-get-frames #'backtrace-frames) (or backtrace-function #'eldev-backtrace-frames)))
+
+(defun eldev-backtrace (&optional frames backtrace-function)
   "Print backtrace to stderr.
 This is similar to built-in function `backtrace', but respects
-`eldev-backtrace-style' value.  Since 0.8."
-  ;; Not using newer functions for compatibility reasons.
-  (let ((limit (eldev-shrink-screen-width-as-needed eldev-backtrace-style)))
-    (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
-    (with-temp-buffer
-      (let ((standard-output       (current-buffer))
-            ;; Emacs' `backtrace' module can die if this value is too small or nil.
-            (backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
-        (backtrace))
+`eldev-backtrace-style' value.  Since 0.8.
+
+Since 0.10 two optional argument are accepted: FRAMES can be (a
+postprocessed) result of a call to `backtrace-frames' or
+`backtrace-get-frames'.  All frames before the innermost call to
+BACKTRACE-FUNCTION are dropped."
+  (eldev-output :stderr "%s" (eldev-backtrace-to-string frames (or backtrace-function #'eldev-backtrace))))
+
+(defun eldev-backtrace-to-string (&optional frames backtrace-function)
+  "Return a string containing formatted backtrace.
+See `eldev-backtrace' for more information.  Since 0.10."
+  (require 'backtrace nil t)
+  (unless frames
+    (setf frames (eldev-backtrace-frames (or backtrace-function #'eldev-backtrace-to-string))))
+  (with-temp-buffer
+    (let ((limit (eldev-shrink-screen-width-as-needed eldev-backtrace-style)))
+      (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
+      ;; Use `backtrace-to-string' only with new-style frames.
+      (if (and (fboundp #'backtrace-to-string) (not (listp (car frames))))
+          (insert (backtrace-to-string frames))
+        (let ((standard-output       (current-buffer))
+              ;; Emacs' `backtrace' module can die if this value is too small or nil.
+              (backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
+          (backtrace)))
       (goto-char 1)
-      ;; Discard backtrace part inside this function.
-      (when (search-forward-regexp (rx bol (0+ " ") "eldev-backtrace()" eol) nil t)
-        (beginning-of-line)
-        (delete-region 1 (point)))
       (eldev-highlight-backtrace)
       (eldev--truncate-backtrace-lines limit)
       (goto-char (point-max))
       (when (eq (char-before) ?\n)
         (delete-char -1))
-      (eldev-output :stderr "%s" (buffer-string)))))
+      (buffer-string))))
+
+(defun eldev-backtrace-frame-function (frame)
+  "Get the function from given backtrace FRAME.
+Works both with list-like frames function `backtrace-frames'
+returns and with structural frames of `backtrace-get-frames' on
+Emacs 27+.  Since 0.3."
+  (if (listp frame)
+      (nth 1 frame)
+    (require 'backtrace nil t)
+    (if (fboundp #'backtrace-frame-fun)
+        (backtrace-frame-fun frame)
+      (aref 1 frame))))
 
 (defun eldev--truncate-backtrace-lines (limit)
   ;; Optionally truncate long lines.
@@ -829,67 +921,6 @@ Since 0.8."
                             (eldev--truncate-backtrace-lines limit)
                             (eldev-highlight-backtrace)))))
                   (apply original args)))))
-
-
-(defun eldev-documentation (function)
-  "Return Elisp documentation of given FUNCTION.
-Strip calling convention from byte-compiled functions, since that
-is not meant for humans."
-  (let ((documentation (documentation function t)))
-    (setf documentation (if documentation (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" documentation) ""))
-    (dolist (preprocessor (reverse (eldev-get function 'doc-preprocessors)))
-      (setf documentation (funcall preprocessor documentation)))
-    (when (> (length documentation) 0)
-      (substitute-command-keys documentation))))
-
-(defun eldev-briefdoc (function)
-  "Return first sentence of Elisp documentation of given FUNCTION."
-  (or (eldev-get function :briefdoc)
-      (when (documentation function)
-        (with-temp-buffer
-          (insert (eldev-documentation function))
-          (goto-char 1)
-          (forward-sentence)
-          ;; `skip-syntax-backward' also skips e.g. quotes.
-          (skip-chars-backward ".;")
-          (buffer-substring 1 (point))))))
-
-(defun eldev-add-documentation-preprocessor (functions preprocessor)
-  "Call PREPROCESSOR on documentation string for each of FUNCTIONS.
-FUNCTIONS can be a single symbol or a list of those.  Since 0.3."
-  (dolist (function (eldev-listify functions))
-    (eldev-put function 'doc-preprocessors `(,preprocessor ,@(eldev-get function 'doc-preprocessors)))))
-
-
-(defmacro eldev-suppress-warning-emacs-text (&rest body)
-  "Execute BODY with “Warning (emacs):” from `warn' suppressed.
-This macro should be used when this text carries no meaning and
-potentially lots of warnings is expected.  A good example is
-`checkdoc' linter, which otherwise prepends this noise to any
-warning it issues.
-
-Since 0.2."
-  (declare (indent 0) (debug (body)))
-  `(progn (eval-and-compile (require 'warnings))
-          (eldev-advised ('display-warning :around
-                                           (lambda (original type message &rest arguments)
-                                             (let* ((suppressing    (eq (if (consp type) (car type) type) 'emacs))
-                                                    (warning-levels (if suppressing `((:warning "") ,@warning-levels) warning-levels)))
-                                               ;; Remove the first newline: it makes no sense with silencing.
-                                               (apply original type
-                                                      (if (and suppressing (string-prefix-p "\n" message)) (substring message 1) message)
-                                                      arguments))))
-            ,@body)))
-
-;; Hack: make Emacs 24.x shut up.  We don't do it in most places, but
-;; some are important for our tests.
-(defmacro eldev--silence-file-writing-message (filename &rest body)
-  (declare (indent 1) (debug (sexp body)))
-  `(eldev-advised (#'message :around (when (< emacs-major-version 25)
-                                       (lambda (original &rest arguments)
-                                         (unless (and (member (car arguments) '("Wrote %s" "Saving file %s...")) (equal (cadr arguments) ,filename))
-                                           (apply original arguments)))))
-     ,@body))
 
 
 
