@@ -3836,7 +3836,9 @@ being that it doesn't print form results."
           (require feature)))
       (dolist (form forms)
         (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
-        (let ((result (eval (cdr form) eldev-eval-lexical)))
+        ;; For these commands we restore the standard behavior of `message' of writing to stderr,
+        (let ((result (let ((eldev-message-rerouting-destination :stderr))
+                        (eval (cdr form) eldev-eval-lexical))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))

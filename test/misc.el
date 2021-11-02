@@ -49,4 +49,14 @@
       (should (= exit-code 0)))))
 
 
+;; https://github.com/doublep/eldev/issues/57
+;;
+;; `(message nil)' is a valid call in Emacs, so it must not fail under Eldev either.
+(ert-deftest eldev-message-nil ()
+  (eldev--test-run "trivial-project" ("exec" `(message nil))
+    (should (string= stdout ""))
+    (should (string= stderr "\n"))
+    (should (= exit-code 0))))
+
+
 (provide 'test/integration/misc)

@@ -565,7 +565,7 @@ Since 0.2."
         (`:nocolor (setf nocolor t))
         (_         (error "Unknown option `%s'" format-string)))
       (setf format-string (pop arguments)))
-    (let ((message (apply #'eldev-format-message format-string arguments)))
+    (let ((message (if format-string (apply #'eldev-format-message format-string arguments) "")))
       (when eldev-output-time-diffs
         (let* ((elapsed         (- (float-time) eldev--time-diff-base))
                (elapsed-min     (floor (/ elapsed 60)))
