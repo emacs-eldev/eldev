@@ -1,4 +1,4 @@
-;;; project-h.el --- Test project with one dependency and a stable/unstable archive
+;;; project-h.el --- Test project with one dependency, a stable/unstable archive and Ecukes tests
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

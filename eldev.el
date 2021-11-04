@@ -146,15 +146,17 @@ Default value means “everything that doesn't match any non-main
 filesets”.  E.g. if no additional filesets are defined, this
 matches everything that is not included in `test' fileset.")
 
-(defvar eldev-test-fileset '("./test.el" "./tests.el" "./*-test.el" "./*-tests.el" "./test/" "./tests/")
+(defvar eldev-test-fileset '("./test.el" "./tests.el" "./*-test.el" "./*-tests.el" "./test/" "./tests/" "./features/")  ; the last is for Ecukes
   "Fileset used to find test targets.
 Default value is files `test.el', `tests.el', `*-test.el' or
 `*-tests.el' in the project directory and everything within
 `test' or `tests' subdirectories.")
 
-(defvar eldev-standard-excludes '(:or ".*" (let ((dist-dir (file-relative-name (eldev-dist-dir) eldev-project-dir)))
-                                             (unless (eldev-external-or-absolute-filename dist-dir)
-                                               (concat "/" dist-dir))))
+(defvar eldev-standard-excludes '(:or ".*"
+                                      "./features/step-definitions/" "./features/support/"  ; for Ecukes
+                                      (let ((dist-dir (file-relative-name (eldev-dist-dir) eldev-project-dir)))
+                                        (unless (eldev-external-or-absolute-filename dist-dir)
+                                          (concat "/" dist-dir))))
   "Fileset of targets that should be excluded from all sets.
 Default value excludes all files and directories with name
 starting with dot (i.e. hidden files by UNIX conventions).  Most
@@ -250,12 +252,13 @@ normal interface, but can be set in a `--setup-first' form.
 Since 0.5")
 
 (defvar eldev-known-tool-packages
-  '((buttercup    :version "1.24" :archive  melpa)
-    (package-lint :version "0.14" :archives (melpa gnu))
-    (relint       :version "1.18" :archive  gnu)
-    (elisp-lint                   :archives (melpa gnu))
+  '((buttercup    :version "1.24"   :archive  melpa)
+    (ecukes       :version "0.6.18" :archive  melpa)
+    (package-lint :version "0.14"   :archives (melpa gnu))
+    (relint       :version "1.18"   :archive  gnu)
+    (elisp-lint                     :archives (melpa gnu))
     ;; This is for a plugin, but probably no reason not to have it unconditionally.
-    (undercover   :version "0.8"  :archive  melpa))
+    (undercover   :version "0.8"    :archive  melpa))
   "Alist of known external tool packages.
 Packages listed here can be referred to as `(:tool PACKAGE-NAME)'
 in places where package alists are understood.  Users can
@@ -2927,6 +2930,9 @@ mode output is restricted to just the version."
 (declare-function eldev-test-buttercup-preprocess-selectors "eldev-buttercup" (selectors))
 (declare-function eldev-run-buttercup-tests "eldev-buttercup" (selectors &optional environment))
 
+(declare-function eldev-test-ecukes-preprocess-selectors "eldev-ecukes" (selectors))
+(declare-function eldev-run-ecukes-tests "eldev-ecukes" (feature-files selectors &optional environment))
+
 (defvaralias 'eldev-test-dwim 'eldev-dwim)
 
 (defvar eldev-dwim t
@@ -2949,7 +2955,9 @@ These heuristics are aimed at further simplifying of test
 execution and other common commands.")
 
 (defvar eldev-test-stop-on-unexpected nil
-  "If non-nil, stop as soon as a test produces an unexpected result.")
+  "If non-nil, stop as soon as a test produces an unexpected result.
+Can also be an integer, in which case stop after that many tests
+produce unexpected results.")
 
 (defvar eldev-test-print-backtraces t
   "If non-nil (default), print assertion backtraces.
@@ -2966,8 +2974,15 @@ situations where success is claimed only because no/few tests
 were executed.")
 
 (defvar eldev-test-framework nil
-  "Test framework to use.
-If left nil (default value), Eldev will try to autodetect.")
+  "Test framework(s) to use.
+Can be a list of supported framework names in case the project
+includes tests of different kinds, e.g. \\='(ert buttercup)
+or \\='(buttercup ecukes).
+
+If left nil (default value), Eldev will try to autodetect.
+Autodetection will not produce correct result if you use
+different kinds of tests in files of same type, i.e. currently
+ERT and Buttercup: both use `.el' files.")
 
 (defvar eldev-test-runner nil
   "Test runner to use.")
@@ -2984,28 +2999,44 @@ Functions are called with SELECTORS as argument.
 
 Since Eldev 0.2.")
 
+(defvar eldev-test-ecukes-hook nil
+  "Hook executed before running Ecukes tests.
+Functions are called with SELECTORS as argument.
+
+Since Eldev 0.10.")
+
 (defvar eldev--test-runners nil)
 
 (defvar eldev-test-file-patterns nil
   "Load only those test files that match one of these patterns.
 Should normally be specified only from command line.")
 
-(defvar eldev-test-known-frameworks '((ert .       ((detect               . (lambda () (and (featurep 'ert) (not (featurep 'buttercup)))))
-                                                    (require              . eldev-ert)
-                                                    (preprocess-selectors . eldev-test-ert-preprocess-selectors)
-                                                    (prepare              . (lambda (_selectors)
-                                                                              (eldev-test-ert-load-results)))
-                                                    (run-tests            . (lambda (selectors _runner environment)
-                                                                              (eldev-run-ert-tests selectors environment)))
-                                                    (finalize             . (lambda (_selectors)
-                                                                              (eldev-test-ert-save-results)))))
-                                      (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
-                                                    (features             . buttercup)
-                                                    (packages             . ((:tool buttercup)))
-                                                    (require              . eldev-buttercup)
-                                                    (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
-                                                    (run-tests            . (lambda (selectors _runner environment)
-                                                                              (eldev-run-buttercup-tests selectors environment))))))
+(defvar eldev-test-known-frameworks
+  (eval-when-compile `((ert .       ((detect               . (lambda () (and (featurep 'ert) (not (featurep 'buttercup)))))
+                                     (require              . eldev-ert)
+                                     (preprocess-selectors . eldev-test-ert-preprocess-selectors)
+                                     (prepare              . (lambda (_selectors)
+                                                               (eldev-test-ert-load-results)))
+                                     (run-tests            . (lambda (selectors _files _runner environment)
+                                                               (eldev-run-ert-tests selectors environment)))
+                                     (finalize             . (lambda (_selectors)
+                                                               (eldev-test-ert-save-results)))))
+                       (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
+                                     (features             . buttercup)
+                                     (packages             . ((:tool buttercup)))
+                                     (require              . eldev-buttercup)
+                                     (preprocess-selectors . eldev-test-buttercup-preprocess-selectors)
+                                     (run-tests            . (lambda (selectors _files _runner environment)
+                                                               (eldev-run-buttercup-tests selectors environment)))))
+                       (ecukes    . ((detect               . (lambda () t))  ; if `.feature' files are found, then they must be for Ecukes
+                                     (fileset              . "*.feature")
+                                     (file-description     . "test `.feature' file%s")
+                                     (dwim-regexp          . ,(rx ".feature" eol))
+                                     (packages             . ((:tool ecukes)))
+                                     (require              . eldev-ecukes)
+                                     (preprocess-selectors . eldev-test-ecukes-preprocess-selectors)
+                                     (run-tests            . (lambda (selectors files _runner environment)
+                                                               (eldev-run-ecukes-tests files selectors environment)))))))
   "Alist of all test frameworks known to Eldev.
 While this variable is public and can be modified, you most
 likely shouldn't do that.  Leave adding support for more
@@ -3042,58 +3073,78 @@ is not controllable from command line---change its value in
 This command exits with error code 1 if any test produces an
 unexpected result."
   :parameters     "[SELECTOR...]"
+  (eldev--do-test eldev-test-framework parameters))
+
+(defun eldev--do-test (possible-frameworks parameters)
   (eldev-load-project-dependencies 'test)
-  (let ((files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) "*.el") "test `.el' file%s"))
-        selectors)
-    (when files
-      (let ((filter-patterns eldev-test-file-patterns))
-        (dolist (selector parameters)
-          (if (and eldev-dwim (string-match-p (rx ".el" eol) selector))
-              (push selector filter-patterns)
-            (push selector selectors)))
-        (setf selectors (nreverse selectors))
+  (setf possible-frameworks (if possible-frameworks
+                                (eldev-listify possible-frameworks)
+                              (mapcar #'car eldev-test-known-frameworks)))
+  (let ((filter-patterns eldev-test-file-patterns)
+        selectors
+        filesets
+        found-any-files)
+    (dolist (selector parameters)
+      (if (and eldev-dwim (eldev-any-p (string-match-p (or (eldev-test-get-framework-entry it 'dwim-regexp) (rx ".el" eol)) selector) possible-frameworks))
+          (push selector filter-patterns)
+        (push selector selectors)))
+    (dolist (framework possible-frameworks)
+      (let* ((fileset (or (eldev-test-get-framework-entry framework 'fileset) "*.el"))
+             (entry   (cdr (assoc fileset filesets))))
+        (if entry
+            (push framework (car entry))
+          (push `(,fileset . ((,framework) . ,(or (eldev-test-get-framework-entry framework 'file-description) "test `.el' file%s"))) filesets))))
+    (setf selectors (nreverse selectors)
+          filesets  (nreverse filesets))
+    (dolist (entry filesets)
+      (let* ((fileset            (car  entry))
+             (used-by-frameworks (cadr entry))
+             (file-description   (cddr entry))
+             (files              (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) ,fileset) file-description)))
         (when filter-patterns
           (setf files (eldev-filter-files files (reverse filter-patterns)))
-          (eldev-trace "%s" (eldev-message-enumerate-files "Remaining test `.el' file%s after applying `--file' filter(s): %s (%d)" files)))))
-    ;; Framework autoguessing can only work if there is at least one file to load, so this
-    ;; `if' is important.
-    (if files
-        (progn
-          (eldev-autoinstalling-implicit-dependencies t
-            (dolist (file files)
-              (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
-                     (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
-                (if already-loaded
-                    (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
-                  (eldev-verbose "Loading test file `%s'..." file)
-                  (load absolute-without-el nil t nil t)))))
+          (eldev-trace "%s" (eldev-message-enumerate-files (format "Remaining %s after applying `--file' filter(s): %%s (%%d)" file-description) files)))
+        ;; Framework autoguessing can only work if there is at least one file to load, so
+        ;; this `when' is important.
+        (when files
+          (when (equal fileset "*.el")
+            (eldev-autoinstalling-implicit-dependencies t
+              (dolist (file files)
+                (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
+                       (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
+                  (if already-loaded
+                      (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
+                    (eldev-verbose "Loading test file `%s'..." file)
+                    (load absolute-without-el nil t nil t))))))
           (let* ((runner-name (or eldev-test-runner 'simple))
                  (runner      (or (cdr (assq runner-name eldev--test-runners))
                                   (signal 'eldev-error `(:hint ("Check output of `%s test --list-runners'" ,(eldev-shell-command t)) "Unknown test runner `%s'" ,runner-name))))
-                 (supported   (eldev-get runner :frameworks))
-                 (framework   (or (eldev-test-framework)
-                                  (signal 'eldev-error `(:hint "Consider setting `eldev-test-framework' explicitly" "Unable to guess testing framework")))))
-            (unless (or (null supported) (eq framework supported) (and (listp supported) (memq framework supported)))
-              (signal 'eldev-error `(:hint ("Run `%s test --list-runners' for more information" ,(eldev-shell-command t))
-                                           "Test runner `%s' doesn't support framework `%s'" ,runner-name ,framework)))
-            (setf selectors (eldev-test-preprocess-selectors framework selectors))
-            (run-hook-with-args (intern (format "eldev-test-%s-hook" framework)) selectors)
-            (eldev-test-prepare-framework framework selectors)
-            (unwind-protect
-                (funcall runner framework selectors)
-              (eldev-test-finalize-framework framework selectors))))
-      (eldev-print "No test files to load"))))
+                 (supported   (eldev-get runner :frameworks)))
+            (dolist (framework (or (eldev-listify (eldev-test-framework used-by-frameworks))
+                                   (signal 'eldev-error `(:hint "Consider setting `eldev-test-framework' explicitly" "Unable to guess testing framework(s)"))))
+              (unless (equal fileset "*.el")
+                (eldev--test-maybe-install-framework framework "Installing package(s) of testing framework `%s'..."))
+              (unless (or (null supported) (memq framework (eldev-listify supported)))
+                (signal 'eldev-error `(:hint ("Run `%s test --list-runners' for more information" ,(eldev-shell-command t))
+                                             "Test runner `%s' doesn't support framework `%s'" ,runner-name ,framework)))
+              (let ((actual-selectors (eldev-test-preprocess-selectors framework selectors)))
+                (run-hook-with-args (intern (format "eldev-test-%s-hook" framework)) actual-selectors)
+                (eldev-test-prepare-framework framework actual-selectors)
+                (unwind-protect
+                    (funcall runner framework actual-selectors files)
+                  (eldev-test-finalize-framework framework actual-selectors)))))
+          (setf found-any-files t))))
+    (unless found-any-files
+      (eldev-print "No test files to use"))))
 
 (defvar byte-compiler-error-flag)
 (defun eldev--test-autoinstalling-framework (enabled callback)
   ;; If framework is specified explicitly, ensure it is installed first.  Otherwise
   ;; appropriate framework will be installed from `require' advice below.
   (when (and enabled eldev-test-framework)
-    (let ((to-install (eldev-test-get-framework-entry eldev-test-framework 'packages)))
-      (when to-install
-        (eldev-verbose "Preparing testing framework `%s' as specified by variable `eldev-test-framework'..." eldev-test-framework)
-        (apply #'eldev-add-extra-dependencies 'runtime to-install)
-        (eldev-load-extra-dependencies 'runtime))))
+    (dolist (framework (eldev-listify eldev-test-framework))
+      (unless (eldev-test-get-framework-entry framework 'fileset)
+        (eldev--test-maybe-install-framework framework "Preparing testing framework `%s' as specified by variable `eldev-test-framework'..."))))
   (eldev-advised ('require :before (when (and enabled (null eldev-test-framework))
                                      (lambda (feature &optional filename no-error)
                                        ;; Only perform autoinstallation for simple `(require 'x)' forms.
@@ -3112,6 +3163,13 @@ unexpected result."
                                                (eldev-load-extra-dependencies 'runtime))))))))
     (funcall callback)))
 
+(defun eldev--test-maybe-install-framework (framework message)
+  (let ((to-install (eldev-test-get-framework-entry framework 'packages)))
+    (when to-install
+      (eldev-verbose message framework)
+      (apply #'eldev-add-extra-dependencies 'runtime to-install)
+      (eldev-load-extra-dependencies 'runtime))))
+
 (defun eldev-test-get-framework-data (framework)
   "Get all data for given FRAMEWORK."
  (or (cdr (assq framework eldev-test-known-frameworks))
@@ -3128,20 +3186,23 @@ unexpected result."
         (require feature)))
     entry))
 
-(defun eldev-test-framework ()
-  "Get used test framework.
-If variable `eldev-test-framework' has nil value, framework is
-autodetected if possible."
-  (or eldev-test-framework
-      (let ((scan eldev-test-known-frameworks)
-            detected)
-        (while scan
-          (let* ((framework-data (pop scan))
-                 (detect         (cdr (assq 'detect (cdr framework-data)))))
-            (when (and detect (funcall detect))
-              (setf detected (car framework-data)
-                    scan     nil))))
-        detected)))
+(defun eldev-test-framework (&optional possible-frameworks)
+  "Get used test framework(s).
+For compatibility, return value is a symbol if only one framework
+is used.  If variable `eldev-test-framework' has nil value,
+framework(s) are autodetected where possible, among those allowed
+by parameter POSSIBLE-FRAMEWORKS (if that is not specified, only
+frameworks based on `.el' files, i.e. ERT and Buttercup, are
+considered allowed)."
+  (let ((frameworks (or (eldev-listify eldev-test-framework)
+                        (mapcar #'car (eldev-filter (let* ((framework (car it))
+                                                           (detect    (when (if possible-frameworks
+                                                                                (memq framework possible-frameworks)
+                                                                              (null (cdr (assq 'fileset (cdr it)))))
+                                                                        (cdr (assq 'detect (cdr it))))))
+                                                      (and detect (funcall detect)))
+                                                    eldev-test-known-frameworks)))))
+    (if (cdr frameworks) frameworks (car frameworks))))
 
 (defun eldev-test-preprocess-selectors (framework selectors)
   "Convert specified SELECTORS for use by given FRAMEWORK."
@@ -3238,17 +3299,17 @@ it will have to redownload all dependency packages."
             (eldev--register-test-runner ',name ',runner-name ',(nreverse keywords)))))
 
 
-(eldev-deftestrunner eldev-test-runner-standard (framework selectors)
+(eldev-deftestrunner eldev-test-runner-standard (framework selectors files)
   "Invokes test framework without changing anything.  However,
 various options to command `test' and global option `-b'
 (variable `eldev-backtrace-style') are still respected if
 possible."
-  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'standard
+  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'standard
            (pcase framework
              ;; For Buttercup we still pass through our color setting.
              (`buttercup `((buttercup-color . ,(eldev-output-colorized-p)))))))
 
-(eldev-deftestrunner eldev-test-runner-simple (framework selectors)
+(eldev-deftestrunner eldev-test-runner-simple (framework selectors files)
   "Simple test runner with a few tweaks to the defaults.
 
 For ERT:
@@ -3262,7 +3323,7 @@ For Buttercup:
 Backtraces are formatted according to `eldev-test-print-backtraces'
 and `eldev-backtrace-style'.  For Buttercup, any truncation results
 in `crop' stack frame style."
-  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors 'simple
+  (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'simple
              ;; Other frameworks are just invoked with empty environment.
              (pcase framework
                (`ert
@@ -3270,7 +3331,9 @@ in `crop' stack frame style."
                   (eldev--test-ert-short-backtraces . t)))
                (`buttercup
                 `((buttercup-color                         . ,(eldev-output-colorized-p))
-                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed)))))))))
+                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))))
+               (`ecukes
+                `((ecukes-verbose . (not (eldev-unless-quiet t))))))))
 
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"

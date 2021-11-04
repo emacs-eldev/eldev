@@ -145,8 +145,9 @@ use this for ERT framework, unless they can do better."
         (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
                (num-unexpected (ert-stats-completed-unexpected statistics)))
           (unless (= num-unexpected 0)
-            (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "test")))))))))
+            (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "ERT test")))))))))
 
+;; See new functionality of `eldev-backtrace'.  Maybe we could reuse that somehow?
 (defun eldev--ert-maybe-shorten-backtrace (frames)
   (when eldev--test-ert-short-backtraces
     ;; Drop the frames that are inside ERT and Eldev.

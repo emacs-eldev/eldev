@@ -24,13 +24,13 @@
 (ert-deftest eldev-test-project-b-4 ()
   ;; No files match, so zero tests.
   (eldev--test-run "project-b" ("test" "--file" "there-is-no-such-file.el")
-    (should (string= stdout "No test files to load\n"))
+    (should (string= stdout "No test files to use\n"))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-5 ()
   ;; No tests match, but the file should be loaded.
   (eldev--test-run "project-b" ("test" "there-are-no-such-tests")
-    (should (not (string= stdout "No test files to load\n")))
+    (should (not (string= stdout "No test files to use\n")))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-c-1 ()
@@ -60,7 +60,7 @@
   (eldev--test-run "project-d" ("test")
     ;; If Eldev itself (rather than tests) fails, there will be a
     ;; different message.
-    (should (string-match-p "\\`\n*[0-9]+ tests? produced an unexpected result\n*\\'" stderr))))
+    (should (string-match-p "\\`\n*[0-9]+ ERT tests? produced an unexpected result\n*\\'" stderr))))
 
 
 (ert-deftest eldev-test-utility-files-in-package-mode-1 ()

@@ -57,7 +57,7 @@
       (buttercup-mark-skipped selectors t))
     (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))
     (unless (buttercup-run t)
-      (signal 'eldev-error `("%s failed" ,(eldev-message-plural (buttercup-suites-total-specs-failed buttercup-suites) "test"))))))
+      (signal 'eldev-error `("%s failed" ,(eldev-message-plural (buttercup-suites-total-specs-failed buttercup-suites) "Buttercup test"))))))
 
 
 (provide 'eldev-buttercup)
