@@ -801,9 +801,10 @@ applied to backtraces printed because of `--debug' option.
 
 (defvar backtrace-line-length)
 
-(declare-function backtrace-get-frames "backtrace" ())
-(declare-function backtrace-to-string "backtrace" (&optional frames))
-(declare-function backtrace-frame-fun "backtrace" (frame))
+(declare-function backtrace-get-frames "backtrace")
+(declare-function backtrace-frames "backtrace")
+(declare-function backtrace-to-string "backtrace")
+(declare-function backtrace-frame-fun "backtrace")
 
 
 (defun eldev-backtrace-frames (&optional backtrace-function)
@@ -811,8 +812,21 @@ applied to backtraces printed because of `--debug' option.
 All frames before the innermost call to BACKTRACE-FUNCTION are
 dropped.  This uses either `backtrace-frames' or newer
 `backtrace-get-frames' if available.  Since 0.10"
+  (unless backtrace-function
+    (setf backtrace-function #'eldev-backtrace-frames))
   (require 'backtrace nil t)
-  (funcall (if (fboundp #'backtrace-get-frames) #'backtrace-get-frames #'backtrace-frames) (or backtrace-function #'eldev-backtrace-frames)))
+  (cond ((fboundp #'backtrace-get-frames)
+         (backtrace-get-frames backtrace-function))
+        ((fboundp #'backtrace-frames)
+         (backtrace-frames backtrace-function))
+        (t
+         (let ((n 0)
+               frames)
+           (while (let ((frame (backtrace-frame n backtrace-function)))
+                    (when frame
+                      (push frame frames)
+                      (setf n (1+ n)))))
+           (nreverse frames)))))
 
 (defun eldev-backtrace (&optional frames backtrace-function)
   "Print backtrace to stderr.
