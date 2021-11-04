@@ -820,11 +820,14 @@ dropped.  This uses either `backtrace-frames' or newer
         ((fboundp #'backtrace-frames)
          (backtrace-frames backtrace-function))
         (t
+         ;; On Emacs 24 and 25 there are no such functions.
          (let ((n 0)
                frames)
+           ;; Result of `backtrace-frame' is incompatible with what `backtrace-frames'
+           ;; delivers.  Elisp...  Restructure for compatibility.
            (while (let ((frame (backtrace-frame n backtrace-function)))
                     (when frame
-                      (push frame frames)
+                      (push (list (nth 0 frame) (nth 1 frame) (nthcdr 2 frame)) frames)
                       (setf n (1+ n)))))
            (nreverse frames)))))
 
@@ -850,11 +853,25 @@ See `eldev-backtrace' for more information.  Since 0.10."
       (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
       ;; Use `backtrace-to-string' only with new-style frames.
       (if (and (fboundp #'backtrace-to-string) (not (listp (car frames))))
-          (insert (backtrace-to-string frames))
-        (let ((standard-output       (current-buffer))
-              ;; Emacs' `backtrace' module can die if this value is too small or nil.
-              (backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
-          (backtrace)))
+          ;; Emacs' `backtrace' module can die if this value is too small or nil.
+          (let ((backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
+            (insert (backtrace-to-string frames)))
+        (let ((standard-output                 (current-buffer))
+              (print-level                     (or print-level 8))
+              (print-escape-control-characters t)
+              (print-escape-newlines           t))
+          ;(mapatoms (lambda (x) (when (and (boundp x) (string-prefix-p "print-" (symbol-name x))) (eldev-warn "%S %S" x (symbol-value x)))))
+          (dolist (frame frames)
+            (princ "  ")
+            (let ((fn   (nth 1 frame))
+                  (args (nth 2 frame)))
+              (if (nth 0 frame)
+                  (progn (prin1 fn)
+                         (if args
+                             (prin1 args)
+                           (princ "()")))
+                (prin1 (cons fn args))))
+            (princ "\n"))))
       (goto-char 1)
       (eldev-highlight-backtrace)
       (eldev--truncate-backtrace-lines limit)
@@ -891,8 +908,7 @@ Emacs 27+.  Since 0.3."
   "Highlight elements in given BACKTRACE.
 The argument can be either a string or a buffer.  If it is not
 specified, current buffer is highlighted.  Currently,
-highlighting is done only on Emacs 27 and up and only for frames'
-main function names.
+highlighting is done only for frames' main function names.
 
 If the argument is a string, return highlighted string (i.e. with
 faces set up).  Otherwise, just modify the buffer.
@@ -900,15 +916,13 @@ faces set up).  Otherwise, just modify the buffer.
 Since 0.8."
   ;; This is useful for non-byte-compiled code.  However, it seems that on pre-27 Emacs
   ;; single frames can take multiple lines.
-  (if (>= emacs-major-version 27)
-      (if (stringp backtrace)
-          (with-temp-buffer
-            (insert backtrace)
-            (eldev--do-highlight-backtrace)
-            (buffer-string))
-        (with-current-buffer (or backtrace (current-buffer))
-          (eldev--do-highlight-backtrace)))
-    backtrace))
+  (if (stringp backtrace)
+      (with-temp-buffer
+        (insert backtrace)
+        (eldev--do-highlight-backtrace)
+        (buffer-string))
+    (with-current-buffer (or backtrace (current-buffer))
+      (eldev--do-highlight-backtrace))))
 
 (defun eldev--do-highlight-backtrace ()
   (save-excursion

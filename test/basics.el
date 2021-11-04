@@ -107,24 +107,4 @@
     (should (= exit-code 1))))
 
 
-(eldev-ert-defargtest eldev-backtrace-length-limit-1 (with-time-diff)
-                      (nil t)
-  ;; Backtrace length limit should be adjusted accordingly when option `-T' is used.
-  (eldev--test-run "trivial-project" ("--backtrace=30" (if with-time-diff "--time" "--no-time") "exec" `(eldev-backtrace))
-    (let ((lines (eldev-filter (not (string-match-p "Bootstrapping Eldev" it)) (eldev--test-line-list stderr))))
-      (should (string= stdout ""))
-      (should (eldev-all-p (<  (length it) 30) lines))
-      (should (eldev-any-p (>= (length it) 29) lines))
-      (should (= exit-code 0)))))
-
-(eldev-ert-defargtest eldev-backtrace-length-limit-2 (with-time-diff)
-                      (nil t)
-  (eldev--test-run "trivial-project" ("--backtrace=30" "--debug" (if with-time-diff "--time" "--no-time") "eval" "this-variable-is-not-bound")
-    (let ((lines (eldev-filter (not (string-match-p "Bootstrapping Eldev" it)) (eldev--test-line-list stderr))))
-      (should (string= stdout ""))
-      (should (eldev-all-p (<  (length it) 30) lines))
-      (should (eldev-any-p (>= (length it) 29) lines))
-      (should (/= exit-code 0)))))
-
-
 (provide 'test/basics)
