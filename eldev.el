@@ -111,6 +111,9 @@ instead.")
   "Name of Eldev cache subdirectory, `.eldev'.
 See also function `eldev-cache-dir'.")
 
+(defconst eldev-global-cache-dir "global-cache"
+  "Name of the global cache directory (a subdirectory of `eldev-dir').")
+
 (defvar eldev--internal-pseudoarchive "--eldev--")
 
 (defvar eldev--loading-modes
@@ -980,7 +983,7 @@ Returns COMMAND-LINE with options removed."
       (nreverse without-options))))
 
 (defun eldev-global-package-archive-cache-dir ()
-  (expand-file-name "global-cache" eldev-dir))
+  (expand-file-name eldev-global-cache-dir eldev-dir))
 
 (defun eldev-cache-dir (emacs-version-specific &optional ensure-exists)
   "Get the directory where various internal caches should be stored.
@@ -4094,6 +4097,219 @@ be passed to Emacs, else it will most likely fail."
         :pre-execution (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
         :die-on-error  "child Emacs"
         (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")))))
+
+
+
+;; eldev docker
+
+(defvar eldev--docker-gui-args
+  (list "-e" "DISPLAY" "-v" "/tmp/.X11-unix:/tmp/.X11-unix")
+  "Arguments needed to launch dockerized Emacs as a GUI.")
+
+(defvar eldev-docker-run-extra-args nil
+  "Extra arguments to pass to \"docker run\".")
+
+(defvar eldev--container-bootstrap-cmd-fn
+  #'eldev--container-bootstrap-cmd-fn
+  "Function to determine the command used by \"docker run\".
+
+It should take one parameter: the arguments of the \"eldev\" call.")
+
+(defvar eldev--docker-home-name "docker-home"
+  "Name of the home directory of the docker user.")
+
+(defvar eldev--docker-os-error-fmt-string
+  "OS %s is not currently supported by \"eldev docker\""
+  "Error message format string if the os is not supported.")
+
+(defun eldev--container-bootstrap-cmd-fn (eldev-args)
+  "Return a command in the form of an argument list for \"docker run\".
+
+ELDEV-ARGS will be passed to an \"eldev\" call."
+  (list
+   "sh" "-c"
+   (format "export PATH=\"$HOME/bin:$PATH\" && eldev %s" eldev-args)))
+
+(defun eldev--container-eldev-source-install-cmd (eldev-src-repo-dir eldev-args)
+  "Return command for \"docker run\" that will install eldev from source.
+
+Return a command that installs eldev from the source repository
+ELDEV-SRC-REPO-DIR (a full path on the container), and then calls eldev
+with ELDEV-ARGS."
+  (list
+   "sh" "-c"
+   (format "ELDEV_LOCAL=%s %s/bin/eldev %s"
+           eldev-src-repo-dir
+           eldev-src-repo-dir
+           eldev-args)))
+
+(defun eldev--docker-determine-img (img-string)
+  "Return an appropriate docker image based on IMG-STRING."
+  (if (string-match-p ".*/.*" img-string)
+      img-string
+    (format "silex/emacs:%s" img-string)))
+
+(defun eldev--docker-local-dep-mounts (home)
+  "Return bind mount arguments of local dependencies for docker run.
+
+HOME is the home directory of the container user."
+  (eldev-flatten-tree
+   (mapcar (lambda (local-dep)
+             (let* ((dir (nth 3 local-dep))
+                    (dir-rel (file-relative-name dir (expand-file-name "~")))
+                    (container-dir
+                     (if (eldev-external-filename dir-rel)
+                         dir
+                       (concat (file-name-as-directory home) dir-rel))))
+               (list "-v" (format "%s:%s" (expand-file-name dir) container-dir))))
+           eldev--local-dependencies)))
+
+(defun eldev--docker-create-directories (docker-home)
+  "Make directories required for \"eldev docker\" given DOCKER-HOME.
+
+This is necessary since if we mount a volume such that the directory
+on the host does not exist, then it will be created on the container
+owned by root."
+  (unless (file-exists-p docker-home)
+    (make-directory
+     (concat (file-name-as-directory docker-home)
+             (file-name-as-directory eldev-cache-dir)
+             eldev-global-cache-dir)
+     t))
+  (let ((home-bin (concat (file-name-as-directory docker-home) "bin")))
+    (unless (file-exists-p home-bin) (make-directory home-bin))))
+
+(defun eldev--docker-home ()
+  "Return the host directory of the container docker home."
+  (concat (file-name-as-directory (eldev-cache-dir nil t))
+          eldev--docker-home-name))
+
+(defun eldev--docker-args (img eldev-args &optional as-gui local-eldev)
+  "Return command line args to run the docker image IMG.
+
+ELDEV-ARGS will be appended to the eldev call in the container.
+
+The global config file and cache will be mounted unless
+`eldev-skip-global-config' is nil.
+
+If AS-GUI is non-nil include arguments necessary to run Emacs as a GUI.
+
+If LOCAL-ELDEV (a directory) is specified, the returned arguments will
+contain a mount of it at /eldev."
+  (let* ((container-project-dir (file-name-nondirectory
+                                 (directory-file-name eldev-project-dir)))
+         (container-home (concat "/"
+                                 (file-name-as-directory container-project-dir)
+                                 (file-name-as-directory eldev-cache-dir)
+                                 eldev--docker-home-name))
+         (container-eldev-cache-dir
+          (concat (file-name-as-directory container-home) eldev-cache-dir))
+         (container-bin (concat (file-name-as-directory container-home) "bin")))
+    (eldev--docker-create-directories (eldev--docker-home))
+    (append (list "run" "--rm"
+                  "-e" (format "HOME=%s" container-home)
+                  "-u" (format "%s:%s" (user-uid) (group-gid))
+                  "-v" (format "%s:/%s" eldev-project-dir container-project-dir)
+                  "-w" (concat "/" container-project-dir))
+            (when as-gui eldev--docker-gui-args)
+            (if local-eldev
+                (when (not (string= (directory-file-name eldev-project-dir)
+                                    (directory-file-name local-eldev)))
+                  (list "-v" (format "%s:/eldev" local-eldev)))
+              (list "-v" (format "%s:%s/eldev"
+                                 (locate-file "bin/eldev" load-path)
+                                 container-bin)))
+            (unless eldev-skip-global-config
+              (list "-v" (format "%s:%s/%s"
+                                 (eldev-global-package-archive-cache-dir)
+                                 container-eldev-cache-dir
+                                 eldev-global-cache-dir)))
+            (unless (or eldev-skip-global-config
+                        (not (file-exists-p eldev-user-config-file)))
+              (list "-v" (format "%s:%s/config"
+                                 eldev-user-config-file
+                                 container-eldev-cache-dir)))
+            (eldev--docker-local-dep-mounts container-home)
+            eldev-docker-run-extra-args
+            (cons img (funcall eldev--container-bootstrap-cmd-fn
+                               (mapconcat #'identity eldev-args " "))))))
+
+(defun eldev--docker-container-eldev-cmd (args)
+  "Return the eldev command to call in the docker container deduced from ARGS."
+  (car (eldev-filter (not (string-prefix-p "-" it)) args)))
+
+(defun eldev--docker-on-supported-os ()
+  "Return t if on a supported OS, else return nil."
+  (memq system-type '(gnu/linux gnu/kfreebsd darwin)))
+
+(eldev-defcommand eldev-docker (&rest parameters)
+  "Launch specified Emacs version in a Docker container.
+
+This will execute given Eldev COMMAND against a specified Emacs
+version with the project loaded with all its dependencies in a
+Docker container.  GLOBAL-OPTIONs, such as `--trace', preceding
+the COMMAND, will be forwarded to the Eldev call inside the
+container.
+
+You must specify either a valid Emacs VERSION, e.g. `27.2' or a
+full Docker image name.  If a version is specified, corresponding
+Silex's image (https://hub.docker.com/r/silex/emacs, see also for
+the list of available versions) is used.  If you specify a full
+image name, make sure it contains an installed Emacs of a version
+supported by Eldev.
+
+Command line arguments appearing after VERSION will be forwarded
+to an `eldev' call within the container.  For example:
+
+    eldev docker 25 emacs file.txt
+
+will execute `eldev emacs file.txt' inside an Emacs 25 container.
+
+The contents of `eldev-docker-run-extra-args' will be added to the
+`docker run' call this command issues.
+
+Currently only Linux and macOS systems are supported."
+  :parameters     "{VERSION|IMG-NAME} [GLOBAL-OPTION..] COMMAND [...]"
+  :aliases        emacs-docker
+  :custom-parsing t
+  (unless (eldev--docker-on-supported-os)
+    (signal 'eldev-error
+            `(t ,(format eldev--docker-os-error-fmt-string system-type))))
+  (unless (car parameters)
+    (signal 'eldev-wrong-command-usage `(t "version not specified")))
+  (let* ((img (eldev--docker-determine-img (car parameters)))
+         (docker-exec (eldev-docker-executable))
+         (escaped-params (mapcar #'eldev-quote-sh-string (cdr parameters)))
+         (container-cmd (eldev--docker-container-eldev-cmd escaped-params))
+         (as-gui (and (string= "emacs" container-cmd)
+                      (not (member "--batch" parameters))))
+         (local-eldev (getenv "ELDEV_LOCAL"))
+         (exp-local-eldev (when local-eldev (expand-file-name local-eldev)))
+         (eldev--container-bootstrap-cmd-fn
+          (if local-eldev
+              (apply-partially
+               #'eldev--container-eldev-source-install-cmd "/eldev")
+            eldev--container-bootstrap-cmd-fn))
+         (args (append
+                (eldev--docker-args img escaped-params as-gui exp-local-eldev))))
+    (eldev-call-process
+        docker-exec
+        args
+      :pre-execution
+      (eldev-verbose "Running command '%s %s'"
+                     docker-exec
+                     (mapconcat #'identity args " "))
+      :die-on-error
+      (progn
+        (delete-directory (eldev--docker-home) t)
+        (when (string-match-p ".*unavailable, simulating -nw.*" (buffer-string))
+          (eldev-warn "It appears your X server is not accepting connections from the docker container")
+          (eldev-warn "Have you run `xhost +local:root' (remember about security issues, though)?\n"))
+        (format "%s run" docker-exec))
+      (eldev--forward-process-output
+       (format "Output of the %s process:" docker-exec)
+       (format "%s process produced no output" docker-exec)))
+    (delete-directory (eldev--docker-home) t)))
 
 
 
