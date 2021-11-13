@@ -85,17 +85,13 @@ use this for ERT framework, unless they can do better."
         ;; Otherwise use value of `eldev-backtrace-style', but only if test runner doesn't
         ;; specify anything.
         (unless (assq 'ert-batch-backtrace-right-margin environment)
-          ;; XXX
           (setf width                            (eldev-shrink-screen-width-as-needed eldev-backtrace-style)
                 ert-batch-backtrace-right-margin (when (and (integerp width) (> width 0)) (max (1- width) 1))))))
     ;; Workaround: older Emacsen don't support setting `ert-batch-backtrace-right-margin'
     ;; to nil.  We assume that if the variable is customizable, nil is already supported.
     (unless (or ert-batch-backtrace-right-margin (get 'ert-batch-backtrace-right-margin 'custom-type))
       (setf ert-batch-backtrace-right-margin 1000000))
-    (let ((stop-after-failures eldev-test-stop-on-unexpected)
-          completed-tests)
-      (when (and stop-after-failures (not (and (integerp stop-after-failures) (> stop-after-failures 1))))
-        (setf stop-after-failures 1))
+    (let (completed-tests)
       (eldev-advised (#'ert-run-tests
                       ;; There is a difference in number arguments in Emacs 24, so just hide
                       ;; the extra arguments with `&rest'.
@@ -126,13 +122,14 @@ use this for ERT framework, unless they can do better."
                                              (`run-started
                                               (eldev-test-validate-amount (ert-stats-total (nth 0 arguments))))
                                              (`test-ended
-                                              (when stop-after-failures
+                                              (when eldev-test-stop-on-unexpected
                                                 (let ((stats             (nth 0 arguments))
                                                       (test              (nth 1 arguments))
                                                       (result            (nth 2 arguments))
                                                       (num-tests-ignored 0))
                                                   (push test completed-tests)
-                                                  (unless (or (ert-test-result-expected-p test result) (> (setf stop-after-failures (1- stop-after-failures)) 0))
+                                                  (unless (or (ert-test-result-expected-p test result)
+                                                              (> (setf eldev-test-stop-on-unexpected (1- eldev-test-stop-on-unexpected)) 0))
                                                     ;; Since this really goes into internals, assert some things beforehand.
                                                     (when (and (fboundp #'ert--stats-tests) (fboundp #'ert-test-most-recent-result)
                                                                (vectorp (ert--stats-tests stats)))
@@ -144,8 +141,16 @@ use this for ERT framework, unless they can do better."
                                        rest)))
         (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
                (num-unexpected (ert-stats-completed-unexpected statistics)))
+          ;; We map ERT's expected/unexpected to passed/failed here.
+          (setf eldev-test-num-passed  (+ eldev-test-num-passed  (ert-stats-completed-expected statistics))
+                eldev-test-num-failed  (+ eldev-test-num-failed  num-unexpected)
+                eldev-test-num-skipped (+ eldev-test-num-skipped (ert-stats-skipped statistics)))
           (unless (= num-unexpected 0)
             (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "ERT test")))))))))
+
+(defun eldev-count-ert-tests (selectors)
+  "Count ERT tests matching given SELECTORS."
+  (length (ert-select-tests (or (eldev-build-ert-selector selectors) t) t)))
 
 ;; See new functionality of `eldev-backtrace'.  Maybe we could reuse that somehow?
 (defun eldev--ert-maybe-shorten-backtrace (frames)

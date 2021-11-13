@@ -31,6 +31,7 @@
 (declare-function buttercup-suites-total-specs-defined "buttercup")
 (declare-function buttercup-suites-total-specs-failed "buttercup")
 (declare-function buttercup-suites-total-specs-pending "buttercup")
+(declare-function buttercup-suites-total-specs-status "buttercup")
 
 
 (defun eldev-test-buttercup-preprocess-selectors (selectors)
@@ -55,9 +56,23 @@
                                      (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full)))))
     (when selectors
       (buttercup-mark-skipped selectors t))
-    (eldev-test-validate-amount (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))
-    (unless (buttercup-run t)
-      (signal 'eldev-error `("%s failed" ,(eldev-message-plural (buttercup-suites-total-specs-failed buttercup-suites) "Buttercup test"))))))
+    (let* ((result     (buttercup-run t))
+           (num-failed (buttercup-suites-total-specs-failed buttercup-suites)))
+      (setf eldev-test-num-passed  (+ eldev-test-num-passed  (buttercup-suites-total-specs-status buttercup-suites 'passed))
+            eldev-test-num-failed  (+ eldev-test-num-failed  num-failed)
+            eldev-test-num-skipped (+ eldev-test-num-skipped (buttercup-suites-total-specs-status buttercup-suites 'skipped)))
+      ;; Even if unsupported by the framework, at least update the variable so that we can
+      ;; stop before running further test types.
+      (when eldev-test-stop-on-unexpected
+        (setf eldev-test-stop-on-unexpected (- eldev-test-stop-on-unexpected num-failed)))
+      (unless result
+        (signal 'eldev-error `("%s failed" ,(if (> num-failed 0) (eldev-message-plural num-failed "Buttercup test") "Buttercup")))))))
+
+(defun eldev-count-buttercup-tests (selectors)
+  "Count Buttercup tests matching given SELECTORS."
+  (when selectors
+    (buttercup-mark-skipped selectors t))
+  (- (buttercup-suites-total-specs-defined buttercup-suites) (buttercup-suites-total-specs-pending buttercup-suites)))
 
 
 (provide 'eldev-buttercup)

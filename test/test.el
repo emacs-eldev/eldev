@@ -70,4 +70,14 @@
     (should (= exit-code 0))))
 
 
+(ert-deftest eldev-test-expect-1 ()
+  (eldev--test-run "project-a" ("test" "--expect" 2)
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-test-expect-2 ()
+  (eldev--test-run "project-a" ("test" "--expect" 10)
+    (should (string-match-p "Too few tests" stderr))
+    (should (= exit-code 1))))
+
+
 (provide 'test/test)

@@ -28,6 +28,7 @@
 (defvar ecukes-include-tags)
 (defvar ecukes-exclude-tags)
 (defvar ecukes-stats-scenarios)
+(defvar ecukes-stats-scenarios-passed)
 (defvar ecukes-stats-scenarios-failed)
 
 (declare-function ecukes-load "ecukes")
@@ -38,6 +39,18 @@
 (defvar eldev--ecukes-backtraces)
 (defvar eldev--ecukes-current-step)
 
+(defvar eldev--test-ecukes-initialized nil)
+
+
+(defun eldev--test-init-ecukes ()
+  ;; Apparently these variables are touched only by `ecukes-cli', which is not included,
+  ;; but we add a safeguard in case Ecukes is changed later.
+  (unless eldev--test-ecukes-initialized
+    (let ((debugger       debugger)
+          (debug-on-error debug-on-error))
+      (require 'ecukes))
+    (ecukes-load)
+    (setf eldev--test-ecukes-initialized t)))
 
 (defun eldev-test-ecukes-preprocess-selectors (selectors)
   "Convert SELECTORS to Ecukes patterns and tags."
@@ -47,65 +60,66 @@
         (signal 'eldev-error `("Non-tag selector/pattern `%s' is not a valid regular expression" ,selector)))))
   selectors)
 
+
+(defmacro eldev--test-ecukes-split-selectors (selectors &rest body)
+  (declare (indent 1))
+  `(let (ecukes-only-failing
+         (ecukes-failing-scenarios-file (expand-file-name "failing-scenarios.ecukes" (eldev-cache-dir t t)))
+         ecukes-patterns
+         ecukes-anti-patterns
+         ecukes-include-tags
+         ecukes-exclude-tags)
+     (dolist (selector (reverse ,selectors))
+       (if (member selector '(":failed" ":failing"))
+           (setf ecukes-only-failing t)
+         (let ((negated (string-prefix-p "~" selector)))
+           (when negated
+             (setf selector (substring selector 1)))
+           (let ((tag (string-prefix-p "@" selector)))
+             (when tag
+               (setf selector (substring selector 1)))
+             (push selector (if tag
+                                (if negated ecukes-exclude-tags ecukes-include-tags)
+                              (if negated ecukes-anti-patterns ecukes-patterns)))))))
+     ,@body))
+
 (defun eldev-run-ecukes-tests (feature-files selectors &optional environment)
   "Run Ecukes tests according to given SELECTORS (patterns)."
-  ;; Apparently these variables are touched only by `ecukes-cli', which is not included,
-  ;; but we add a safeguard in case Ecukes is changed later.
-  (let ((debugger       debugger)
-        (debug-on-error debug-on-error))
-    (require 'ecukes))
+  (eldev--test-init-ecukes)
   (eldev-bind-from-environment environment (ecukes-verbose)
-    (ecukes-load)
     (ecukes-reporter-use "dot")
-    (let* ((stop-after-failures eldev-test-stop-on-unexpected)
-           skip-the-rest
-           have-skipped-something
-           (maybe-skip (lambda ()
-                         (when skip-the-rest
-                           (unless have-skipped-something
-                             (eldev-warn "Stopping early because of the failed scenario%s" (if (> stop-after-failures 1) "s" "")))
-                           (setf have-skipped-something t))))
-           ecukes-only-failing
-           (ecukes-failing-scenarios-file (expand-file-name "failing-scenarios.ecukes" (eldev-cache-dir t t)))
-           ecukes-patterns
-           ecukes-anti-patterns
-           ecukes-include-tags
-           ecukes-exclude-tags)
-      (when (and stop-after-failures (not (and (integerp stop-after-failures) (> stop-after-failures 1))))
-        (setf stop-after-failures 1))
-      (dolist (selector (reverse selectors))
-        (if (member selector '(":failed" ":failing"))
-            (setf ecukes-only-failing t)
-          (let ((negated (string-prefix-p "~" selector)))
-            (when negated
-              (setf selector (substring selector 1)))
-            (let ((tag (string-prefix-p "@" selector)))
-              (when tag
-                (setf selector (substring selector 1)))
-              (push selector (if tag
-                                 (if negated ecukes-exclude-tags ecukes-include-tags)
-                               (if negated ecukes-anti-patterns ecukes-patterns)))))))
-      (eldev-advised ('ecukes-run-feature :around (lambda (original &rest args)
-                                                    (unless (funcall maybe-skip)
-                                                      (apply original args))))
-        (eldev-advised ('ecukes-run-scenario :around (lambda (original &rest args)
-                                                       (unless (funcall maybe-skip)
-                                                         (apply original args)
-                                                         (when (and stop-after-failures (>= ecukes-stats-scenarios-failed stop-after-failures))
-                                                           (setf skip-the-rest t)))))
-          (if eldev-test-print-backtraces
-              (let ((eldev--ecukes-backtraces (make-hash-table :test #'eq)))
-                (eldev-advised ('ecukes-run-step :around #'eldev--ecukes-run-step)
-                  (eldev-advised ('ecukes-reporter-print-step :after (lambda (step)
-                                                                       (let ((backtrace (gethash step eldev--ecukes-backtraces)))
-                                                                         (when backtrace
-                                                                           (eldev-output "%s" backtrace)))))
-                    (ecukes-run feature-files))))
-            (ecukes-run feature-files))))
-      (when (> ecukes-stats-scenarios-failed 0)
-        (signal 'eldev-error `("%s failed" ,(eldev-message-plural ecukes-stats-scenarios-failed "Ecukes scenario"))))
-      ;; With Ecukes I don't see any realistic way to validate in advance.
-      (eldev-test-validate-amount ecukes-stats-scenarios))))
+    (eldev--test-ecukes-split-selectors selectors
+      (let* (skip-the-rest
+             have-skipped-something
+             (maybe-skip (lambda ()
+                           (when skip-the-rest
+                             (unless have-skipped-something
+                               (eldev-warn "Stopping early because of the failed scenario%s" (if (> ecukes-stats-scenarios-failed 1) "s" "")))
+                             (setf have-skipped-something t)))))
+        (eldev-advised ('ecukes-run-feature :around (lambda (original &rest args)
+                                                      (unless (funcall maybe-skip)
+                                                        (apply original args))))
+          (eldev-advised ('ecukes-run-scenario :around (lambda (original &rest args)
+                                                         (unless (funcall maybe-skip)
+                                                           (let ((failures-before ecukes-stats-scenarios-failed))
+                                                             (apply original args)
+                                                             (when (and eldev-test-stop-on-unexpected
+                                                                        (> ecukes-stats-scenarios-failed failures-before)
+                                                                        (<= (setf eldev-test-stop-on-unexpected (1- eldev-test-stop-on-unexpected)) 0))
+                                                               (setf skip-the-rest t))))))
+            (if eldev-test-print-backtraces
+                (let ((eldev--ecukes-backtraces (make-hash-table :test #'eq)))
+                  (eldev-advised ('ecukes-run-step :around #'eldev--ecukes-run-step)
+                    (eldev-advised ('ecukes-reporter-print-step :after (lambda (step)
+                                                                         (let ((backtrace (gethash step eldev--ecukes-backtraces)))
+                                                                           (when backtrace
+                                                                             (eldev-output "%s" backtrace)))))
+                      (ecukes-run feature-files))))
+              (ecukes-run feature-files))))
+        (setf eldev-test-num-passed (+ eldev-test-num-passed ecukes-stats-scenarios-passed)
+              eldev-test-num-failed (+ eldev-test-num-failed ecukes-stats-scenarios-failed))
+        (when (> ecukes-stats-scenarios-failed 0)
+          (signal 'eldev-error `("%s failed" ,(eldev-message-plural ecukes-stats-scenarios-failed "Ecukes scenario"))))))))
 
 (defun eldev--ecukes-run-step (original step &rest args)
   (let ((eldev--ecukes-current-step step)
