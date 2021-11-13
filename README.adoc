@@ -16,6 +16,7 @@ endif::[]
 :uri-ert-sel: https://www.gnu.org/software/emacs/manual/html_node/ert/Test-Selectors.html
 :uri-buttercup: https://github.com/jorgenschaefer/emacs-buttercup
 :uri-buttercup-rt: https://github.com/jorgenschaefer/emacs-buttercup/blob/master/docs/running-tests.md
+:uri-ecukes: https://github.com/ecukes/ecukes
 :uri-cask: https://github.com/cask/cask
 :uri-makem-sh: https://github.com/alphapapa/makem.sh
 :uri-emake: https://github.com/vermiculus/emake.el
@@ -752,6 +753,7 @@ can be referred this way.
 Current list of the known tools:
 
 * `buttercup`
+* `ecukes`
 * `package-lint`
 * `relint`
 * `elisp-lint`
@@ -1189,10 +1191,10 @@ deleted, without actually deleting it.
 == Testing
 
 Eldev has built-in support for running regression/unit tests of your
-project.  Currently, Eldev supports only {uri-ert}[ERT] and
-{uri-buttercup}[Buttercup] testing frameworks.  Leave a feature
-request in the issue tracker if you are interested in a different
-library.
+project.  Currently, Eldev supports {uri-ert}[ERT],
+{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
+frameworks.  Leave a feature request in the issue tracker if you are
+interested in a different library.
 
 Simply executing
 
@@ -1258,14 +1260,16 @@ Finally, you can even write your own runner.
 [#frameworks]
 === Frameworks
 
-As stated above, Eldev supports {uri-ert}[ERT] (Emacs built-in) and
-{uri-buttercup}[Buttercup] testing frameworks.  Normally, you don’t
-need to specify which framework the project uses, as the tool can
-autodetect that.  But in rare cases you may need to set variable
-`eldev-test-framework` to either `'ert` or `'buttercup`, as
-appropriate.  You also don’t need to declare testing package as
-<<additional-dependencies,an extra dependency>>: Eldev will install it
-itself when needed.
+As stated above, Eldev supports {uri-ert}[ERT] (Emacs built-in),
+{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
+frameworks.  Normally, you don’t need to specify which framework the
+project uses, as the tool can autodetect that.  But in rare cases you
+may need to set variable `eldev-test-framework` to either `'ert`,
+`'buttercup` or `'ecukes`, as appropriate.  It is also possible to use
+more than one framework in a project, <<multiple-frameworks,see
+below>>.  You don’t need to declare testing package(s) as
+<<additional-dependencies,extra dependencies>>: Eldev will install
+them itself when needed.
 
 Eldev tries to provide uniform command line interface to the supported
 frameworks, but of course there are many differences between them.
@@ -1303,6 +1307,92 @@ Things that won’t work with Buttercup at the moment:
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
+
+[#ecukes]
+==== Ecukes
+
+{since-0-10} {uri-ecukes}[Ecukes] is a framework for performing
+integrational testing.  Its support in Eldev is limited to “script”
+(a.k.a “batch”) mode: neither “no win” nor “win” mode is supported
+currently.
+
+Instead of adding more command-line options, Eldev reuses its standard
+selector concept for all of Ecukes patterns, anti-patterns, tags and
+“run only failing scenarios” option.  It depends on the contents of a
+selector:
+
+[cols="2, 5"]
+|===
+| `REGEXP`
+| Pattern: scenarios with names matching the `REGEXP` are executed
+
+| `~REGEXP`
+| Antipattern: scenarios matching the `REGEXP` are omitted
+
+| `@TAG`
+| Scenarios with given tag (i.e. `@TAG`) are executed
+
+| `~@TAG`
+| Scenarios with the tag are omitted
+
+| `:failed` _or_ `:failing`
+| Only scenarios that failed in the previous run are executed
+|===
+
+For example, command
+
+    $ eldev test @foo ~open
+
+runs all scenarios tagged as `@foo` with name that doesn’t contain
+word `open`.
+
+Unlike the standard (Cask-based) Ecukes test runner, Eldev prints
+backtraces of failures in scenario steps by default.  As for all other
+supported frameworks, however, this can be disabled using option `-B`
+(`--omit-backtraces`).  If your project uses only Ecukes tests and you
+don’t like the backtraces being printed by default, you can always add
+`(setf eldev-test-print-backtraces nil)` to file `Eldev`.
+
+Option `-X` (`--expect`) is currently not supported for this
+framework.
+
+[#multiple-frameworks]
+=== Multiple frameworks in one project
+
+{since-0-10} Eldev supports using test of different types in one
+project, in any combination of supported <<frameworks,frameworks>>.
+In fact, its autodetection will work even in such cases.  However,
+especially when using different test types, it might be useful to set
+variable `eldev-test-framework` to a _list_ of the frameworks the
+project uses.  E.g.:
+
+....
+(setf eldev-test-framework '(ert buttercup))
+....
+
+The order of elements in the list is important, as this will be the
+order in which `test` command calls the different frameworks.
+
+Command `test` will apply all its options and selectors to all
+frameworks (autodetected or specified explicitly as above) at once.
+Additionally, when tests of different types are invoked, the command
+will print a short summary over all types.
+
+Often, however, you don’t want to mix different test types and instead
+run them using separate commands.  This is especially useful when you
+specify selectors, because those are often different across
+frameworks.  In this case you can use commands `test-FRAMEWORK` or
+their shorter aliases `FRAMEWORK`.  The syntax and behavior of these
+commands is the same as that of `test`, with the only difference that
+only one, specified, framework is used.  These commands are available
+in all project.  However, they are not “advertised”, i.e. not shown in
+output of `eldev help`, unless you set variable `eldev-test-framework`
+to a list of at least two elements.
+
+Example usage:
+
+    $ eldev test-ert
+    $ eldev ecukes basics.feature
 
 === Loading test files
 
@@ -1363,15 +1453,24 @@ For more information, see {uri-ert-sel}[documentation on ERT
 selectors] — other “special” selectors (e.g. `:new` or `:unexpected`)
 also work.
 
+For <<ecukes,Ecukes>> there is a comparable feature, though only for
+failing scenarios.  Internally it is implemted differently, as it is
+built into the framework itself, but from the interface point of view
+it works almost exactly the same: specify selector `:failed` or
+`:failing` on the command line:
+
+    $ eldev test-ecukes :failed
+
 [#testing-simplifications]
 === Testing command line simplifications
 
-When variable `eldev-dwim` (“do what I mean”) is non-nil (as by
-default), Eldev supports a few simplifications of the command line to
+When variable `eldev-dwim` (“do what I mean”) is non-nil, as by
+default, Eldev supports a few simplifications of the command line to
 make testing even more streamlined.
 
-* For all frameworks: any selector that ends in `.el` is instead
-  treated as a file pattern.  For example:
+* For all frameworks: any selector that ends in `.el` (`.feature` for
+  <<ecukes,Ecukes>>) is instead treated as a file pattern.  For
+  example:
 +
 --
     $ eldev test foo.el
@@ -1622,8 +1721,8 @@ A full run down of the command line options is available via:
 Because of Eldev’s trivial installation and built-in support for
 testing, it is a suitable tool for use on continuous integration
 servers.  But of course this only applies if the test framework your
-project uses is already supported (currently <<ert,ERT>> and
-<<buttercup,Buttercup>>).
+project uses is already supported (currently <<ert,ERT>>,
+<<buttercup,Buttercup>> and <<ecukes,Ecukes>>).
 
 [#github-workflows]
 === GitHub workflows
@@ -2173,11 +2272,11 @@ Functions for many of the hooks listed below do receive arguments.
 {since-0-2} `eldev-test-FRAMEWORK-hook (SELECTORS)`::
 
     Called immediately before executing tests with given framework
-    (<<ert,ERT>> or <<buttercup,Buttercup>>).  Functions on the hook
-    get passed `SELECTORS` as the only argument.  At this point
-    project dependencies and additional set `test` will have been
-    loaded already, so functions can `require` features from the
-    project.
+    (<<ert,ERT>>, <<buttercup,Buttercup>>, <<ecukes,Ecukes>>).
+    Functions on the hook get passed `SELECTORS` as the only argument.
+    At this point project dependencies and additional set `test` will
+    have been loaded already, so functions can `require` features from
+    the project.
 
 === Writing builders
 
