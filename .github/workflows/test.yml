@@ -23,12 +23,10 @@ jobs:
         os: [ubuntu-latest]
         emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', '27.2', 'snapshot']
         include:
-          # Currently disabled as failing for reasons unrelated to Eldev, see
-          # https://github.com/purcell/setup-emacs/issues/24.
-          # - os: macos-latest
-          #   emacs_version: '27.2'
-          # - os: macos-latest
-          #   emacs_version: 'snapshot'
+          - os: macos-latest
+            emacs_version: '27.2'
+          - os: macos-latest
+            emacs_version: 'snapshot'
           - os: windows-latest
             emacs_version: '27.2'
 
