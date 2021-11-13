@@ -38,6 +38,7 @@ endif::[]
 :uri-iter2: https://github.com/doublep/iter2
 :uri-logview: https://github.com/doublep/logview
 :uri-datetime: https://github.com/doublep/datetime
+:uri-docker-emacs: https://github.com/Silex/docker-emacs
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
@@ -1580,6 +1581,40 @@ ____
 Therefore, if you use byte-compilation and switch Emacs versions,
 don’t forget to clean the directory.
 
+=== Using Docker
+
+Alternatively, if you are on a linux system and have `docker` installed,
+then Eldev supports running arbitrary commands from within containers
+based on the images distributed by {uri-docker-emacs}[docker-emacs].
+For example:
+
+--
+    $ eldev docker 27.2 emacs --foreground-color=red --eval '(insert (format "Emacs version: %s" emacs-version))'
+--
+
+Will start an Emacs 27.2 container and run `eldev emacs --foreground-color=red --eval '(insert (format "Emacs version: %s" emacs-version))'`.
+
+*Note* You may have to run `xhost +local:root` which allows the
+docker container to make connections to the hosts X server.  Note however
+this does come with some security considerations (`man xhost`).
+
+You may also run a custom image by replacing the Emacs version (27.2
+in the above example) with a repository or image name.
+
+The `docker run` arguments are also customisable via the variable
+`eldev-docker-run-extra-args`.  For example in your project's `Eldev`:
+
+....
+(setq eldev-docker-run-extra-args '("--name" "my_cool_container"))
+....
+
+Will set the container name to `"my_cool_container"`.
+
+A full run down of the command line options is available via:
+
+--
+    $ eldev help docker
+--
 
 [#continuous-integration]
 == Continuous integration
