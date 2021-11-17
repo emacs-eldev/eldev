@@ -57,6 +57,9 @@
 ;; Pre-0.1.2 ERT integration code used to fail on Emacs 26.x because
 ;; of a faulty advice for `ert--print-backtrace'.
 (ert-deftest eldev-test-ert-print-backtrace-advise-1 ()
+  ;; To make sure dependencies are there, else stderr will be "polluted".
+  (eldev--test-run "project-d" ("prepare")
+    (should (= exit-code 0)))
   (eldev--test-run "project-d" ("test")
     ;; If Eldev itself (rather than tests) fails, there will be a
     ;; different message.
