@@ -3448,14 +3448,14 @@ in `crop' stack frame style."
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"
   :options        (-f --file)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :value          PATTERN
   (push pattern eldev-test-file-patterns))
 
 (eldev-defoption eldev-test-stop-on-unexpected-mode (&optional num-failures)
   "Stop after this many unexpected results (usually failures), 1 if omitted"
   :options        (-s --stop --stop-on-unexpected)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :optional-value N
   :default-value  (if eldev-test-stop-on-unexpected
                       (if (and (integerp eldev-test-stop-on-unexpected) (> eldev-test-stop-on-unexpected 1))
@@ -3467,7 +3467,7 @@ in `crop' stack frame style."
 (eldev-defoption eldev-test-continue-mode ()
   "Execute all scheduled tests regardless of results"
   :options        (-c --continue)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :if-default     (null eldev-test-stop-on-unexpected)
   (setf eldev-test-stop-on-unexpected nil))
 
@@ -3475,7 +3475,7 @@ in `crop' stack frame style."
   "Print test failure backtraces; WIDTH overrides value of the
 global option `-b'"
   :options        (-b --print-backtraces)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :optional-value WIDTH
   :default-value  (pcase eldev-test-print-backtraces
                     (`nil            :no-default)
@@ -3486,21 +3486,21 @@ global option `-b'"
 (eldev-defoption eldev-test-omit-backtraces ()
   "Omit failure backtraces for brevity"
   :options        (-B --omit-backtraces)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :if-default     (not eldev-test-print-backtraces)
   (setf eldev-test-print-backtraces nil))
 
 (eldev-defoption eldev-test-expect-at-least (n)
   "Fail if fewer than N tests match selectors"
   :options        (-X --expect)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :value          N
   (setf eldev-test-expect-at-least (string-to-number n)))
 
 (eldev-defoption eldev-test-runner (name)
   "Choose test runner"
   :options        (-r --runner)
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   :value          NAME
   :default-value  (or eldev-test-runner 'simple)
   ;; Will be validated when executing the command.
@@ -3509,7 +3509,7 @@ global option `-b'"
 (eldev-defoption eldev-test-list-runners ()
   "List available test runners and exit"
   :options        --list-runners
-  :for-command    test
+  :for-command    (test test-ert test-buttercup test-ecukes)
   (let ((all-runners (reverse eldev--test-runners)))
     (while all-runners
       (let* ((runner   (pop all-runners))

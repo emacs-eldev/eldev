@@ -74,7 +74,9 @@
 
 
 (ert-deftest eldev-test-expect-1 ()
-  (eldev--test-run "project-a" ("test" "--expect" 2)
+  ;; Using `test-ert' here to also indirectly make sure that the command understands the
+  ;; option, just like `test'.
+  (eldev--test-run "project-a" ("test-ert" "--expect" 2)
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-expect-2 ()
