@@ -17,6 +17,33 @@
     (should (= exit-code 0))))
 
 
+;; `project-i' has two ERT and two Buttercup tests.  Make sure that this combination works
+;; both in autodetermined and explicit ways.
+
+(eldev-ert-defargtest eldev-test-buttercup-project-i-1 (command explicitly-configured)
+                      (('test           nil)
+                       ('test           t)
+                       ('test-ert       nil)
+                       ('test-ert       t)
+                       ('test-buttercup nil)
+                       ('test-buttercup t))
+  (eldev--test-run "project-i" (:eval `(,@(if explicitly-configured
+                                              '("--setup" (setf eldev-test-framework '(ert buttercup)))
+                                            '("--setup" (setf eldev-test-framework nil)))
+                                        ,command))
+    ;; Make sure that the exact tests executed match the issued command.
+    (let ((ran-ert       (string-match-p "Running 2 tests"            stdout))
+          (ran-buttercup (string-match-p "Running 2 specs"            stdout))
+          (ran-both      (string-match-p "Testing summary: 4 test(s)" stdout)))
+      (pcase command
+        (`test           (should     (and ran-ert ran-buttercup ran-both)))
+        (`test-ert       (should     ran-ert)
+                         (should-not (or ran-buttercup ran-both)))
+        (`test-buttercup (should     ran-buttercup)
+                         (should-not (or ran-ert ran-both))))
+      (should (= exit-code 0)))))
+
+
 (ert-deftest eldev-test-buttercup-erroneous-backtrace-1 ()
   ;; Until Eldev 0.7 (and Buttercup 1.23) a pointless and unneded backtrace would have
   ;; been printed if a test failed and Eldev was in debug mode.

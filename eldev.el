@@ -3236,6 +3236,8 @@ for details."
       (if (cdr used-frameworks)
           ;; Print summary over all test types if we have run more than one.
           (unless (eq pass 'count)
+            ;; Using "(s)" because if replaced with proper singular/plural form of word
+            ;; "test", "of them" becomes weird.
             (let ((summary (eldev-format-message "\nTesting summary: %d test(s), of them %d passed, %d failed, %d skipped"
                                                  (+ eldev-test-num-passed eldev-test-num-failed eldev-test-num-skipped)
                                                  eldev-test-num-passed eldev-test-num-failed eldev-test-num-skipped)))
@@ -3304,14 +3306,19 @@ framework(s) are autodetected where possible, among those allowed
 by parameter POSSIBLE-FRAMEWORKS (if that is not specified, only
 frameworks based on `.el' files, i.e. ERT and Buttercup, are
 considered allowed)."
-  (let ((frameworks (or (eldev-listify eldev-test-framework)
-                        (mapcar #'car (eldev-filter (let* ((framework (car it))
-                                                           (detect    (when (if possible-frameworks
-                                                                                (memq framework possible-frameworks)
-                                                                              (null (cdr (assq 'fileset (cdr it)))))
-                                                                        (cdr (assq 'detect (cdr it))))))
-                                                      (and detect (funcall detect)))
-                                                    eldev-test-known-frameworks)))))
+  (let ((frameworks (eldev-listify eldev-test-framework)))
+    (setf frameworks (if frameworks
+                         (eldev-filter (if possible-frameworks
+                                           (memq it possible-frameworks)
+                                         (null (eldev-test-get-framework-entry it 'fileset)))
+                                       frameworks)
+                       (mapcar #'car (eldev-filter (let* ((framework (car it))
+                                                          (detect    (when (if possible-frameworks
+                                                                               (memq framework possible-frameworks)
+                                                                             (null (cdr (assq 'fileset (cdr it)))))
+                                                                       (cdr (assq 'detect (cdr it))))))
+                                                     (and detect (funcall detect)))
+                                                   eldev-test-known-frameworks))))
     (if (cdr frameworks) frameworks (car frameworks))))
 
 (defun eldev-test-preprocess-selectors (framework selectors)

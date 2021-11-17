@@ -1,4 +1,4 @@
-;;; project-i.el --- Test project with autoload cookies in multiple files
+;;; project-i.el --- Test project with autoload cookies in multiple files and both ERT and Buttercup tests
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/
