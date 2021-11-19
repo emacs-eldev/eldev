@@ -122,7 +122,7 @@ think real-world usage provides better models.
     for some tools ({uri-flycheck-eldev}[flycheck-eldev],
     {uri-projectile}[Projectile]).
 
-{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.travis.yml[`.travis.yml`]::
+{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
     Another simple project with no dependencies.  However, it uses its
     file `Eldev` to define a custom option that activates
@@ -147,9 +147,9 @@ think real-world usage provides better models.
     are later included in its package.
 
 All these projects also use <<continuous-integration,continuous
-integration>> on either <<github-workflows,GitHub>> or
-<<travis-ci,Travis CI>> for automated testing.  Various elements of
-files `Eldev` in these projects are documented below.
+integration>> on <<github-workflows,GitHub>> for automated testing.
+Various elements of files `Eldev` in these projects are documented
+below.
 
 
 == Requirements
