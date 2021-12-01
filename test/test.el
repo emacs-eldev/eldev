@@ -85,4 +85,25 @@
     (should (= exit-code 1))))
 
 
+(eldev-ert-defargtest eldev-test-read-ert-results (inject-cyclic-list)
+                      (nil t)
+  (let ((eldev--test-project "project-b")
+        ;; Previously Eldev would fail to read back ERT results because
+        ;; `eldev-do-save-cache-file' explicitly disabled proper circular structure saving
+        ;; by setting `print-circle' to nil for whatever reason.  This would cause
+        ;; `test-ert :failed' to be no-op below, so the process would succeed, making this
+        ;; test (`eldev-test-read-ert-results') fail.
+        (test-injection      (when inject-cyclic-list
+                               '("--setup" (with-eval-after-load 'ert
+                                             (ert-deftest project-b-injected ()
+                                               (let ((cyclic (list nil)))
+                                                 (setf (cdr cyclic) cyclic)
+                                                 (should (equal cyclic nil)))))))))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil (:eval `(,@test-injection "test-ert"))
+      (should (= exit-code 1)))
+    (eldev--test-run nil (:eval `(,@test-injection "test-ert" :failed))
+      (should (= exit-code 1)))))
+
+
 (provide 'test/test)

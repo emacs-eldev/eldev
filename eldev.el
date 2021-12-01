@@ -1064,7 +1064,7 @@ the data."
        (with-temp-file ,file
          (eldev-trace "Saving %s to file `%s'..." ,description (file-relative-name ,file eldev-project-dir))
          (let ((data                       (progn ,@body))
-               (print-circle               nil)
+               (print-circle               t)
                (print-continuous-numbering nil))
            (prin1 (cons (cons 'version ,version) data) (current-buffer))
            (insert "\n")))
