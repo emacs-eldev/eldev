@@ -3001,15 +3001,34 @@ Functions are called with SELECTORS as argument.
 
 Since Eldev 0.2.")
 
+(defvar eldev-test-ert-fileset nil
+  "Test files that contain project's ERT tests.
+Only important if the project contains tests of different types.
+
+Since Eldev 0.10.")
+
 (defvar eldev-test-buttercup-hook nil
   "Hook executed before running Buttercup tests.
 Functions are called with SELECTORS as argument.
 
 Since Eldev 0.2.")
 
+(defvar eldev-test-buttercup-fileset nil
+  "Test files that contain project's Buttercup tests.
+Only important if the project contains tests of different types.
+
+Since Eldev 0.10.")
+
 (defvar eldev-test-ecukes-hook nil
   "Hook executed before running Ecukes tests.
 Functions are called with SELECTORS as argument.
+
+Since Eldev 0.10.")
+
+(defvar eldev-test-ecukes-fileset nil
+  "Test files that contain project's Ecukes tests.
+For Ecukes it's currently never important, since only this
+framework uses `.feature' files.
 
 Since Eldev 0.10.")
 
@@ -3172,9 +3191,19 @@ for details."
                             (used-by-frameworks (nth 0 (cdr entry)))
                             (file-description   (nth 1 (cdr entry)))
                             (files              (nth 2 (cdr entry)))
-                            (files-looked-up    (listp files)))
+                            (files-looked-up    (listp files))
+                            framework-filesets
+                            disregard-framework-filesets)
                        (unless files-looked-up
-                         (setf files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) ,fileset) file-description))
+                         (dolist (framework used-by-frameworks)
+                           (let* ((variable (intern (format "eldev-test-%s-fileset" framework)))
+                                  (fileset  (when (boundp variable) (symbol-value variable))))
+                             (if fileset
+                                 (push fileset framework-filesets)
+                               (setf disregard-framework-filesets t))))
+                         (setf files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) ,fileset ,@(when (and framework-filesets (not disregard-framework-filesets))
+                                                                                                                     `((:or ,(nreverse framework-filesets)))))
+                                                                 file-description))
                          (when filter-patterns
                            (setf files (eldev-filter-files files (reverse filter-patterns)))
                            (eldev-trace "%s" (eldev-message-enumerate-files (format "Remaining %s after applying `--file' filter(s): %%s (%%d)" file-description) files)))
@@ -3253,6 +3282,10 @@ for details."
 (defun eldev--test-autoinstalling-framework (enabled callback)
   ;; If framework is specified explicitly, ensure it is installed first.  Otherwise
   ;; appropriate framework will be installed from `require' advice below.
+  ;;
+  ;; FIXME: Why do we need this?  Drawback example: when multiple frameworks are used
+  ;;        (since 0.10) and you explicitly test with only one, the second one also gets
+  ;;        installed because of the below code.
   (when (and enabled eldev-test-framework)
     (dolist (framework (eldev-listify eldev-test-framework))
       (unless (eldev-test-get-framework-entry framework 'fileset)
