@@ -1394,6 +1394,18 @@ Example usage:
     $ eldev test-ert
     $ eldev ecukes basics.feature
 
+It is also possible to specify filesets that limit test file selection
+for each framework, using variables `eldev-test-FRAMEWORK-fileset`.
+If you often use single-framework commands, these filesets can speed
+up testing by not loading unneeded files.  For example, if you have
+ERT tests in one file called `ert.el` and a lot of files with
+Buttercup tests, you could add this to file `Eldev`:
+
+....
+(setf eldev-test-ert-fileset "ert.el"
+      eldev-test-buttercup-fileset "!ert.el")
+....
+
 === Loading test files
 
 {since-0-5} There appears to be two common ways of using tests: 1)
