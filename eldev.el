@@ -3202,7 +3202,7 @@ for details."
                                  (push fileset framework-filesets)
                                (setf disregard-framework-filesets t))))
                          (setf files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) ,fileset ,@(when (and framework-filesets (not disregard-framework-filesets))
-                                                                                                                     `((:or ,(nreverse framework-filesets)))))
+                                                                                                                     `((:or ,@(nreverse framework-filesets)))))
                                                                  file-description))
                          (when filter-patterns
                            (setf files (eldev-filter-files files (reverse filter-patterns)))

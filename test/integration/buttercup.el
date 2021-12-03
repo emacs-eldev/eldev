@@ -20,7 +20,7 @@
 ;; `project-i' has two ERT and two Buttercup tests.  Make sure that this combination works
 ;; both in autodetermined and explicit ways.
 
-(eldev-ert-defargtest eldev-test-buttercup-project-i-1 (command frameworks-configured with-ert-fileset)
+(eldev-ert-defargtest eldev-test-buttercup-project-i-1 (command frameworks-configured with-framework-filesets)
                       ;; Test most combinations.
                       (('test           nil nil)
                        ('test           t   nil)
@@ -38,8 +38,9 @@
         ran-buttercup
         ran-both)
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" `(setf eldev-test-framework   ,(when frameworks-configured ''(ert buttercup)))
-                          "--setup" `(setf eldev-test-ert-fileset ,(when with-ert-fileset      "ert.el"))
+    (eldev--test-run nil ("--setup" `(setf eldev-test-framework         ,(when frameworks-configured   ''(ert buttercup)))
+                          "--setup" `(setf eldev-test-ert-fileset       ,(when with-framework-filesets "ert.el"))
+                          "--setup" `(setf eldev-test-buttercup-fileset ,(when with-framework-filesets "!ert.el"))
                           command)
       (setf testing call-info)
       ;; Make sure that the exact tests executed match the issued command.
