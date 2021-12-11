@@ -59,4 +59,12 @@
     (should (= exit-code 0))))
 
 
+;; https://github.com/doublep/eldev/issues/61
+;;
+;; `vc-responsible-backend' actually throws if there is no active backend, and not returns
+;; nil.  Hard to notice when your home directory is Git-managed.
+(ert-deftest eldev-vc-detect-must-not-throw ()
+  (eldev-vc-detect "/"))
+
+
 (provide 'test/integration/misc)

@@ -72,7 +72,7 @@ has access to locally bound variable `backend'.
 Since 0.8."
   (declare (indent 1) (debug (sexp body)))
   `(let* ((default-directory (or ,project-dir eldev-project-dir))
-          (backend           (vc-responsible-backend default-directory)))
+          (backend           (ignore-errors (vc-responsible-backend default-directory))))
      ;; `vc-deduce-backend' insists on specific modes; easier to just fake it.
      (eldev-advised (#'vc-deduce-backend :override (lambda (&rest _ignored) backend))
        ,@body)))
