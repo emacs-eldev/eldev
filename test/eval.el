@@ -48,19 +48,34 @@
   (eldev--test-run "trivial-project" ("eval" "--dont-require" `(trivial-project-hello))
     (should (= exit-code 1))))
 
+
+(eldev-ert-defargtest eldev-eval-compilation-1 (compile-first)
+                      (nil t)
+  (eldev--test-run "trivial-project" ("eval" (if compile-first "--compile" "--dont-compile")
+                                      `(defun test-function (x) (+ x x)) `(byte-code-function-p (symbol-function 'test-function)))
+    (should (equal (eldev--test-line-list stdout) `("test-function" ,(if compile-first "t" "nil"))))
+    (should (= exit-code 0))))
+
+
 ;; Make sure lexical evaluation is the default.
-(ert-deftest eldev-eval-lexical-binding-1 ()
-  (eldev--test-run "trivial-project" ("eval" `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
+(eldev-ert-defargtest eldev-eval-lexical-binding-1 (compile-first)
+                      (nil t)
+  (eldev--test-run "trivial-project" ("eval" (if compile-first "--compile" "--dont-compile")
+                                      `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
     (should (string= stdout "lexical\n"))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-eval-lexical-binding-2 ()
-  (eldev--test-run "trivial-project" ("eval" "--lexical" `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
+(eldev-ert-defargtest eldev-eval-lexical-binding-2 (compile-first)
+                      (nil t)
+  (eldev--test-run "trivial-project" ("eval" "--lexical" (if compile-first "--compile" "--dont-compile")
+                                      `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
     (should (string= stdout "lexical\n"))
     (should (= exit-code 0))))
 
-(ert-deftest eldev-eval-dynamic-binding-1 ()
-  (eldev--test-run "trivial-project" ("eval" "--dynamic" `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
+(eldev-ert-defargtest eldev-eval-dynamic-binding-1 (compile-first)
+                      (nil t)
+  (eldev--test-run "trivial-project" ("eval" "--dynamic" (if compile-first "--compile" "--dont-compile")
+                                      `(let ((y (lambda () (if (boundp 'x) 'dynamic 'lexical)))) ((lambda (x) (funcall y)) t)))
     (should (string= stdout "dynamic\n"))
     (should (= exit-code 0))))
 

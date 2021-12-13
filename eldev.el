@@ -4004,6 +4004,9 @@ Not loading means that `eldev-eval-require-main-feature' is also
 ignored.  This is available from command line, but the options
 are not advertised, since they are rarely useful.")
 
+(defvar eldev-eval-byte-compile-forms nil
+  "Whether to byte-compile evaluated forms first.")
+
 (defvar eldev-eval-printer-function #'eldev-prin1
   "Default printer function for `eval' command.
 Standard value is `eldev-prin1', but can be customized.")
@@ -4052,7 +4055,12 @@ being that it doesn't print form results."
         (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
         ;; For these commands we restore the standard behavior of `message' of writing to stderr,
         (let ((result (let ((eldev-message-rerouting-destination :stderr))
-                        (eval (cdr form) eldev-eval-lexical))))
+                        (if eldev-eval-byte-compile-forms
+                            (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-byte-compile-forms'...")
+                                   (let* ((lexical-binding eldev-eval-lexical)
+                                          (function        (byte-compile `(lambda () ,(cdr form)))))
+                                     (funcall function)))
+                          (eval (cdr form) eldev-eval-lexical)))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
@@ -4085,6 +4093,14 @@ being that it doesn't print form results."
   ("Don't load project and its dependencies; only Eldev itself and Emacs built-ins will be available"
    :options       (--dont-load)
    :hidden-if     eldev-eval-load-project)
+  :for-command    (eval exec))
+
+(eldev-defbooloptions eldev-eval-byte-compile-forms eldev-eval-dont-byte-compile-forms eldev-eval-byte-compile-forms
+  ("Byte-compile forms before evaluating them"
+   :options       (-c --compile))
+  ("Don't byte-compile forms, evaluate them raw"
+   :options       (-C --dont-compile)
+   :hidden-if     (not eldev-eval-byte-compile-forms))
   :for-command    (eval exec))
 
 (eldev-defoption eldev-eval-printer (function)
