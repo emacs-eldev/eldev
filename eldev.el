@@ -4560,6 +4560,9 @@ In addition to t or nil, can also be symbol `concise'.")
 (defvar eldev-targets-list-dependencies nil
   "Whether to print known target dependencies.")
 
+(defvar eldev--target-dependencies nil)
+(defvar eldev--target-dependencies-need-saving nil)
+
 ;; FIXME: Maybe find a better way?
 (defvar eldev--package-target-file nil)
 (defvar eldev--package-target-generated nil)
@@ -4567,9 +4570,6 @@ In addition to t or nil, can also be symbol `concise'.")
 
 (defsubst eldev-virtual-target-p (target)
   (string-prefix-p ":" target))
-
-(declare-function eldev--load-target-dependencies 'eldev-build)
-(declare-function eldev--save-target-dependencies 'eldev-build)
 
 (defmacro eldev-with-target-dependencies (&rest body)
   "Execute BODY with target dependency mechanism set up."
@@ -4579,6 +4579,18 @@ In addition to t or nil, can also be symbol `concise'.")
           (unwind-protect
               (progn ,@body)
             (eldev--save-target-dependencies))))
+
+(defun eldev--load-target-dependencies ()
+  (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
+    (setf eldev--target-dependencies (cdr (assq 'dependencies contents))))
+  (unless eldev--target-dependencies
+    (setf eldev--target-dependencies (make-hash-table :test #'equal))))
+
+(defun eldev--save-target-dependencies ()
+  (if eldev--target-dependencies-need-saving
+      (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
+        `((dependencies . ,eldev--target-dependencies)))
+    (eldev-trace "Target dependency information is up-to-date, not saving...")))
 
 
 ;; Internal helper for `eldev-defbuilder'.

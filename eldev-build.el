@@ -28,9 +28,6 @@
 (defvar eldev--build-plan nil)
 (defvar eldev--build-results nil)
 
-(defvar eldev--target-dependencies nil)
-(defvar eldev--target-dependencies-need-saving nil)
-
 
 (defun eldev-build-find-targets (&rest standard-filesets)
   "Return a hash table of all build targets in given filesets.
@@ -271,18 +268,6 @@ This function may only be called while inside the body of a
                    (sort (copy-sequence current-dependencies) (lambda (a b) (string< (car a) (car b)))))
       (eldev--assq-set finder (copy-sequence dependencies) (gethash target eldev--target-dependencies) #'equal)
       (setf eldev--target-dependencies-need-saving t))))
-
-(defun eldev--load-target-dependencies ()
-  (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
-    (setf eldev--target-dependencies (cdr (assq 'dependencies contents))))
-  (unless eldev--target-dependencies
-    (setf eldev--target-dependencies (make-hash-table :test #'equal))))
-
-(defun eldev--save-target-dependencies ()
-  (if eldev--target-dependencies-need-saving
-      (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
-        `((dependencies . ,eldev--target-dependencies)))
-    (eldev-trace "Target dependency information is up-to-date, not saving...")))
 
 
 (defun eldev--do-targets (parameters)
