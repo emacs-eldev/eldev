@@ -4004,8 +4004,11 @@ Not loading means that `eldev-eval-require-main-feature' is also
 ignored.  This is available from command line, but the options
 are not advertised, since they are rarely useful.")
 
-(defvar eldev-eval-byte-compile-forms nil
-  "Whether to byte-compile evaluated forms first.")
+(defvar eldev-eval-preprocess-forms nil
+  "How to preprocess forms before evaluating them.
+Currently supported values are symbols `macroexpand' and
+`byte-compile', with the obvious meanings.  Can also be left as
+nil, in which case no preprocessing is performed.")
 
 (defvar eldev-eval-printer-function #'eldev-prin1
   "Default printer function for `eval' command.
@@ -4017,12 +4020,18 @@ See `eldev-default-required-features' for value description.
 Special value `:default' means to use that variable's value
 instead.")
 
+
 (eldev-defcommand eldev-eval (&rest parameters)
   "Evaluate Lisp expressions and print results.  Expressions are
 evaluated in project's environment, with all the dependencies
 available.  If option `-r' is specified (or is on by default),
 project's main feature will be required before evaluating, so
-that you don't have to include `(require ...)' yourself."
+that you don't have to include `(require ...)' yourself.
+
+Results of evaluation are printed to stdout using specified
+function.  Default printer is function `eldev-prin1' that falls
+back to `cl-prin1' as long as that is available (Emacs 26 and
+up)."
   :parameters     "EXPRESSION..."
   :aliases        evaluate
   (eldev--do-eval t parameters))
@@ -4055,12 +4064,17 @@ being that it doesn't print form results."
         (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
         ;; For these commands we restore the standard behavior of `message' of writing to stderr,
         (let ((result (let ((eldev-message-rerouting-destination :stderr))
-                        (if eldev-eval-byte-compile-forms
-                            (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-byte-compile-forms'...")
+                        (if (eq eldev-eval-preprocess-forms 'byte-compile)
+                            (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
                                    (let* ((lexical-binding eldev-eval-lexical)
                                           (function        (byte-compile `(lambda () ,(cdr form)))))
                                      (funcall function)))
-                          (eval (cdr form) eldev-eval-lexical)))))
+                          (if (eq eldev-eval-preprocess-forms 'macroexpand)
+                              (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
+                                     (setf (cdr form) (macroexpand-all (cdr form))))
+                            (when eldev-eval-preprocess-forms
+                              (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms)))
+                          (eval (cdr form) (not (null eldev-eval-lexical)))))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
@@ -4095,13 +4109,27 @@ being that it doesn't print form results."
    :hidden-if     eldev-eval-load-project)
   :for-command    (eval exec))
 
-(eldev-defbooloptions eldev-eval-byte-compile-forms eldev-eval-dont-byte-compile-forms eldev-eval-byte-compile-forms
-  ("Byte-compile forms before evaluating them"
-   :options       (-c --compile))
-  ("Don't byte-compile forms, evaluate them raw"
-   :options       (-C --dont-compile)
-   :hidden-if     (not eldev-eval-byte-compile-forms))
-  :for-command    (eval exec))
+(eldev-defoption eldev-eval-as-is ()
+  "Don't macroexpand or byte-compile forms, evaluate them as they are"
+  :options        (-a --as-is)
+  :for-command    (eval exec)
+  :if-default     (not (memq eldev-eval-preprocess-forms '(macroexpand byte-compile)))
+  :hidden-if      :default
+  (setf eldev-eval-preprocess-forms nil))
+
+(eldev-defoption eldev-eval-macroexpand-forms ()
+  "Expand all macros in forms before evaluating"
+  :options        (-m --macroexpand)
+  :for-command    (eval exec)
+  :if-default     (eq eldev-eval-preprocess-forms 'macroexpand)
+  (setf eldev-eval-preprocess-forms 'macroexpand))
+
+(eldev-defoption eldev-eval-byte-compile-forms ()
+  "Byte-compile forms before evaluating"
+  :options        (-c --compile)
+  :for-command    (eval exec)
+  :if-default     (eq eldev-eval-preprocess-forms 'byte-compile)
+  (setf eldev-eval-preprocess-forms 'byte-compile))
 
 (eldev-defoption eldev-eval-printer (function)
   "Use given function to print results"
