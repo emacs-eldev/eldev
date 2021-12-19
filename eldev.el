@@ -4010,6 +4010,10 @@ Currently supported values are symbols `macroexpand' and
 `byte-compile', with the obvious meanings.  Can also be left as
 nil, in which case no preprocessing is performed.")
 
+(defvar eldev-eval-repeat nil
+  "Evaluate every form several times.
+Value of this variable must be either nil or a number.")
+
 (defvar eldev-eval-printer-function #'eldev-prin1
   "Default printer function for `eval' command.
 Standard value is `eldev-prin1', but can be customized.")
@@ -4052,7 +4056,8 @@ being that it doesn't print form results."
 (defun eldev--do-eval (print-results parameters)
   (unless parameters
     (signal 'eldev-wrong-command-usage `(t ,(if print-results "Missing expressions to evaluate" "Missing forms to execute"))))
-  (let ((forms (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters)))
+  (let ((forms       (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters))
+        (repetitions (if eldev-eval-repeat (max (round eldev-eval-repeat) 1) 1)))
     (when eldev-eval-load-project
       (eldev-load-project-dependencies (if print-results 'eval 'exec)))
     (eldev-autoinstalling-implicit-dependencies eldev-eval-load-project
@@ -4062,19 +4067,22 @@ being that it doesn't print form results."
           (require feature)))
       (dolist (form forms)
         (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
-        ;; For these commands we restore the standard behavior of `message' of writing to stderr,
-        (let ((result (let ((eldev-message-rerouting-destination :stderr))
-                        (if (eq eldev-eval-preprocess-forms 'byte-compile)
-                            (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
-                                   (let* ((lexical-binding eldev-eval-lexical)
-                                          (function        (byte-compile `(lambda () ,(cdr form)))))
-                                     (funcall function)))
-                          (if (eq eldev-eval-preprocess-forms 'macroexpand)
-                              (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
-                                     (setf (cdr form) (macroexpand-all (cdr form))))
-                            (when eldev-eval-preprocess-forms
-                              (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms)))
-                          (eval (cdr form) (not (null eldev-eval-lexical)))))))
+        (let (result)
+          ;; For these commands we restore the standard behavior of `message' of writing to stderr,
+          (let ((eldev-message-rerouting-destination :stderr))
+            (if (eq eldev-eval-preprocess-forms 'byte-compile)
+                (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
+                       (let* ((lexical-binding eldev-eval-lexical)
+                              (function        (byte-compile `(lambda () ,(cdr form)))))
+                         (dotimes (_ repetitions)
+                           (setf result (funcall function)))))
+              (if (eq eldev-eval-preprocess-forms 'macroexpand)
+                  (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
+                         (setf (cdr form) (macroexpand-all (cdr form))))
+                (when eldev-eval-preprocess-forms
+                  (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms)))
+              (dotimes (_ repetitions)
+                (setf result (eval (cdr form) (not (null eldev-eval-lexical)))))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
@@ -4130,6 +4138,14 @@ being that it doesn't print form results."
   :for-command    (eval exec)
   :if-default     (eq eldev-eval-preprocess-forms 'byte-compile)
   (setf eldev-eval-preprocess-forms 'byte-compile))
+
+(eldev-defoption eldev-eval-repeat (n)
+  "Evaluate every form N times"
+  :options        (-n --repeat)
+  :value          N
+  :for-command    (eval exec)
+  :default-value  (if eldev-eval-repeat (max (round eldev-eval-repeat) 1) 1)
+  (setf eldev-eval-repeat (string-to-number n)))
 
 (eldev-defoption eldev-eval-printer (function)
   "Use given function to print results"

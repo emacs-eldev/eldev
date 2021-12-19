@@ -86,6 +86,15 @@
     (should (string= stdout "dynamic\n"))
     (should (= exit-code 0))))
 
+
+(eldev-ert-defargtest eldev-eval-repeat-1 (n)
+                      (1 10 1000)
+  (eldev--test-run "trivial-project" ("eval" "--repeat" n
+                                      `(defvar test-counter 0) `(setf test-counter (1+ test-counter)) `test-counter)
+    (should (string= stdout (eldev--test-lines "test-counter" (number-to-string n) (number-to-string n))))
+    (should (= exit-code 0))))
+
+
 (ert-deftest eldev-eval-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.
