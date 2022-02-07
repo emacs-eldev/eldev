@@ -4385,7 +4385,7 @@ At least one of options `--file' and `--open' is required."
     ;; Using `concat' because there can be no directory name.
     (concat (or (file-name-directory cpu-profile-file) "")
             (if (string= memory-file-name cpu-file-name)
-                (replace-regexp-in-string (rx (? "." (1+ (not ?.))) eos) "-mem\\1" cpu-file-name)
+                (replace-regexp-in-string (rx (? "." (1+ (not (any ".")))) eos) "-mem\\1" cpu-file-name)
               memory-file-name))))
 
 (defun eldev--profile-open-on-server (server filename)
