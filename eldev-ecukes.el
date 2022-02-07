@@ -107,15 +107,20 @@
                                                                         (> ecukes-stats-scenarios-failed failures-before)
                                                                         (<= (setf eldev-test-stop-on-unexpected (1- eldev-test-stop-on-unexpected)) 0))
                                                                (setf skip-the-rest t))))))
-            (if eldev-test-print-backtraces
-                (let ((eldev--ecukes-backtraces (make-hash-table :test #'eq)))
-                  (eldev-advised ('ecukes-run-step :around #'eldev--ecukes-run-step)
-                    (eldev-advised ('ecukes-reporter-print-step :after (lambda (step)
-                                                                         (let ((backtrace (gethash step eldev--ecukes-backtraces)))
-                                                                           (when backtrace
-                                                                             (eldev-output "%s" backtrace)))))
-                      (ecukes-run feature-files))))
-              (ecukes-run feature-files))))
+            ;; Inject profiling support if wanted.
+            (eldev-advised ('ecukes-run-steps :around (when eldev--effective-profile-mode
+                                                        (lambda (original &rest args)
+                                                          (eldev-profile-body
+                                                            (apply original args)))))
+              (if eldev-test-print-backtraces
+                  (let ((eldev--ecukes-backtraces (make-hash-table :test #'eq)))
+                    (eldev-advised ('ecukes-run-step :around #'eldev--ecukes-run-step)
+                      (eldev-advised ('ecukes-reporter-print-step :after (lambda (step)
+                                                                           (let ((backtrace (gethash step eldev--ecukes-backtraces)))
+                                                                             (when backtrace
+                                                                               (eldev-output "%s" backtrace)))))
+                        (ecukes-run feature-files))))
+                (ecukes-run feature-files)))))
         (setf eldev-test-num-passed (+ eldev-test-num-passed ecukes-stats-scenarios-passed)
               eldev-test-num-failed (+ eldev-test-num-failed ecukes-stats-scenarios-failed))
         (when (> ecukes-stats-scenarios-failed 0)

@@ -56,7 +56,12 @@
                                      (setf buttercup-stack-frame-style (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1)) 'crop 'full)))))
     (when selectors
       (buttercup-mark-skipped selectors t))
-    (let* ((result     (buttercup-run t))
+    ;; Inject profiling support if wanted.
+    (let* ((result     (eldev-advised ('buttercup--run-spec :around (when eldev--effective-profile-mode
+                                                                      (lambda (original &rest args)
+                                                                        (eldev-profile-body
+                                                                          (apply original args)))))
+                         (buttercup-run t)))
            (num-failed (buttercup-suites-total-specs-failed buttercup-suites)))
       (setf eldev-test-num-passed  (+ eldev-test-num-passed  (buttercup-suites-total-specs-status buttercup-suites 'passed))
             eldev-test-num-failed  (+ eldev-test-num-failed  num-failed)

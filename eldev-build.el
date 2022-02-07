@@ -524,7 +524,10 @@ possible to build arbitrary targets this way."
                        (unless eldev-build-dry-run-mode
                          (if eldev-build-keep-going
                              (condition-case error
-                                 (funcall builder source-argument target-argument)
+                                 (if (eldev-get builder :profiling-self)
+                                     (funcall builder source-argument target-argument)
+                                   (eldev-profile-body
+                                     (funcall builder source-argument target-argument)))
                                (eldev-build-abort-branch
                                 (signal (car error) (cdr error)))
                                (eldev-error
@@ -579,7 +582,8 @@ possible to build arbitrary targets this way."
                     ;; of other targets.
                     (when eldev-build-load-before-byte-compiling
                       (eldev-trace "Loading file `%s' before byte-compiling it..." source)
-                      (load source nil t t))
+                      (eldev-profile-body
+                        (load source nil t t)))
                     (setf result (if skip-byte-compilation
                                      'no-byte-compile
                                    (let* ((byte-compile-error-on-warn        eldev-build-treat-warnings-as-errors)
@@ -594,7 +598,8 @@ possible to build arbitrary targets this way."
                                                                                     (unless eldev-build-suppress-warnings
                                                                                       (apply original arguments)))))
                                        (eldev--silence-file-writing-message (expand-file-name target)
-                                         (byte-compile-file source))))))
+                                         (eldev-profile-body
+                                           (byte-compile-file source)))))))
                     (cond ((eq result 'no-byte-compile)
                            (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
                            nil)
@@ -604,7 +609,8 @@ possible to build arbitrary targets this way."
                              ;; without `nomessage' parameter.  Byte-compiled file should
                              ;; be loaded to replace its slower source we loaded above.
                              (eldev-trace "Loading the byte-compiled file `%s'..." target)
-                             (load target nil t t))
+                             (eldev-profile-body
+                               (load target nil t t)))
                            nil)
                           (t
                            source)))))

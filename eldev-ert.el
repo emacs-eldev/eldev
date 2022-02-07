@@ -91,7 +91,8 @@ use this for ERT framework, unless they can do better."
     ;; to nil.  We assume that if the variable is customizable, nil is already supported.
     (unless (or ert-batch-backtrace-right-margin (get 'ert-batch-backtrace-right-margin 'custom-type))
       (setf ert-batch-backtrace-right-margin 1000000))
-    (let (completed-tests)
+    (let ((have-ert--run-test-internal (fboundp 'ert--run-test-internal))
+          completed-tests)
       (eldev-advised (#'ert-run-tests
                       ;; There is a difference in number arguments in Emacs 24, so just hide
                       ;; the extra arguments with `&rest'.
@@ -139,14 +140,23 @@ use this for ERT framework, unless they can do better."
                                                       (eldev-warn "\nStopping before %s" (eldev-message-plural num-tests-ignored "more test")))
                                                     (signal 'eldev-quit 1))))))))
                                        rest)))
-        (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
-               (num-unexpected (ert-stats-completed-unexpected statistics)))
-          ;; We map ERT's expected/unexpected to passed/failed here.
-          (setf eldev-test-num-passed  (+ eldev-test-num-passed  (ert-stats-completed-expected statistics))
-                eldev-test-num-failed  (+ eldev-test-num-failed  num-unexpected)
-                eldev-test-num-skipped (+ eldev-test-num-skipped (ert-stats-skipped statistics)))
-          (unless (= num-unexpected 0)
-            (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "ERT test")))))))))
+        ;; Inject profiling support if wanted.
+        (eldev-advised ('ert--run-test-internal :around (when (and eldev--effective-profile-mode have-ert--run-test-internal)
+                                                          (lambda (original &rest args)
+                                                            (eldev-profile-body
+                                                              (apply original args)))))
+          (eldev-advised ('ert-run-test :around (when (and eldev--effective-profile-mode (not have-ert--run-test-internal)
+                                                           (lambda (original &rest args)
+                                                             (eldev-profile-body
+                                                               (apply original args))))))
+            (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
+                   (num-unexpected (ert-stats-completed-unexpected statistics)))
+              ;; We map ERT's expected/unexpected to passed/failed here.
+              (setf eldev-test-num-passed  (+ eldev-test-num-passed  (ert-stats-completed-expected statistics))
+                    eldev-test-num-failed  (+ eldev-test-num-failed  num-unexpected)
+                    eldev-test-num-skipped (+ eldev-test-num-skipped (ert-stats-skipped statistics)))
+              (unless (= num-unexpected 0)
+                (signal 'eldev-error `("%s produced an unexpected result" ,(eldev-message-plural num-unexpected "ERT test")))))))))))
 
 (defun eldev-count-ert-tests (selectors)
   "Count ERT tests matching given SELECTORS."

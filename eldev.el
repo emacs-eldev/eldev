@@ -297,7 +297,7 @@ Since 0.9.")
       (eldev-pcase-exhaustive (pop keywords)
         (:aliases
          (eldev-register-command-aliases command (pop keywords)))
-        ((and (or :command-hook :briefdoc :parameters :custom-parsing :hidden-if :works-on-old-eldev) keyword)
+        ((and (or :command-hook :briefdoc :parameters :custom-parsing :hidden-if :works-on-old-eldev :profiling-self) keyword)
          (eldev-put function keyword (pop keywords)))
         (:override
          (setf override (pop keywords)))))
@@ -341,6 +341,12 @@ BODY can contain the following keywords:
 
         One-line string for describing command parameters in its
         usage documentation.
+
+    :profiling-self FLAG
+
+        If true, command `profile' will leave it up to the nested
+        command to start/stop profiling where suitable,
+        presumably using `eldev-profile-body'.
 
 Result of BODY is ignored.  If you want Eldev to exit with an
 error status, signal an error, probably a `eldev-error'."
@@ -771,36 +777,10 @@ Used by Eldev startup script."
                                   (dolist (entry package-archives)
                                     (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
                                   (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
+                                (setf command (intern (car command-line)))
                                 (unwind-protect
-                                    (progn
-                                      (setf command (intern (car command-line)))
-                                      (let* ((real-command (or (cdr (assq command eldev--command-aliases)) command))
-                                             (handler      (or (cdr (assq real-command eldev--commands)))))
-                                        (if handler
-                                            (let ((hook (eldev-get handler :command-hook)))
-                                              (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
-                                                (signal 'eldev-too-old eldev-too-old))
-                                              (setf command-line (if (eldev-get handler :custom-parsing)
-                                                                     (cdr command-line)
-                                                                   (eldev-parse-options (cdr command-line) real-command)))
-                                              (if (eq real-command command)
-                                                  (eldev-verbose "Executing command `%s'..." command)
-                                                (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
-                                              (when eldev-executing-command-hook
-                                                (eldev-trace "Executing `eldev-executing-command-hook'...")
-                                                (run-hook-with-args 'eldev-executing-command-hook real-command))
-                                              (when (symbol-value hook)
-                                                (eldev-trace "Executing `%s'..." hook)
-                                                (run-hooks hook))
-                                              ;; We want `message' output on stdout universally, but
-                                              ;; older Emacses are very verbose and having additional
-                                              ;; unexpected messages in our stdout would screw up
-                                              ;; tests.  So we set the target to stdout only now.
-                                              (let ((eldev-message-rerouting-destination :stdout))
-                                                (apply handler command-line))
-                                              (setf exit-code 0))
-                                          (eldev-error "Unknown command `%s'" command)
-                                          (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
+                                    (progn (eldev--execute-command command-line)
+                                           (setf exit-code 0))
                                   (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
                                     (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
                                                  (eldev-message-enumerate nil archive-files-to-delete))
@@ -809,6 +789,8 @@ Used by Eldev startup script."
                             (eldev-usage)
                             (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
                             (setf exit-code 0)))))))
+              ;; FIXME: `command' will be wrong if the error occurs during nested command
+              ;;        processing, e.g. `$ eldev profile ... eval --unknown-option ...'.
               (eldev-error (eldev--print-eldev-error error command))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))
@@ -821,6 +803,35 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+(defun eldev--execute-command (command-line)
+  (let* ((command      (intern (car command-line)))
+         (real-command (or (cdr (assq command eldev--command-aliases)) command))
+         (handler      (cdr (assq real-command eldev--commands))))
+    (if handler
+        (let ((hook (eldev-get handler :command-hook)))
+          (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
+            (signal 'eldev-too-old eldev-too-old))
+          (setf command-line (if (eldev-get handler :custom-parsing)
+                                 (cdr command-line)
+                               (eldev-parse-options (cdr command-line) real-command)))
+          (if (eq real-command command)
+              (eldev-verbose "Executing command `%s'..." command)
+            (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
+          (when eldev-executing-command-hook
+            (eldev-trace "Executing `eldev-executing-command-hook'...")
+            (run-hook-with-args 'eldev-executing-command-hook real-command))
+          (when (symbol-value hook)
+            (eldev-trace "Executing `%s'..." hook)
+            (run-hooks hook))
+          ;; We want `message' output on stdout universally, but
+          ;; older Emacses are very verbose and having additional
+          ;; unexpected messages in our stdout would screw up
+          ;; tests.  So we set the target to stdout only now.
+          (let ((eldev-message-rerouting-destination :stdout))
+            (apply handler command-line)))
+      (eldev-error "Unknown command `%s'" command)
+      (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
 
 (defun eldev--maybe-rename-archive (archive external-dir)
   (catch 'renamed-as
@@ -3060,6 +3071,7 @@ Should normally be specified only from command line.")
                                                                (eldev-count-ert-tests selectors)))
                                      (run-tests            . (lambda (selectors _files _runner environment)
                                                                (eldev-run-ert-tests selectors environment)))
+                                     (profiling-self       . t)
                                      (finalize             . (lambda (_selectors)
                                                                (eldev-test-ert-save-results)))))
                        (buttercup . ((detect               . (lambda () (featurep 'buttercup)))
@@ -3070,7 +3082,8 @@ Should normally be specified only from command line.")
                                      (count-tests          . (lambda (selectors _files)
                                                                (eldev-count-buttercup-tests selectors)))
                                      (run-tests            . (lambda (selectors _files _runner environment)
-                                                               (eldev-run-buttercup-tests selectors environment)))))
+                                                               (eldev-run-buttercup-tests selectors environment)))
+                                     (profiling-self       . t)))
                        (ecukes    . ((detect               . (lambda () t))  ; if `.feature' files are found, then they must be for Ecukes
                                      (fileset              . "*.feature")
                                      (file-description     . "test `.feature' file%s")
@@ -3079,7 +3092,8 @@ Should normally be specified only from command line.")
                                      (require              . eldev-ecukes)
                                      (preprocess-selectors . eldev-test-ecukes-preprocess-selectors)
                                      (run-tests            . (lambda (selectors files _runner environment)
-                                                               (eldev-run-ecukes-tests files selectors environment)))))))
+                                                               (eldev-run-ecukes-tests files selectors environment)))
+                                     (profiling-self       . t)))))
   "Alist of all test frameworks known to Eldev.
 While this variable is public and can be modified, you most
 likely shouldn't do that.  Leave adding support for more
@@ -3116,6 +3130,7 @@ is not controllable from command line---change its value in
 This command exits with error code 1 if any test produces an
 unexpected result."
   :parameters     "[SELECTOR...]"
+  :profiling-self t
   (eldev--do-test eldev-test-framework parameters))
 
 (eldev-defcommand eldev-test-ert (&rest parameters)
@@ -3124,6 +3139,7 @@ for details."
   :parameters     "[SELECTOR...]"
   :aliases        ert
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'ert eldev-test-framework)))
+  :profiling-self t
   (eldev--do-test 'ert parameters))
 
 (eldev-defcommand eldev-test-buttercup (&rest parameters)
@@ -3132,6 +3148,7 @@ for details."
   :parameters     "[SELECTOR...]"
   :aliases        (buttercup test-bcup bcup)
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'buttercup eldev-test-framework)))
+  :profiling-self t
   (eldev--do-test 'buttercup parameters))
 
 (eldev-defcommand eldev-test-ecukes (&rest parameters)
@@ -3140,6 +3157,7 @@ for details."
   :parameters     "[SELECTOR...]"
   :aliases        ecukes
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'ecukes eldev-test-framework)))
+  :profiling-self t
   (eldev--do-test 'ecukes parameters))
 
 (defun eldev--do-test (possible-frameworks parameters)
@@ -3240,14 +3258,18 @@ for details."
                                      (signal 'eldev-error `(:hint ("Run `%s test --list-runners' for more information" ,(eldev-shell-command t))
                                                                   "Test runner `%s' doesn't support framework `%s'" ,runner-name ,framework)))
                                    (push framework used-frameworks))
-                                 (let ((actual-selectors (eldev-test-preprocess-selectors framework selectors)))
+                                 (let ((actual-selectors (eldev-test-preprocess-selectors framework selectors))
+                                       (profiling-self   (eldev-test-get-framework-entry framework 'profiling-self)))
                                    (unless already-prepared
                                      (run-hook-with-args (intern (format "eldev-test-%s-hook" framework)) actual-selectors)
                                      (eldev-test-prepare-framework framework actual-selectors))
                                    (condition-case error
                                        (if (eq pass 'run)
                                            (unwind-protect
-                                               (funcall runner framework actual-selectors files)
+                                               (if profiling-self
+                                                   (funcall runner framework actual-selectors files)
+                                                 (eldev-profile-body
+                                                   (funcall runner framework actual-selectors files)))
                                              (eldev-test-finalize-framework framework actual-selectors))
                                          (let ((count-tests (eldev-test-get-framework-entry framework 'count-tests)))
                                            (if count-tests
@@ -4038,6 +4060,7 @@ back to `cl-prin1' as long as that is available (Emacs 26 and
 up)."
   :parameters     "EXPRESSION..."
   :aliases        evaluate
+  :profiling-self t
   (eldev--do-eval t parameters))
 
 (eldev-defcommand eldev-exec (&rest parameters)
@@ -4051,6 +4074,7 @@ This is basically like `eval' command, with the only difference
 being that it doesn't print form results."
   :parameters     "FORM..."
   :aliases        execute
+  :profiling-self t
   (eldev--do-eval nil parameters))
 
 (defun eldev--do-eval (print-results parameters)
@@ -4074,15 +4098,17 @@ being that it doesn't print form results."
                 (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
                        (let* ((lexical-binding eldev-eval-lexical)
                               (function        (byte-compile `(lambda () ,(cdr form)))))
-                         (dotimes (_ repetitions)
-                           (setf result (funcall function)))))
+                         (eldev-profile-body
+                           (dotimes (_ repetitions)
+                             (setf result (funcall function))))))
               (if (eq eldev-eval-preprocess-forms 'macroexpand)
                   (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
                          (setf (cdr form) (macroexpand-all (cdr form))))
                 (when eldev-eval-preprocess-forms
                   (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms)))
-              (dotimes (_ repetitions)
-                (setf result (eval (cdr form) (not (null eldev-eval-lexical)))))))
+              (eldev-profile-body
+                (dotimes (_ repetitions)
+                  (setf result (eval (cdr form) (not (null eldev-eval-lexical))))))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
@@ -4235,6 +4261,235 @@ obligations."
       `((cache . ,eldev--internal-eval-cache)))))
 
 (add-hook 'kill-emacs-hook #'eldev--save-internal-eval-cache)
+
+
+
+;; eldev profile
+
+(defvar eldev-profile-save-as-file nil
+  "Save profile in given file.")
+
+(defvar eldev-profile-open-in-emacs nil
+  "Immediately open resulting profile(s) in Emacs.")
+
+(defvar eldev-profile-mode nil
+  "Profiler's mode, `cpu' if not specified.")
+
+;; Standard value of 16 seems to be awfully small.
+(setf profiler-max-stack-depth 30)
+
+(defvar eldev-profile-only-project t
+  "Whether to profile only project code.")
+
+(defvar eldev--effective-profile-mode nil)
+
+
+;; I had an idea of profiling in a thread (Emacs 26+) to shorten backtraces, but this
+;; fails because of let-binding for global variables are not visible from the thread.  We
+;; use those in several places, and even if we didn't, it would be unwise to depend on
+;; that (also implicitly require for user code).
+(defmacro eldev-profile-body (&rest body)
+  "Execute BODY, gathering profiling information if requested."
+  (declare (indent 0) (debug (body)))
+  `(progn
+     (when eldev--effective-profile-mode
+       (eval-and-compile (require 'profiler))
+       (let ((inhibit-message t))
+         (profiler-start eldev--effective-profile-mode)))
+     (unwind-protect
+         (progn ,@body)
+       (when eldev--effective-profile-mode
+         (let ((inhibit-message t))
+           (profiler-stop))))))
+
+(eldev-defcommand eldev-profile (&rest parameters)
+  "Profile given Eldev command.  Particularly useful with
+commands `eval', `exec' and `test', since those run code from the
+current project; occasionally with `compile'.  However, can be
+run with any Eldev command, in which case will profile mostly
+Eldev itself.
+
+Option `--file' can be repeated, which is useful for `cpu+mem'
+mode: first filename is used for CPU profile, second---for
+memory.  If the option is used only once, filename for memory
+profile is derived from the only specified filename.  If the mode
+is any other, only the last specified filename is used.
+
+When option `--open' is specified, Eldev will try to open
+resulting profile(s) in a running Emacs, which must have server
+started for that to work (see `server-start').  Unlike nearly
+everything else in Eldev, this uses your normal Emacs rather than
+project-isolated one.
+
+At least one of options `--file' and `--open' is required."
+  :parameters     "COMMAND [...]"
+  :aliases        prof
+  :custom-parsing t
+  (setf parameters (eldev-parse-options parameters 'profile t))
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Missing command line to profile")))
+  (unless (or eldev-profile-save-as-file eldev-profile-open-in-emacs)
+    (signal 'eldev-wrong-command-usage `(t "At least one of options `--file' and `--open' is required")))
+  (let* ((eldev--effective-profile-mode (or eldev-profile-mode 'cpu))
+         (nested-command                (intern (car parameters)))
+         (real-command                  (or (cdr (assq nested-command eldev--command-aliases)) nested-command))
+         (handler                       (cdr (assq real-command eldev--commands)))
+         cpu-profile
+         cpu-profile-file
+         memory-profile
+         memory-profile-file)
+    (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
+        (eldev--execute-command parameters)
+      (eldev-profile-body
+        (let ((eldev--effective-profile-mode nil))
+          (eldev--execute-command parameters))))
+    ;; Older Emacs versions don't support creating profile objects once profiler is not
+    ;; running anymore, even though the data is there.
+    (eldev-advised ('profiler-running-p :override (lambda (&rest _) t))
+      (when (memq eldev--effective-profile-mode '(cpu cpu+mem))
+        (setf cpu-profile (profiler-cpu-profile)))
+      (when (memq eldev--effective-profile-mode '(mem cpu+mem))
+        (setf memory-profile (profiler-memory-profile))))
+    ;; As a workaround for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=52560, replace
+    ;; strings in backtraces with symbols.
+    (eldev-advised ('profiler-fixup-entry :around (lambda (original &rest args)
+                                                    (let ((result (apply original args)))
+                                                      (if (stringp result) (intern result) result))))
+      (let* ((make-backup-files nil)
+             (files             (eldev-listify eldev-profile-save-as-file))
+             (num-files         (length files))
+             (temp-prefix       (format "eldev-%s-" (replace-regexp-in-string (rx (not (any "a-zA-Z0-9"))) "" (symbol-name (package-desc-name (eldev-package-descriptor)))))))
+        (when cpu-profile
+          (setf cpu-profile-file (expand-file-name (if files
+                                                       (nth (- num-files (if (and (> num-files 1) (eq eldev--effective-profile-mode 'cpu+mem)) 2 1)) files)
+                                                     (make-temp-file temp-prefix nil ".cpu.prof"))
+                                                   eldev-project-dir))
+          (profiler-write-profile cpu-profile cpu-profile-file))
+        (when memory-profile
+          (setf memory-profile-file (expand-file-name (if files
+                                                          (car (last files))
+                                                        (make-temp-file temp-prefix nil ".mem.prof"))
+                                                      eldev-project-dir))
+          (when (and cpu-profile-file (string= memory-profile-file cpu-profile-file))
+            (setf memory-profile-file (eldev--profile-derive-memory-file cpu-profile-file)))
+          (profiler-write-profile memory-profile memory-profile-file))))
+    (when eldev-profile-open-in-emacs
+      (when cpu-profile-file
+        (eldev--profile-open-on-server nil cpu-profile-file))
+      (when memory-profile-file
+        (eldev--profile-open-on-server nil memory-profile-file)))))
+
+(defun eldev--profile-derive-memory-file (cpu-profile-file)
+  (let* ((cpu-file-name    (file-name-nondirectory cpu-profile-file))
+         (memory-file-name (replace-regexp-in-string (rx bow "cpu" eow) "mem" cpu-file-name)))
+    ;; Using `concat' because there can be no directory name.
+    (concat (or (file-name-directory cpu-profile-file) "")
+            (if (string= memory-file-name cpu-file-name)
+                (replace-regexp-in-string (rx (? "." (1+ (not ?.))) eos) "-mem\\1" cpu-file-name)
+              memory-file-name))))
+
+(defun eldev--profile-open-on-server (server filename)
+  (eval-and-compile (require 'server))
+  (unless server
+    (setf server server-name))
+  (let ((server-socket-dir (if (server-running-p server)
+                               server-socket-dir
+                             ;; Backporting from newer Emacs source, otherwise older Emacs
+                             ;; versions won't see newer servers.
+                             (when (featurep 'make-network-process '(:family local))
+	                       (let ((xdg_runtime_dir (getenv "XDG_RUNTIME_DIR")))
+	                         (if xdg_runtime_dir
+	                             (format "%s/emacs" xdg_runtime_dir)
+	                           (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid)))))))
+        (form              `(progn (profiler-report-profile (profiler-read-profile ,filename)) t)))
+    ;; Ugly in that if something goes wrong with evaluating expression "there", no error
+    ;; is signalled "here".  But what can we do other than rewriting all this crap?  At
+    ;; least it will give an error if the server is not running.
+    (server-eval-at server form)))
+
+
+(eldev-defoption eldev-profile-save-as-file (filename)
+  "Save profile in given file (also see notes below)"
+  :options        (-f --file)
+  :for-command    profile
+  :value          FILENAME
+  :default-value  (if (consp eldev-profile-save-as-file)
+                      (eldev-message-enumerate nil eldev-profile-save-as-file nil t)
+                    (or eldev-profile-save-as-file :no-default))
+  ;; Accept both strings and symbols.
+  (setf eldev-profile-save-as-file (nconc eldev-profile-save-as-file (eldev-listify filename))))
+
+(eldev-defbooloptions eldev-profile-open-in-emacs eldev-profile-dont-open eldev-profile-open-in-emacs
+  ("Open resulting profile(s) in Emacs"
+   :options       (-o --open))
+  ("Don't open profile(s) in Emacs, only write them to file(s)"
+   :options       (--dont-open)
+   :hidden-if     :default)
+  :for-command    profile)
+
+(eldev-defoption eldev-profile-set-mode (mode)
+  "Set the profiler's mode"
+  :options        (--mode)
+  :for-command    profile
+  :value          MODE
+  :default-value  (or eldev-profile-mode 'cpu)
+  ;; Accept both strings and symbols.
+  (when (stringp mode)
+    (setf mode (intern (downcase mode))))
+  (when (eq mode 'cpu-mem)
+    (setf mode 'cpu+mem))
+  (unless (memq mode '(cpu mem cpu+mem))
+    (signal 'eldev-wrong-option-usage `("unknown profiler mode `%s'" ,mode)))
+  (setf eldev-profile-mode mode))
+
+(eldev-defoption eldev-profile-set-mode-cpu ()
+  "Shorthand for `--mode=cpu'"
+  :options        (-c --cpu)
+  :for-command    profile
+  :if-default     (eq (or eldev-profile-mode 'cpu) 'cpu)
+  (eldev-profile-set-mode 'cpu))
+
+(eldev-defoption eldev-profile-set-mode-mem ()
+  "Shorthand for `--mode=mem'"
+  :options        (-m --mem)
+  :for-command    profile
+  :if-default     (eq eldev-profile-mode 'mem)
+  (eldev-profile-set-mode 'mem))
+
+(eldev-defoption eldev-profile-set-mode-cpu+mem ()
+  "Shorthand for `--mode=cpu+mem'"
+  :options        (-M --cpu-mem)
+  :for-command    profile
+  :if-default     (eq eldev-profile-mode 'cpu+mem)
+  (eldev-profile-set-mode 'cpu+mem))
+
+(eldev-defoption eldev-profile-set-sampling-interval (millis)
+  "Sampling interval"
+  :options        (-i --sampling-interval)
+  :for-command    profile
+  :value          MILLISECONDS
+  :default-value  (progn (require 'profiler) (/ profiler-sampling-interval 1000000.0))
+  (setf profiler-sampling-interval (round (* (string-to-number millis) 1000000))))
+
+(eldev-defoption eldev-profile-set-max-stack-depth (depth)
+  "Maximum stack depth"
+  :options        (-d --depth)
+  :for-command    profile
+  :value          FRAMES
+  :default-value  profiler-max-stack-depth
+  (unless (> (setf profiler-max-stack-depth (string-to-number depth)) 0)
+    ;; Emacs dies with "really" unlimited depth, e.g. `most-positive-fixnum'.  With a big
+    ;; number like 0x10000 it eats so much memory that machine gets stuck.  And even with
+    ;; anything above ~30 backtrace displaying in `profiler-mode' becomes useless.
+    ;; Pinnacle of software engineering.
+    (setf profiler-max-stack-depth #x1000)))
+
+(eldev-defbooloptions eldev-profile-only-project eldev-profile-full-command eldev-profile-only-project
+  ("Profile only the project itself (if nested command supports that)"
+   :options       (-p --project))
+  ("Profile full nested command code, including parts of Eldev"
+   :options       (-F --full-command))
+  :for-command    profile)
 
 
 
@@ -4642,7 +4897,7 @@ In addition to t or nil, can also be symbol `concise'.")
   (let (cleaner-specifications)
     (while keywords
       (eldev-pcase-exhaustive (pop keywords)
-        ((and (or :type :short-name :message :source-files :targets :collect :briefdoc) keyword)
+        ((and (or :type :short-name :message :source-files :targets :collect :briefdoc :profiling-self) keyword)
          (eldev-put builder keyword (pop keywords)))
         (:define-cleaner
          (push (pop keywords) cleaner-specifications))))
@@ -4764,6 +5019,7 @@ file.
 
 Also see commands `compile' and `package'."
   :parameters     "[TARGET...]"
+  :profiling-self t
   ;; When building, project loading mode is ignored.  The reason is that building itself
   ;; can involve compiling or packaging.
   (require 'eldev-build)
@@ -4779,6 +5035,7 @@ This is basically a different way of invoking `build' command.
 However, instead of targets, here you specify sources."
   :parameters     "[SOURCE...]"
   :aliases        byte-compile
+  :profiling-self t
   (if parameters
       (let (elc-files)
         (dolist (el-file (eldev-find-files `(:and ,(apply #'eldev-standard-filesets :or (or eldev-build-sets '(main))) "*.el" ,parameters)))
@@ -4795,6 +5052,7 @@ additional optional features.
 Option `--force-version' allows you to override the project's
 self-reported version."
   :aliases        pack
+  :profiling-self t
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (if eldev-package-generate-entry-file
@@ -4918,6 +5176,7 @@ declares"
                    "Delete `.elc' files, i.e. results of byte-compilation."
                    :aliases (elc dot-elc)
                    :default t)
+  :profiling-self t
   (require 'eldev-build)
   (eldev--byte-compile-.el source target))
 
