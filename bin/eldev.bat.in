@@ -1,7 +1,7 @@
 @echo off
 REM Eldev --- Elisp Development Tool.
 REM
-REM Copyright (C) 2021 Paul Pogonyshev
+REM Copyright (C) 2021-2022 Paul Pogonyshev
 REM
 REM Author:   Paul Pogonyshev <pogonyshev@gmail.com>
 REM Homepage: https://github.com/doublep/eldev
