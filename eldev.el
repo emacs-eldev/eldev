@@ -2938,6 +2938,236 @@ mode output is restricted to just the version."
 
 
 
+;; eldev profile
+;; Placed relatively early, since `eldev-profile-body' is used by other commands too.
+
+(defvar eldev-profile-save-as-file nil
+  "Save profile in given file.")
+
+(defvar eldev-profile-open-in-emacs nil
+  "Immediately open resulting profile(s) in Emacs.")
+
+(defvar eldev-profile-mode nil
+  "Profiler's mode, `cpu' if not specified.")
+
+;; Standard value of 16 seems to be awfully small.
+(setf profiler-max-stack-depth 30)
+
+(defvar eldev-profile-only-project t
+  "Whether to profile only project code.")
+
+(defvar eldev--effective-profile-mode nil)
+
+
+;; I had an idea of profiling in a thread (Emacs 26+) to shorten backtraces, but this
+;; fails because of let-binding for global variables are not visible from the thread.  We
+;; use those in several places, and even if we didn't, it would be unwise to depend on
+;; that (also implicitly require for user code).
+(defmacro eldev-profile-body (&rest body)
+  "Execute BODY, gathering profiling information if requested."
+  (declare (indent 0) (debug (body)))
+  `(progn
+     (when eldev--effective-profile-mode
+       (eval-and-compile (require 'profiler))
+       (let ((inhibit-message t))
+         (profiler-start eldev--effective-profile-mode)))
+     (unwind-protect
+         (progn ,@body)
+       (when eldev--effective-profile-mode
+         (let ((inhibit-message t))
+           (profiler-stop))))))
+
+(eldev-defcommand eldev-profile (&rest parameters)
+  "Profile given Eldev command.  Particularly useful with
+commands `eval', `exec' and `test', since those run code from the
+current project; occasionally with `compile'.  However, can be
+run with any Eldev command, in which case will profile mostly
+Eldev itself.
+
+Option `--file' can be repeated, which is useful for `cpu+mem'
+mode: first filename is used for CPU profile, second---for
+memory.  If the option is used only once, filename for memory
+profile is derived from the only specified filename.  If the mode
+is any other, only the last specified filename is used.
+
+When option `--open' is specified, Eldev will try to open
+resulting profile(s) in a running Emacs, which must have server
+started for that to work (see `server-start').  Unlike nearly
+everything else in Eldev, this uses your normal Emacs rather than
+project-isolated one.
+
+At least one of options `--file' and `--open' is required."
+  :parameters     "COMMAND [...]"
+  :aliases        prof
+  :custom-parsing t
+  (setf parameters (eldev-parse-options parameters 'profile t))
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Missing command line to profile")))
+  (unless (or eldev-profile-save-as-file eldev-profile-open-in-emacs)
+    (signal 'eldev-wrong-command-usage `(t "At least one of options `--file' and `--open' is required")))
+  (let* ((eldev--effective-profile-mode (or eldev-profile-mode 'cpu))
+         (nested-command                (intern (car parameters)))
+         (real-command                  (or (cdr (assq nested-command eldev--command-aliases)) nested-command))
+         (handler                       (cdr (assq real-command eldev--commands)))
+         cpu-profile
+         cpu-profile-file
+         memory-profile
+         memory-profile-file)
+    (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
+        (eldev--execute-command parameters)
+      (eldev-profile-body
+        (let ((eldev--effective-profile-mode nil))
+          (eldev--execute-command parameters))))
+    ;; Older Emacs versions don't support creating profile objects once profiler is not
+    ;; running anymore, even though the data is there.
+    (eldev-advised ('profiler-running-p :override (lambda (&rest _) t))
+      (when (memq eldev--effective-profile-mode '(cpu cpu+mem))
+        (setf cpu-profile (profiler-cpu-profile)))
+      (when (memq eldev--effective-profile-mode '(mem cpu+mem))
+        (setf memory-profile (profiler-memory-profile))))
+    ;; As a workaround for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=52560, replace
+    ;; strings in backtraces with symbols.
+    (eldev-advised ('profiler-fixup-entry :around (lambda (original &rest args)
+                                                    (let ((result (apply original args)))
+                                                      (if (stringp result) (intern result) result))))
+      (let* ((make-backup-files nil)
+             (files             (eldev-listify eldev-profile-save-as-file))
+             (num-files         (length files))
+             (temp-prefix       (format "eldev-%s-" (replace-regexp-in-string (rx (not (any "a-zA-Z0-9"))) "" (symbol-name (package-desc-name (eldev-package-descriptor)))))))
+        (when cpu-profile
+          (setf cpu-profile-file (expand-file-name (if files
+                                                       (nth (- num-files (if (and (> num-files 1) (eq eldev--effective-profile-mode 'cpu+mem)) 2 1)) files)
+                                                     (make-temp-file temp-prefix nil ".cpu.prof"))
+                                                   eldev-project-dir))
+          (profiler-write-profile cpu-profile cpu-profile-file))
+        (when memory-profile
+          (setf memory-profile-file (expand-file-name (if files
+                                                          (car (last files))
+                                                        (make-temp-file temp-prefix nil ".mem.prof"))
+                                                      eldev-project-dir))
+          (when (and cpu-profile-file (string= memory-profile-file cpu-profile-file))
+            (setf memory-profile-file (eldev--profile-derive-memory-file cpu-profile-file)))
+          (profiler-write-profile memory-profile memory-profile-file))))
+    (when eldev-profile-open-in-emacs
+      (when cpu-profile-file
+        (eldev--profile-open-on-server nil cpu-profile-file))
+      (when memory-profile-file
+        (eldev--profile-open-on-server nil memory-profile-file)))))
+
+(defun eldev--profile-derive-memory-file (cpu-profile-file)
+  (let* ((cpu-file-name    (file-name-nondirectory cpu-profile-file))
+         (memory-file-name (replace-regexp-in-string (rx bow "cpu" eow) "mem" cpu-file-name)))
+    ;; Using `concat' because there can be no directory name.
+    (concat (or (file-name-directory cpu-profile-file) "")
+            (if (string= memory-file-name cpu-file-name)
+                (replace-regexp-in-string (rx (? "." (1+ (not (any ".")))) eos) "-mem\\1" cpu-file-name)
+              memory-file-name))))
+
+(defun eldev--profile-open-on-server (server filename)
+  (eval-and-compile (require 'server))
+  (unless server
+    (setf server server-name))
+  (let ((server-socket-dir (if (server-running-p server)
+                               server-socket-dir
+                             ;; Backporting from newer Emacs source, otherwise older Emacs
+                             ;; versions won't see newer servers.
+                             (when (featurep 'make-network-process '(:family local))
+	                       (let ((xdg_runtime_dir (getenv "XDG_RUNTIME_DIR")))
+	                         (if xdg_runtime_dir
+	                             (format "%s/emacs" xdg_runtime_dir)
+	                           (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid)))))))
+        (form              `(progn (profiler-report-profile (profiler-read-profile ,filename)) t)))
+    ;; Ugly in that if something goes wrong with evaluating expression "there", no error
+    ;; is signalled "here".  But what can we do other than rewriting all this crap?  At
+    ;; least it will give an error if the server is not running.
+    (server-eval-at server form)))
+
+
+(eldev-defoption eldev-profile-save-as-file (filename)
+  "Save profile in given file (also see notes below)"
+  :options        (-f --file)
+  :for-command    profile
+  :value          FILENAME
+  :default-value  (if (consp eldev-profile-save-as-file)
+                      (eldev-message-enumerate nil eldev-profile-save-as-file nil t)
+                    (or eldev-profile-save-as-file :no-default))
+  ;; Accept both strings and symbols.
+  (setf eldev-profile-save-as-file (nconc eldev-profile-save-as-file (eldev-listify filename))))
+
+(eldev-defbooloptions eldev-profile-open-in-emacs eldev-profile-dont-open eldev-profile-open-in-emacs
+  ("Open resulting profile(s) in Emacs"
+   :options       (-o --open))
+  ("Don't open profile(s) in Emacs, only write them to file(s)"
+   :options       (--dont-open)
+   :hidden-if     :default)
+  :for-command    profile)
+
+(eldev-defoption eldev-profile-set-mode (mode)
+  "Set the profiler's mode"
+  :options        (--mode)
+  :for-command    profile
+  :value          MODE
+  :default-value  (or eldev-profile-mode 'cpu)
+  ;; Accept both strings and symbols.
+  (when (stringp mode)
+    (setf mode (intern (downcase mode))))
+  (when (eq mode 'cpu-mem)
+    (setf mode 'cpu+mem))
+  (unless (memq mode '(cpu mem cpu+mem))
+    (signal 'eldev-wrong-option-usage `("unknown profiler mode `%s'" ,mode)))
+  (setf eldev-profile-mode mode))
+
+(eldev-defoption eldev-profile-set-mode-cpu ()
+  "Shorthand for `--mode=cpu'"
+  :options        (-c --cpu)
+  :for-command    profile
+  :if-default     (eq (or eldev-profile-mode 'cpu) 'cpu)
+  (eldev-profile-set-mode 'cpu))
+
+(eldev-defoption eldev-profile-set-mode-mem ()
+  "Shorthand for `--mode=mem'"
+  :options        (-m --mem)
+  :for-command    profile
+  :if-default     (eq eldev-profile-mode 'mem)
+  (eldev-profile-set-mode 'mem))
+
+(eldev-defoption eldev-profile-set-mode-cpu+mem ()
+  "Shorthand for `--mode=cpu+mem'"
+  :options        (-M --cpu-mem)
+  :for-command    profile
+  :if-default     (eq eldev-profile-mode 'cpu+mem)
+  (eldev-profile-set-mode 'cpu+mem))
+
+(eldev-defoption eldev-profile-set-sampling-interval (millis)
+  "Sampling interval"
+  :options        (-i --sampling-interval)
+  :for-command    profile
+  :value          MILLISECONDS
+  :default-value  (progn (require 'profiler) (/ profiler-sampling-interval 1000000.0))
+  (setf profiler-sampling-interval (round (* (string-to-number millis) 1000000))))
+
+(eldev-defoption eldev-profile-set-max-stack-depth (depth)
+  "Maximum stack depth"
+  :options        (-d --depth)
+  :for-command    profile
+  :value          FRAMES
+  :default-value  profiler-max-stack-depth
+  (unless (> (setf profiler-max-stack-depth (string-to-number depth)) 0)
+    ;; Emacs dies with "really" unlimited depth, e.g. `most-positive-fixnum'.  With a big
+    ;; number like 0x10000 it eats so much memory that machine gets stuck.  And even with
+    ;; anything above ~30 backtrace displaying in `profiler-mode' becomes useless.
+    ;; Pinnacle of software engineering.
+    (setf profiler-max-stack-depth #x1000)))
+
+(eldev-defbooloptions eldev-profile-only-project eldev-profile-full-command eldev-profile-only-project
+  ("Profile only the project itself (if nested command supports that)"
+   :options       (-p --project))
+  ("Profile full nested command code, including parts of Eldev"
+   :options       (-F --full-command))
+  :for-command    profile)
+
+
+
 ;; eldev test
 
 (declare-function eldev-test-ert-preprocess-selectors "eldev-ert" (selectors))
@@ -4261,235 +4491,6 @@ obligations."
       `((cache . ,eldev--internal-eval-cache)))))
 
 (add-hook 'kill-emacs-hook #'eldev--save-internal-eval-cache)
-
-
-
-;; eldev profile
-
-(defvar eldev-profile-save-as-file nil
-  "Save profile in given file.")
-
-(defvar eldev-profile-open-in-emacs nil
-  "Immediately open resulting profile(s) in Emacs.")
-
-(defvar eldev-profile-mode nil
-  "Profiler's mode, `cpu' if not specified.")
-
-;; Standard value of 16 seems to be awfully small.
-(setf profiler-max-stack-depth 30)
-
-(defvar eldev-profile-only-project t
-  "Whether to profile only project code.")
-
-(defvar eldev--effective-profile-mode nil)
-
-
-;; I had an idea of profiling in a thread (Emacs 26+) to shorten backtraces, but this
-;; fails because of let-binding for global variables are not visible from the thread.  We
-;; use those in several places, and even if we didn't, it would be unwise to depend on
-;; that (also implicitly require for user code).
-(defmacro eldev-profile-body (&rest body)
-  "Execute BODY, gathering profiling information if requested."
-  (declare (indent 0) (debug (body)))
-  `(progn
-     (when eldev--effective-profile-mode
-       (eval-and-compile (require 'profiler))
-       (let ((inhibit-message t))
-         (profiler-start eldev--effective-profile-mode)))
-     (unwind-protect
-         (progn ,@body)
-       (when eldev--effective-profile-mode
-         (let ((inhibit-message t))
-           (profiler-stop))))))
-
-(eldev-defcommand eldev-profile (&rest parameters)
-  "Profile given Eldev command.  Particularly useful with
-commands `eval', `exec' and `test', since those run code from the
-current project; occasionally with `compile'.  However, can be
-run with any Eldev command, in which case will profile mostly
-Eldev itself.
-
-Option `--file' can be repeated, which is useful for `cpu+mem'
-mode: first filename is used for CPU profile, second---for
-memory.  If the option is used only once, filename for memory
-profile is derived from the only specified filename.  If the mode
-is any other, only the last specified filename is used.
-
-When option `--open' is specified, Eldev will try to open
-resulting profile(s) in a running Emacs, which must have server
-started for that to work (see `server-start').  Unlike nearly
-everything else in Eldev, this uses your normal Emacs rather than
-project-isolated one.
-
-At least one of options `--file' and `--open' is required."
-  :parameters     "COMMAND [...]"
-  :aliases        prof
-  :custom-parsing t
-  (setf parameters (eldev-parse-options parameters 'profile t))
-  (unless parameters
-    (signal 'eldev-wrong-command-usage `(t "Missing command line to profile")))
-  (unless (or eldev-profile-save-as-file eldev-profile-open-in-emacs)
-    (signal 'eldev-wrong-command-usage `(t "At least one of options `--file' and `--open' is required")))
-  (let* ((eldev--effective-profile-mode (or eldev-profile-mode 'cpu))
-         (nested-command                (intern (car parameters)))
-         (real-command                  (or (cdr (assq nested-command eldev--command-aliases)) nested-command))
-         (handler                       (cdr (assq real-command eldev--commands)))
-         cpu-profile
-         cpu-profile-file
-         memory-profile
-         memory-profile-file)
-    (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
-        (eldev--execute-command parameters)
-      (eldev-profile-body
-        (let ((eldev--effective-profile-mode nil))
-          (eldev--execute-command parameters))))
-    ;; Older Emacs versions don't support creating profile objects once profiler is not
-    ;; running anymore, even though the data is there.
-    (eldev-advised ('profiler-running-p :override (lambda (&rest _) t))
-      (when (memq eldev--effective-profile-mode '(cpu cpu+mem))
-        (setf cpu-profile (profiler-cpu-profile)))
-      (when (memq eldev--effective-profile-mode '(mem cpu+mem))
-        (setf memory-profile (profiler-memory-profile))))
-    ;; As a workaround for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=52560, replace
-    ;; strings in backtraces with symbols.
-    (eldev-advised ('profiler-fixup-entry :around (lambda (original &rest args)
-                                                    (let ((result (apply original args)))
-                                                      (if (stringp result) (intern result) result))))
-      (let* ((make-backup-files nil)
-             (files             (eldev-listify eldev-profile-save-as-file))
-             (num-files         (length files))
-             (temp-prefix       (format "eldev-%s-" (replace-regexp-in-string (rx (not (any "a-zA-Z0-9"))) "" (symbol-name (package-desc-name (eldev-package-descriptor)))))))
-        (when cpu-profile
-          (setf cpu-profile-file (expand-file-name (if files
-                                                       (nth (- num-files (if (and (> num-files 1) (eq eldev--effective-profile-mode 'cpu+mem)) 2 1)) files)
-                                                     (make-temp-file temp-prefix nil ".cpu.prof"))
-                                                   eldev-project-dir))
-          (profiler-write-profile cpu-profile cpu-profile-file))
-        (when memory-profile
-          (setf memory-profile-file (expand-file-name (if files
-                                                          (car (last files))
-                                                        (make-temp-file temp-prefix nil ".mem.prof"))
-                                                      eldev-project-dir))
-          (when (and cpu-profile-file (string= memory-profile-file cpu-profile-file))
-            (setf memory-profile-file (eldev--profile-derive-memory-file cpu-profile-file)))
-          (profiler-write-profile memory-profile memory-profile-file))))
-    (when eldev-profile-open-in-emacs
-      (when cpu-profile-file
-        (eldev--profile-open-on-server nil cpu-profile-file))
-      (when memory-profile-file
-        (eldev--profile-open-on-server nil memory-profile-file)))))
-
-(defun eldev--profile-derive-memory-file (cpu-profile-file)
-  (let* ((cpu-file-name    (file-name-nondirectory cpu-profile-file))
-         (memory-file-name (replace-regexp-in-string (rx bow "cpu" eow) "mem" cpu-file-name)))
-    ;; Using `concat' because there can be no directory name.
-    (concat (or (file-name-directory cpu-profile-file) "")
-            (if (string= memory-file-name cpu-file-name)
-                (replace-regexp-in-string (rx (? "." (1+ (not (any ".")))) eos) "-mem\\1" cpu-file-name)
-              memory-file-name))))
-
-(defun eldev--profile-open-on-server (server filename)
-  (eval-and-compile (require 'server))
-  (unless server
-    (setf server server-name))
-  (let ((server-socket-dir (if (server-running-p server)
-                               server-socket-dir
-                             ;; Backporting from newer Emacs source, otherwise older Emacs
-                             ;; versions won't see newer servers.
-                             (when (featurep 'make-network-process '(:family local))
-	                       (let ((xdg_runtime_dir (getenv "XDG_RUNTIME_DIR")))
-	                         (if xdg_runtime_dir
-	                             (format "%s/emacs" xdg_runtime_dir)
-	                           (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid)))))))
-        (form              `(progn (profiler-report-profile (profiler-read-profile ,filename)) t)))
-    ;; Ugly in that if something goes wrong with evaluating expression "there", no error
-    ;; is signalled "here".  But what can we do other than rewriting all this crap?  At
-    ;; least it will give an error if the server is not running.
-    (server-eval-at server form)))
-
-
-(eldev-defoption eldev-profile-save-as-file (filename)
-  "Save profile in given file (also see notes below)"
-  :options        (-f --file)
-  :for-command    profile
-  :value          FILENAME
-  :default-value  (if (consp eldev-profile-save-as-file)
-                      (eldev-message-enumerate nil eldev-profile-save-as-file nil t)
-                    (or eldev-profile-save-as-file :no-default))
-  ;; Accept both strings and symbols.
-  (setf eldev-profile-save-as-file (nconc eldev-profile-save-as-file (eldev-listify filename))))
-
-(eldev-defbooloptions eldev-profile-open-in-emacs eldev-profile-dont-open eldev-profile-open-in-emacs
-  ("Open resulting profile(s) in Emacs"
-   :options       (-o --open))
-  ("Don't open profile(s) in Emacs, only write them to file(s)"
-   :options       (--dont-open)
-   :hidden-if     :default)
-  :for-command    profile)
-
-(eldev-defoption eldev-profile-set-mode (mode)
-  "Set the profiler's mode"
-  :options        (--mode)
-  :for-command    profile
-  :value          MODE
-  :default-value  (or eldev-profile-mode 'cpu)
-  ;; Accept both strings and symbols.
-  (when (stringp mode)
-    (setf mode (intern (downcase mode))))
-  (when (eq mode 'cpu-mem)
-    (setf mode 'cpu+mem))
-  (unless (memq mode '(cpu mem cpu+mem))
-    (signal 'eldev-wrong-option-usage `("unknown profiler mode `%s'" ,mode)))
-  (setf eldev-profile-mode mode))
-
-(eldev-defoption eldev-profile-set-mode-cpu ()
-  "Shorthand for `--mode=cpu'"
-  :options        (-c --cpu)
-  :for-command    profile
-  :if-default     (eq (or eldev-profile-mode 'cpu) 'cpu)
-  (eldev-profile-set-mode 'cpu))
-
-(eldev-defoption eldev-profile-set-mode-mem ()
-  "Shorthand for `--mode=mem'"
-  :options        (-m --mem)
-  :for-command    profile
-  :if-default     (eq eldev-profile-mode 'mem)
-  (eldev-profile-set-mode 'mem))
-
-(eldev-defoption eldev-profile-set-mode-cpu+mem ()
-  "Shorthand for `--mode=cpu+mem'"
-  :options        (-M --cpu-mem)
-  :for-command    profile
-  :if-default     (eq eldev-profile-mode 'cpu+mem)
-  (eldev-profile-set-mode 'cpu+mem))
-
-(eldev-defoption eldev-profile-set-sampling-interval (millis)
-  "Sampling interval"
-  :options        (-i --sampling-interval)
-  :for-command    profile
-  :value          MILLISECONDS
-  :default-value  (progn (require 'profiler) (/ profiler-sampling-interval 1000000.0))
-  (setf profiler-sampling-interval (round (* (string-to-number millis) 1000000))))
-
-(eldev-defoption eldev-profile-set-max-stack-depth (depth)
-  "Maximum stack depth"
-  :options        (-d --depth)
-  :for-command    profile
-  :value          FRAMES
-  :default-value  profiler-max-stack-depth
-  (unless (> (setf profiler-max-stack-depth (string-to-number depth)) 0)
-    ;; Emacs dies with "really" unlimited depth, e.g. `most-positive-fixnum'.  With a big
-    ;; number like 0x10000 it eats so much memory that machine gets stuck.  And even with
-    ;; anything above ~30 backtrace displaying in `profiler-mode' becomes useless.
-    ;; Pinnacle of software engineering.
-    (setf profiler-max-stack-depth #x1000)))
-
-(eldev-defbooloptions eldev-profile-only-project eldev-profile-full-command eldev-profile-only-project
-  ("Profile only the project itself (if nested command supports that)"
-   :options       (-p --project))
-  ("Profile full nested command code, including parts of Eldev"
-   :options       (-F --full-command))
-  :for-command    profile)
 
 
 
