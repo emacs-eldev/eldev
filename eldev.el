@@ -1407,8 +1407,8 @@ show details about that command instead."
              (handler      (cdr (assq real-command eldev--commands))))
         (if handler
             (let ((parameters (eldev-get handler :parameters)))
-              (eldev-output "Usage: %s%s %s" (eldev-shell-command t) (if (cdr (assq command eldev--options)) " [OPTION...]" "")
-                            (if parameters (format "%s %s" real-command parameters) real-command))
+              (eldev-output "Usage: %s [...] %s%s%s" (eldev-shell-command t)
+                            real-command (if (cdr (assq real-command eldev--options)) " [OPTION...]" "") (if parameters (format " %s" parameters) ""))
               (eldev-help-list-aliases real-command eldev--command-aliases "\n%s" '("Command alias:" "Command aliases:"))
               (eldev-options-help real-command)
               (eldev-output "\n%s" (or (eldev-documentation handler) "Not documented")))
