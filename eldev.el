@@ -714,6 +714,15 @@ Since 0.2.1.")
 (defvar eldev-too-old nil)
 (defvar eldev--setup-step nil)
 
+(defvar eldev-preprocessed-command-line nil
+  "Command line to be returned from `eldev-parse-options'.
+The value is a reversed list of non-option parameters encountered
+so far.  Option handlers (i.e. bodies of `eldev-defoption') may
+access it and modify freely.  This is useful if precise order of
+certain options relative to non-option parameters is important.
+
+Since 0.11.")
+
 
 (defun eldev-start-up ()
   "Prepare Eldev.
@@ -941,7 +950,7 @@ Since 0.2."
   "Parse global or command-specific options.
 Returns COMMAND-LINE with options removed."
   (save-match-data
-    (let (without-options)
+    (let (eldev-preprocessed-command-line)
       (while command-line
         (let* ((term     (pop command-line))
                (stop-now (string= term "--")))
@@ -990,11 +999,11 @@ Returns COMMAND-LINE with options removed."
                     (setf term (when rest (format "-%c" (aref rest 0)))
                           rest (when (> (length rest) 1) (substring rest (length "-")))))))
             (unless stop-now
-              (push term without-options))
+              (push term eldev-preprocessed-command-line))
             (when (or stop-now stop-on-non-option)
               (while command-line
-                (push (pop command-line) without-options))))))
-      (nreverse without-options))))
+                (push (pop command-line) eldev-preprocessed-command-line))))))
+      (nreverse eldev-preprocessed-command-line))))
 
 (defun eldev-global-package-archive-cache-dir ()
   (expand-file-name eldev-global-cache-dir eldev-dir))
@@ -4287,7 +4296,14 @@ that you don't have to include `(require ...)' yourself.
 Results of evaluation are printed to stdout using specified
 function.  Default printer is function `eldev-prin1' that falls
 back to `cl-prin1' as long as that is available (Emacs 26 and
-up)."
+up).
+
+Expressions can be specified on the command line, read from a
+file or both, see option `--file'.  In the latter case files are
+not loaded in Elisp sense, but forms in them are read to be
+evaluated.  If `eldev-dwim' variable is on (default), Eldev
+treats any command line expression that ends in `.el' as a
+filename."
   :parameters     "EXPRESSION..."
   :aliases        evaluate
   :profiling-self t
@@ -4300,6 +4316,12 @@ option `-r' is specified (or is on by default), project's main
 feature will be required before evaluating, so that you don't
 have to include `(require ...)' yourself.
 
+Forms can be specified on the command line, read from a file or
+both, see option `--file'.  In the latter case files are not
+loaded in Elisp sense, but forms in them are read to be executed.
+If `eldev-dwim' variable is on (default), Eldev treats any
+command line expression that ends in `.el' as a filename.
+
 This is basically like `eval' command, with the only difference
 being that it doesn't print form results."
   :parameters     "FORM..."
@@ -4309,9 +4331,23 @@ being that it doesn't print form results."
 
 (defun eldev--do-eval (print-results parameters)
   (unless parameters
-    (signal 'eldev-wrong-command-usage `(t ,(if print-results "Missing expressions to evaluate" "Missing forms to execute"))))
-  (let ((forms       (mapcar (lambda (parameter) (cons parameter (eldev-read-wholly parameter (if print-results "expression" "form to evaluate")))) parameters))
-        (repetitions (if eldev-eval-repeat (max (round eldev-eval-repeat) 1) 1)))
+    (signal 'eldev-wrong-command-usage `(t ,(eldev-format-message "Missing %s (on the command line or in a file)" (if print-results "expressions to evaluate" "forms to execute")))))
+  (let ((repetitions (if eldev-eval-repeat (max (round eldev-eval-repeat) 1) 1))
+        forms)
+    (dolist (parameter parameters)
+      (when (and eldev-dwim (stringp parameter) (string-match-p (rx ".el" eos) parameter))
+        (setf parameter `(,parameter)))
+      (if (stringp parameter)
+          (push `(,(eldev-read-wholly parameter (if print-results "expression" "form to evaluate")) ,parameter) forms)
+        (let* ((file       (car parameter))
+               (short-name (abbreviate-file-name file)))
+          (eldev-trace "Reading forms from file `%s'..." file)
+          (with-temp-buffer
+            (condition-case error
+                (insert-file-contents file t)
+              (file-error (signal 'eldev-error `("Unable to read forms from file `%s': file is missing or unreadable" ,short-name))))
+            (dolist (form (eldev-read-current-buffer-forms (eldev-format-message "forms in file `%s'" file)))
+              (push `(,form ,(prin1-to-string form) ,short-name) forms))))))
     (when eldev-eval-load-project
       (eldev-load-project-dependencies (if print-results 'eval 'exec)))
     (eldev-autoinstalling-implicit-dependencies eldev-eval-load-project
@@ -4319,26 +4355,27 @@ being that it doesn't print form results."
         (dolist (feature (eldev-required-features eldev-eval-required-features))
           (eldev-verbose "Autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
           (require feature)))
-      (dolist (form forms)
-        (eldev-verbose (if print-results "Evaluating expression `%s':" "Executing form `%s'...") (car form))
+      (dolist (form (nreverse forms))
+        (eldev-verbose (if print-results "Evaluating expression `%s'%s:" "Executing form `%s'%s...")
+                       (cadr form) (if (nth 2 form) (eldev-format-message " (from file `%s')" (nth 2 form)) ""))
         (let (result)
           ;; For these commands we restore the standard behavior of `message' of writing to stderr,
           (let ((eldev-message-rerouting-destination :stderr))
             (if (eq eldev-eval-preprocess-forms 'byte-compile)
                 (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
                        (let* ((lexical-binding eldev-eval-lexical)
-                              (function        (byte-compile `(lambda () ,(cdr form)))))
+                              (function        (byte-compile `(lambda () ,(car form)))))
                          (eldev-profile-body
                            (dotimes (_ repetitions)
                              (setf result (funcall function))))))
               (if (eq eldev-eval-preprocess-forms 'macroexpand)
                   (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
-                         (setf (cdr form) (macroexpand-all (cdr form))))
+                         (setf (car form) (macroexpand-all (car form))))
                 (when eldev-eval-preprocess-forms
                   (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms)))
               (eldev-profile-body
                 (dotimes (_ repetitions)
-                  (setf result (eval (cdr form) (not (null eldev-eval-lexical))))))))
+                  (setf result (eval (car form) (not (null eldev-eval-lexical))))))))
           (when print-results
             (with-temp-buffer
               (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
@@ -4347,6 +4384,13 @@ being that it doesn't print form results."
               (when (equal (char-before) ?\n)
                 (delete-char -1))
               (eldev-output "%s" (buffer-string)))))))))
+
+(eldev-defoption eldev-eval-from-file (file)
+  "Read expressions (forms) from given file"
+  :options        (-f --file)
+  :value          FILE
+  :for-command    (eval exec)
+  (push `(,file) eldev-preprocessed-command-line))
 
 (eldev-defbooloptions eldev-eval-lexical-mode eldev-eval-dynamic-mode eldev-eval-lexical
   ("Evaluate expressions using lexical scoping"

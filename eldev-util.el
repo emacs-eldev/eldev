@@ -682,18 +682,36 @@ Since 0.6.1."
 
 (defun eldev-read-wholly (string &optional description)
   "Read STRING as Elisp expression.
-This is basically a wrapper over `read-from-string', but issues
+This is largely similar to `read-from-string', but issues
 human-readable errors if there are any problems."
-  (setf description (eldev-format-message (or description "Lisp object from `%s'") string))
-  (let* ((result (condition-case error
-                     (read-from-string string)
-                   (error (signal 'eldev-error `("When reading %s: %s" ,description ,(error-message-string error))))))
-         (tail   (replace-regexp-in-string (rx (or (: bol (1+ whitespace)) (: (1+ whitespace) eol))) "" (substring string (cdr result)) t t)))
-    (unless (= (length tail) 0)
-      (signal 'eldev-error (if (string-suffix-p "expression" description)
-                               `("Trailing garbage after the %s: `%s'" ,description ,tail)
-                             `("Trailing garbage after the expression in %s: `%s'" ,description ,tail))))
-    (car result)))
+  (with-temp-buffer
+    (insert string)
+    (goto-char 1)
+    (prog1 (car (eldev-read-current-buffer-forms (eldev-format-message (or description "Lisp object from `%s'") string) t))
+      (unless (eobp)
+        (let ((tail (buffer-substring (point) (point-max))))
+          (signal 'eldev-error (if (string-suffix-p "expression" description)
+                                   `("Trailing garbage after the %s: `%s'" ,description ,tail)
+                                 `("Trailing garbage after the expression in %s: `%s'" ,description ,tail))))))))
+
+(defun eldev-read-current-buffer-forms (&optional description stop-after-one)
+  "Read forms from the current buffer, starting at point.
+Return the list of forms or, if STOP-AFTER-ONE is non-nil, the
+list with one item only.  When stopping early, whitespace and
+comments after the form are skipped, which can be used to detect
+whether there is something important following the form.
+
+Since 0.11."
+  (let (forms)
+    (while (and (not (eobp)) (not (and stop-after-one forms)))
+      (condition-case error
+          (push (read (current-buffer)) forms)
+        (error (signal 'eldev-error `("When reading %s: %s" ,description ,(error-message-string error)))))
+      (while (looking-at (rx (: (or (1+ whitespace) (: ";" (1+ any))))))
+        (goto-char (match-end 0))
+        (when (eolp)
+          (forward-line))))
+    (nreverse forms)))
 
 
 (defmacro eldev-output-reroute-messages (&rest body)

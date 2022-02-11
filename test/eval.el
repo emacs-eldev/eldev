@@ -11,6 +11,14 @@
     (should (string= stdout "1\n5\n(1 . 2)\n"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-eval-from-file-1 ()
+  (let ((file (make-temp-file "eval-" nil ".el")))
+    (with-temp-file file
+      (insert "(+ 1 2) ;; comments should be ignored\n(+ 3 4)\n"))
+    (eldev--test-run "trivial-project" ("eval" "--file" file)
+      (should (string= stdout (eldev--test-lines "3" "7")))
+      (should (= exit-code 0)))))
+
 (ert-deftest eldev-eval-project-function-1 ()
   (eldev--test-run "trivial-project" ("eval" `(progn (require 'trivial-project) (trivial-project-hello)))
     (should (string= stdout "\"Hello\"\n"))

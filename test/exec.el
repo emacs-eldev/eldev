@@ -11,6 +11,14 @@
     (should (string= stdout "1"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-exec-from-file-1 ()
+  (let ((file (make-temp-file "eval-" nil ".el")))
+    (with-temp-file file
+      (insert "(defun add-numbers (&rest x) (apply '+ x)) ;; comments should be ignored\n(princ (add-numbers 1 2 3 4))\n"))
+    (eldev--test-run "trivial-project" ("exec" "--file" file)
+      (should (string= stdout "10"))
+      (should (= exit-code 0)))))
+
 (ert-deftest eldev-multiexec-1 ()
   (eldev--test-run "trivial-project" ("exec" `1 `(+ 2 3) `(cons 1 2))
     (should (string= stdout ""))
