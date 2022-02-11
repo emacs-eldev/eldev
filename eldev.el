@@ -4343,7 +4343,7 @@ being that it doesn't print form results."
                (short-name (abbreviate-file-name file)))
           (eldev-trace "Reading forms from file `%s'..." file)
           (with-temp-buffer
-            (condition-case error
+            (condition-case nil
                 (insert-file-contents file t)
               (file-error (signal 'eldev-error `("Unable to read forms from file `%s': file is missing or unreadable" ,short-name))))
             (dolist (form (eldev-read-current-buffer-forms (eldev-format-message "forms in file `%s'" file)))
