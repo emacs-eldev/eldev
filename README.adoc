@@ -9,6 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
@@ -203,12 +204,13 @@ first invocation.
 --
     $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
 
-This will install `eldev` script to `~/.eldev/bin`.
+This will install `eldev` script to `~/.local/bin`.
 --
 
-. Add the directory to your `PATH`; e.g. in `~/.profile` add this:
+. Generally, {uri-xdg}[this directory should already be in your
+  `PATH`].  But if not, e.g. in `~/.profile` add this:
 +
-    export PATH="$HOME/.eldev/bin:$PATH"
+    export PATH="$HOME/.local/bin:$PATH"
 
 * On Windows:
 . Execute:
@@ -216,12 +218,12 @@ This will install `eldev` script to `~/.eldev/bin`.
 --
     > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
 
-This will install `eldev.bat` script to `%USERPROFILE%\.eldev\bin`.
+This will install `eldev.bat` script to `%USERPROFILE%\.local\bin`.
 --
 
 . Add this directory to your `PATH`:
 +
-    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.eldev\bin;%PATH%" /f
+    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.local\bin;%PATH%" /f
 
 Afterwards Eldev will bootstrap itself as needed on first invocation.
 
@@ -374,7 +376,7 @@ After this step, Eldev is ready to work with your project.
 Now that we have created file `Eldev`, it makes sense to go over the
 full startup process:
 
-* Load file `~/.eldev/config`
+* Load file `~/.config/eldev/config`
 * Load file `Eldev` in the current directory
 * Load file `Eldev-local` in the current directory
 * Execute setup forms specified on the command line
@@ -383,11 +385,17 @@ None of these Elisp files and forms are required.  They are also not
 restricted in what they do.  However, their _intended_ usage is
 different.
 
-File `~/.eldev/config` is _user-specific_.  It is meant mostly for
-customizing Eldev to your personal preferences.  For example, if you
-hate coloring of Eldev output, add form `(setf eldev-coloring-mode
+File `~/.config/eldev/config` is _user-specific_.  It is meant mostly
+for customizing Eldev to your personal preferences.  For example, if
+you hate coloring of Eldev output, add form `(setf eldev-coloring-mode
 nil)` to it.  Then every Eldev process started for any project will
 default to using uncolored output.
+
+NOTE: {since-0-11} More precisely, if directory `~/.eldev` exists (for
+pre-0.11 Eldev installations), file `~/.eldev/config` is used.
+Otherwise, if {uri-xdg}[environment variable `XDG_CONFIG_HOME`] is
+set, file `$XDG_CONFIG_HOME/eldev/config` is used.  And finally,
+`~/.config/eldev/config` is the default fallback.
 
 File `Eldev` is _project-specific_.  It is the only configuration file
 that should be added to project’s VCS (Git, Mercurial, etc.).  Typical
@@ -464,8 +472,8 @@ for continuous integration or for working on packages that you do not
 have — for whatever reason — installed normally.  It is also difficult
 to test on <<different-emacs-versions,different Emacs versions>> in
 external directory mode.  Therefore, it is not the default.  But, as
-usual in Eldev, you can make it the default in file `~/.eldev/config`
-if you want.
+usual in Eldev, you can make it the default in file
+`~/.config/eldev/config` if you want.
 
 
 == Project dependencies
@@ -776,7 +784,7 @@ archive contents expires in one hour.  However, if you use command
 refreshed.
 
 Cache usage is not controllable from command line.  However, you can
-customize it somewhat in `~/.eldev/config`.  Variable
+customize it somewhat in `~/.config/eldev/config`.  Variable
 `eldev-enable-global-package-archive-cache` lets you disable the
 global cache outright.  Using
 `eldev-global-cache-archive-contents-max-age` you can adjust how long
@@ -1248,15 +1256,17 @@ option, `-B`, is surprisingly useful.  In many cases backtraces don’t
 actually give any useful information, especially when the tests
 contain only a single assertion, and only clutter the output.  If you
 have different preferences compared to Eldev, you can customize
-variable `eldev-test-print-backtraces` in file `~/.eldev/config`.
+variable `eldev-test-print-backtraces` in file
+`~/.config/eldev/config`.
 
 How exactly tests are executed depends on _test runner_.  If you
 dislike the default behavior of Eldev, you can choose a different test
 runner using `--runner` (`-r`) option of `test` command; see the list
 of available test runners with their descriptions using
 `--list-runners` option.  If you always use a different test runner,
-it is a good idea to set it as the default in file `~/.eldev/config`.
-Finally, you can even write your own runner.
+it is a good idea to set it as the default in file
+`~/.config/eldev/config`.  Finally, you can even write your own
+runner.
 
 [#frameworks]
 === Frameworks
@@ -1506,7 +1516,7 @@ documentation) like this:
 --
 
 If you dislike these simplifications, set `eldev-dwim` to `nil` in
-`~/.eldev/config`.
+`~/.config/eldev/config`.
 
 
 [#linting]
@@ -2018,9 +2028,9 @@ Eldev scripts.
   backtraces to your screen width and thus make them more readable at
   the expense of completeness (by default, Eldev doesn’t truncate
   backtrace lines).  It is a good idea to change the default in file
-  `.eldev/config`.  Starting with 0.10 this also affects backtraces
-  printed if Eldev or code from the project it executes fails with a
-  signal (see also option `--debug`).
+  `~/.config/eldev/config`.  Starting with 0.10 this also affects
+  backtraces printed if Eldev or code from the project it executes
+  fails with a signal (see also option `--debug`).
 
 * Global option `-T` (`--time`) prepends timestamps to all lines of
   Eldev output, making it easier to spot performance problems.
@@ -2305,10 +2315,10 @@ evaluated in turn — and so on, until everything is resolved.
 
 Eldev is written to be not just configurable, but also extensible.  It
 makes perfect sense to have additional code in file `Eldev` — if your
-project has uncommon building steps.  And also in `~/.eldev/config` —
-if you want a special command for your own needs, for example.  Or
-maybe in `Eldev-local` — if you need something extra only for one
-specific project that you maintain.
+project has uncommon building steps.  And also in
+`~/.config/eldev/config` — if you want a special command for your own
+needs, for example.  Or maybe in `Eldev-local` — if you need something
+extra only for one specific project that you maintain.
 
 [#hooks]
 === Hooks
@@ -2713,8 +2723,11 @@ A few environment variables can affect Eldev’s behavior.
 `ELDEV_DIR`::
 
     Directory where user’s configuration file, Eldev’s bootstrapping
-    files etc. are located, defaults to `~/.eldev`.  Used by Eldev’s
-    own regression tests, should be of no interest for typical use.
+    files etc. are located.  When not set, configuration files are
+    looked up either in `~/.eldev` if that exists, else in
+    `~/.config/eldev`; runtime files are placed either in `~/.eldev`
+    or `~/.cache/eldev`.  Used by Eldev’s own regression tests, should
+    be of no interest for typical use.
 
 
 == See also
