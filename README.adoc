@@ -997,6 +997,25 @@ the system to generate virtual target `:package`.  However, there are
 a few options that can only be passed to this special command, not to
 underlying `build`.
 
+Files that are copied to the package `.tar` default to Elisp files
+plus standard documentation: `\*.info`, `doc/*.info` and files `dir`
+along those.  However, if you need to package additional files, just
+modify variable `eldev-files-to-package`.  Its value must be a
+<<filesets,fileset>>.  Best is to _add_ to the default value rather
+than replace it.  Here is an example from Eldev’s own file `Eldev`:
+
+[source]
+----
+(setf eldev-files-to-package
+      (append eldev-files-to-package
+              '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+----
+
+Here we instruct package builder to additionally copy all files from
+subdirectory `bin`, except those with names ending in `.in` or
+`.part`.  If you distribute your package through MELPA, you will
+unfortunately need to repeat these instructions in MELPA recipe.
+
 Normally, packages are generated in subdirectory `dist` (more
 precisely, in directory specified by `eldev-dist-dir` variable).  If
 needed, you can override this using `--output-dir` option.
