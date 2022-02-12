@@ -1,4 +1,4 @@
-# This script downloads Eldev startup script as `~\.eldev\bin\eldev.bat'
+# This script downloads Eldev startup script as `~\.local\bin\eldev.bat'
 # for CircleCI, and permanently adds that directory at the front of PATH
 # in PS's startup profile, so as to be available in every session.
 #
@@ -9,7 +9,7 @@
 $ErrorActionPreference = "Stop"
 
 
-$env:ELDEV_BIN_DIR="$HOME\.eldev\bin"
+$env:ELDEV_BIN_DIR="$HOME\.local\bin"
 
 if (!(Test-Path $env:ELDEV_BIN_DIR)) {new-item "$env:ELDEV_BIN_DIR" -ItemType directory}
 iwr -Uri https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev.bat `

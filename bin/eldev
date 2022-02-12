@@ -43,7 +43,19 @@ $ELDEV_EMACS --batch --no-site-file --no-site-lisp                              
   ;; so `condition-case-unless-debug'\''.
   (unless (and (fboundp '\''version<=) (version<= "24.1" eldev--emacs-version))
     (error "Eldev requires Emacs 24.1 or newer"))
-  (setf package-user-dir       (expand-file-name "bootstrap" (expand-file-name eldev--emacs-version (if (= (length eldev--dir) 0) "~/.eldev" eldev--dir)))
+  (setf package-user-dir
+        (expand-file-name "bootstrap"
+                          (expand-file-name eldev--emacs-version
+                                            (if (> (length eldev--dir) 0)
+                                                eldev--dir
+                                              (if (file-directory-p "~/.eldev")
+                                                  "~/.eldev"
+                                                ;; Duplicating not-yet-available code from `eldev-xdg-cache-home'\''.
+                                                (expand-file-name "eldev"
+                                                                  (let ((eldev--xdg-cache-dir (getenv "XDG_CACHE_HOME")))
+                                                                    (if (and eldev--xdg-cache-dir (file-name-absolute-p eldev--xdg-cache-dir))
+                                                                        eldev--xdg-cache-dir
+                                                                      "~/.cache")))))))
         package-directory-list nil
         package-archives       nil)
   (require '\''package)

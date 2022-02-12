@@ -42,7 +42,7 @@ CONFIGURATION is specific to each plugin.  Usually it is expected
 to be a property list, i.e. keywords interleaved with values.
 
 It is not an error to activate a plugin more than once (e.g. once
-from `~/.eldev/config' and once from `Eldev').  However,
+from `~/.config/eldev/config' and once from `Eldev').  However,
 CONFIGURATION for all activations but the first will be ignored.
 
 Since 0.3."

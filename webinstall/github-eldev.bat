@@ -1,5 +1,5 @@
 @echo off
-rem This script downloads Eldev startup script as `%USERPROFILE%/.eldev/bin/eldev'.
+rem This script downloads Eldev startup script as `%USERPROFILE%\.local\bin\eldev.bat'.
 rem
 rem curl.exe is included in Windows 10 since April-2018-Update (1803)
 rem In your `.github/workflows/*.yml' add this:
@@ -17,7 +17,7 @@ rem optionally pass download URL as parameter to allow testing in PRs
 set URL=https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev.bat
 if %ARGS%==1 set URL=%1
 
-set ELDEV_BIN_DIR=%USERPROFILE%\.eldev\bin
+set ELDEV_BIN_DIR=%USERPROFILE%\.local\bin
 
 mkdir %ELDEV_BIN_DIR%
 

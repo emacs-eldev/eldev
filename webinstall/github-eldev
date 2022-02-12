@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# This script downloads Eldev startup script as `~/.eldev/bin/eldev'
+# This script downloads Eldev startup script as `~/.local/bin/eldev'
 # for use in a GitHub workflow.
 #
 # In your `.github/workflows/*.yml' add this:
@@ -10,7 +10,7 @@
 set -e
 
 
-ELDEV_BIN_DIR=~/.eldev/bin
+ELDEV_BIN_DIR=~/.local/bin
 
 # `$GITHUB_PATH' is a magic file which contents is translated to environment variable `$PATH'.
 echo "$ELDEV_BIN_DIR" >> $GITHUB_PATH

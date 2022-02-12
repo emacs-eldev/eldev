@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# This script downloads Eldev startup script as `~/.eldev/bin/eldev'
+# This script downloads Eldev startup script as `~/.local/bin/eldev'
 # for Travis CI.
 #
 # In your `.travis.yml' add this:
@@ -10,7 +10,7 @@
 set -e
 
 
-ELDEV_BIN_DIR=~/.eldev/bin
+ELDEV_BIN_DIR=~/.local/bin
 
 export PATH="$ELDEV_BIN_DIR:$PATH"
 

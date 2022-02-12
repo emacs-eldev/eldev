@@ -77,6 +77,29 @@
       (cons (nreverse decls) body)))
 
 
+;; XDG support: native only in Emacs 26 and up.
+(defmacro eldev--xdg-dir-home (environ default-path)
+  (declare (debug (stringp stringp)))
+  (let ((env (make-symbol "env")))
+    `(let ((,env (getenv ,environ)))
+       (if (or (null ,env) (not (file-name-absolute-p ,env)))
+           (expand-file-name ,default-path)
+         ,env))))
+
+(if (require 'xdg nil t)
+    (progn
+      (defalias 'eldev-xdg-config-home 'xdg-config-home)
+      (defalias 'eldev-xdg-cache-home  'xdg-cache-home))
+  (defun eldev-xdg-config-home ()
+    "Same as `xdg-config-home' in Emacs 26 and up.
+Since Eldev 0.11."
+    (eldev--xdg-dir-home "XDG_CONFIG_HOME" "~/.config"))
+  (defun eldev-xdg-cache-home ()
+    "Same as `xdg-cache-home' in Emacs 26 and up.
+Since Eldev 0.11."
+    (eldev--xdg-dir-home "XDG_CACHE_HOME" "~/.cache")))
+
+
 
 ;; General.
 

@@ -1,5 +1,5 @@
 @echo off
-rem This script downloads Eldev startup script as `%USERPROFILE%/.eldev/bin/eldev'.
+rem This script downloads Eldev startup script as `%USERPROFILE%\.local\bin\eldev.bat'.
 rem
 rem To bootstrap, run as follows from a command prompt:
 rem
@@ -16,7 +16,7 @@ rem optionally pass download URL as parameter to allow testing in PRs
 set URL=https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev.bat
 if %ARGS%==1 set URL=%1
 
-set ELDEV_BIN_DIR=%USERPROFILE%\.eldev\bin
+set ELDEV_BIN_DIR=%USERPROFILE%\.local\bin
 
 mkdir %ELDEV_BIN_DIR%
 

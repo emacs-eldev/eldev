@@ -53,11 +53,11 @@
 ;;
 ;;      $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
 ;;
-;;    This will install eldev script to ~/.eldev/bin.
+;;    This will install eldev script to ~/.local/bin.
 ;;
-;; 2. Add the directory to your $PATH; e.g. in ~/.profile add this:
+;; 2. If not yet there, add the directory to your $PATH; e.g. in ~/.profile add this:
 ;;
-;;      export PATH="$HOME/.eldev/bin:$PATH"
+;;      export PATH="$HOME/.local/bin:$PATH"
 ;;
 ;; Afterwards Eldev will bootstrap itself as needed on first
 ;; invocation.
@@ -95,11 +95,18 @@ instead.")
 (defvar eldev-emacs-executable (or (eldev-getenv "ELDEV_EMACS") (eldev-getenv "EMACS") "emacs")
   "Emacs executable used for Eldev.")
 
-(defconst eldev-dir (or (eldev-getenv "ELDEV_DIR") "~/.eldev")
-  "Global user's Eldev directory, usually `~/.eldev'.")
+(defconst eldev-dir (or (eldev-getenv "ELDEV_DIR")
+                        (when (file-directory-p "~/.eldev") "~/.eldev")
+                        (expand-file-name "eldev" (eldev-xdg-cache-home)))
+  "User's Eldev cache directory, usually `~/.cache/eldev'.
+This directory is global, i.e. not project-specific.")
 
-(defconst eldev-user-config-file (expand-file-name "config" eldev-dir)
-  "Global user's Eldev configuration file, usually `~/.eldev/config'.")
+(defconst eldev-user-config-file (expand-file-name "config"
+                                                   (or (eldev-getenv "ELDEV_DIR")
+                                                       (when (file-directory-p "~/.eldev") "~/.eldev")
+                                                       (expand-file-name "eldev" (eldev-xdg-config-home))))
+  "User's Eldev configuration file, usually `~/.config/eldev/config'.
+This file is global, i.e. not project-specific.")
 
 (defconst eldev-file "Eldev"
   "Project's Eldev configuration file, `Eldev'.")
@@ -112,7 +119,7 @@ instead.")
 See also function `eldev-cache-dir'.")
 
 (defconst eldev-global-cache-dir "global-cache"
-  "Name of the global cache directory (a subdirectory of `eldev-dir').")
+  "Name of the global package cache directory (a subdirectory of `eldev-dir').")
 
 (defvar eldev--internal-pseudoarchive "--eldev--")
 
@@ -234,7 +241,7 @@ Since 0.5")
 Should normally be specified only via command line.")
 
 (defvar eldev-skip-global-config nil
-  "Whether to skip file `~/.eldev/config'.
+  "Whether to skip file `~/.config/eldev/config'.
 Occasionally useful to some external tools.  Not exposed through
 normal interface, but can be set in a `--setup-first' form.
 
@@ -421,7 +428,8 @@ BODY can contain the following keywords:
     :if-default FORM
 
         Evaluate given FORM to determine if the option is the
-        default (which can be changed e.g. in `~/.eldev/config').
+        default.  Since in Eldev everything is customizable in
+        different ways, result should not be hardcoded.
 
     :default-value FORM
 
@@ -766,8 +774,8 @@ Used by Eldev startup script."
                         (eldev-parse-options command-line nil t t)
                         (when eldev-print-backtrace-on-abort
                           (add-hook 'kill-emacs-hook #'eldev-backtrace))
-                        ;; Since this is printed before `~/.eldev/config' is loaded it can
-                        ;; ignore some settings from that file, e.g. colorizing mode.
+                        ;; Since this is printed before `~/.config/eldev/config' is loaded,
+                        ;; it can ignore some settings from that file, e.g. colorizing mode.
                         (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
                         (eldev-trace "Running on %s" (emacs-version))
                         (eldev-trace "Project directory: `%s'" eldev-project-dir)
@@ -3364,7 +3372,7 @@ those tests that are loaded and match the selectors are executed.
 If `eldev-dwim' variable is on (default), Eldev employs
 additional heuristics when processing SELECTORs.  This variable
 is not controllable from command line---change its value in
-`~/.eldev/config' or `Eldev-local'.
+`~/.config/eldev/config' or `Eldev-local'.
 
 This command exits with error code 1 if any test produces an
 unexpected result."

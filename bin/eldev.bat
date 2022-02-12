@@ -43,7 +43,19 @@ REM the newline variable above MUST be followed by two empty lines.
   ;; so `condition-case-unless-debug'. !NL!^
   (unless (and (fboundp 'version^<=) (version^<= """24.1""" eldev--emacs-version)) !NL!^
     (error """Eldev requires Emacs 24.1 or newer""")) !NL!^
-  (setf package-user-dir       (expand-file-name """bootstrap""" (expand-file-name eldev--emacs-version (if (= (length eldev--dir) 0) """~/.eldev""" eldev--dir))) !NL!^
+  (setf package-user-dir !NL!^
+        (expand-file-name """bootstrap""" !NL!^
+                          (expand-file-name eldev--emacs-version !NL!^
+                                            (if (> (length eldev--dir) 0) !NL!^
+                                                eldev--dir !NL!^
+                                              (if (file-directory-p """~/.eldev""") !NL!^
+                                                  """~/.eldev""" !NL!^
+                                                ;; Duplicating not-yet-available code from `eldev-xdg-cache-home'. !NL!^
+                                                (expand-file-name """eldev""" !NL!^
+                                                                  (let ((eldev--xdg-cache-dir (getenv """XDG_CACHE_HOME"""))) !NL!^
+                                                                    (if (and eldev--xdg-cache-dir (file-name-absolute-p eldev--xdg-cache-dir)) !NL!^
+                                                                        eldev--xdg-cache-dir !NL!^
+                                                                      """~/.cache"""))))))) !NL!^
         package-directory-list nil !NL!^
         package-archives       nil) !NL!^
   (require 'package) !NL!^
