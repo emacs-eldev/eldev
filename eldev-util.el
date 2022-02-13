@@ -285,7 +285,7 @@ parameter, but it's not needed in noninteractive use."
 
        ;; escape special characters with ^
        (goto-char (point-min))
-       (while (re-search-forward "&\\|<" nil t)
+       (while (re-search-forward "&\\|<\\|>" nil t)
          (replace-match "^\\&"))
 
        ;; escape % with %%
