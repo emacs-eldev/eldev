@@ -46,7 +46,7 @@ REM the newline variable above MUST be followed by two empty lines.
   (setf package-user-dir !NL!^
         (expand-file-name """bootstrap""" !NL!^
                           (expand-file-name eldev--emacs-version !NL!^
-                                            (if (> (length eldev--dir) 0) !NL!^
+                                            (if (^> (length eldev--dir) 0) !NL!^
                                                 eldev--dir !NL!^
                                               (if (file-directory-p """~/.eldev""") !NL!^
                                                   """~/.eldev""" !NL!^
