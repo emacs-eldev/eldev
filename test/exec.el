@@ -29,6 +29,12 @@
     (should (string= stdout "1(1 . 2)"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-multiexec-3 ()
+  ;; Since 0.11 we also support multiple forms in one argument, for convenience.
+  (eldev--test-run "trivial-project" ("exec" "(princ 1) (+ 2 3) (princ (cons 1 2))")
+    (should (string= stdout "1(1 . 2)"))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-exec-project-function-1 ()
   (eldev--test-run "trivial-project" ("exec" `(progn (require 'trivial-project) (princ (trivial-project-hello))))
     (should (string= stdout "Hello"))

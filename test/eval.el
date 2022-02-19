@@ -11,6 +11,12 @@
     (should (string= stdout "1\n5\n(1 . 2)\n"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-multieval-2 ()
+  ;; Since 0.11 we also support multiple expression in one argument, for convenience.
+  (eldev--test-run "trivial-project" ("eval" "1 (+ 2 3) (cons 1 2)")
+    (should (string= stdout "1\n5\n(1 . 2)\n"))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-eval-from-file-1 ()
   (let ((file (make-temp-file "eval-" nil ".el")))
     (with-temp-file file

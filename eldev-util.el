@@ -703,19 +703,34 @@ Since 0.6.1."
     width))
 
 
-(defun eldev-read-wholly (string &optional description)
+(defun eldev-read-wholly (string &optional description list-of-expressions)
   "Read STRING as Elisp expression.
 This is largely similar to `read-from-string', but issues
-human-readable errors if there are any problems."
+human-readable errors if there are any problems.  However, if
+LIST-OF-EXPRESSIONS is not nil, STRING may contain multiple
+expressions, and this function returns a list of them."
   (with-temp-buffer
     (insert string)
     (goto-char 1)
-    (prog1 (car (eldev-read-current-buffer-forms (eldev-format-message (or description "Lisp object from `%s'") string) t))
-      (unless (eobp)
+    (let ((expressions (eldev-read-current-buffer-forms (eldev-format-message (or description (format "Lisp object%s from `%%s'" (if list-of-expressions "(s)" ""))) string) (not list-of-expressions))))
+      (unless (or list-of-expressions (eobp))
         (let ((tail (buffer-substring (point) (point-max))))
           (signal 'eldev-error (if (string-suffix-p "expression" description)
                                    `("Trailing garbage after the %s: `%s'" ,description ,tail)
-                                 `("Trailing garbage after the expression in %s: `%s'" ,description ,tail))))))))
+                                 `("Trailing garbage after the expression in %s: `%s'" ,description ,tail)))))
+      (if list-of-expressions
+          expressions
+        (car expressions)))))
+
+(defun eldev-read-file-forms (file)
+  "Read forms from given FILE.
+Return the list of forms.  Will signal a `file-error' if there is
+a problem reading the file.
+
+Since 0.11."
+  (with-temp-buffer
+    (insert-file-contents file t)
+    (eldev-read-current-buffer-forms (eldev-format-message "forms in file `%s'" file))))
 
 (defun eldev-read-current-buffer-forms (&optional description stop-after-one)
   "Read forms from the current buffer, starting at point.

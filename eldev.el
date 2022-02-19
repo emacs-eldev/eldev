@@ -597,13 +597,15 @@ truncate backtrace lines"
   :options        --setup-first
   :value          FORM
   :hidden-if      t
-  (push (eldev-read-wholly form "setup form") eldev-setup-first-forms))
+  (dolist (form (eldev-read-wholly form "setup form(s)" t))
+    (push form eldev-setup-first-forms)))
 
 (eldev-defoption eldev-setup-form (form)
   "Evaluate FORM as the final step of the setup"
   :options        (-S --setup)
   :value          FORM
-  (push (eldev-read-wholly form "setup form") eldev-setup-forms))
+  (dolist (form (eldev-read-wholly form "setup form(s)" t))
+    (push form eldev-setup-forms)))
 
 (eldev-defbooloptions eldev-prefer-stable-archives eldev-prefer-unstable-archives eldev-prefer-stable-archives
   ("Prefer stable archives (e.g. MELPA Stable: stable.melpa.org)"
@@ -4346,16 +4348,18 @@ being that it doesn't print form results."
       (when (and eldev-dwim (stringp parameter) (string-match-p (rx ".el" eos) parameter))
         (setf parameter `(,parameter)))
       (if (stringp parameter)
-          (push `(,(eldev-read-wholly parameter (if print-results "expression" "form to evaluate")) ,parameter) forms)
+          (let ((parameter-forms (eldev-read-wholly parameter (eldev-format-message "%s from `%s'" (if print-results "expression(s)" "form(s) to evaluate") parameter) t)))
+            (if (cdr parameter-forms)
+                (dolist (form parameter-forms)
+                  (push `(,form ,(prin1-to-string form)) forms))
+              (push `(,(car parameter-forms) ,parameter) forms)))
         (let* ((file       (car parameter))
                (short-name (abbreviate-file-name file)))
           (eldev-trace "Reading forms from file `%s'..." file)
-          (with-temp-buffer
-            (condition-case nil
-                (insert-file-contents file t)
-              (file-error (signal 'eldev-error `("Unable to read forms from file `%s': file is missing or unreadable" ,short-name))))
-            (dolist (form (eldev-read-current-buffer-forms (eldev-format-message "forms in file `%s'" file)))
-              (push `(,form ,(prin1-to-string form) ,short-name) forms))))))
+          (condition-case nil
+              (dolist (form (eldev-read-file-forms file))
+                (push `(,form ,(prin1-to-string form) ,short-name) forms))
+            (file-error (signal 'eldev-error `("Unable to read forms from file `%s': file is missing or unreadable" ,short-name)))))))
     (when eldev-eval-load-project
       (eldev-load-project-dependencies (if print-results 'eval 'exec)))
     (eldev-autoinstalling-implicit-dependencies eldev-eval-load-project

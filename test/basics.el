@@ -43,6 +43,13 @@
     (should (string= stdout ""))
     (should (= exit-code 0))))
 
+;; Check that `--setup-first' accepts multiple forms and that ordering is preserved.
+(ert-deftest eldev-setup-first-2 ()
+  (eldev--test-run "project-a" ("--setup-first" "(when (boundp 'middle-form-executed) (error \"not first!\")) (setf middle-form-executed t) (unless middle-form-executed (error \"not last!\"))"
+                                "exec" `(ignore))
+    (should (string= stdout ""))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-skip-project-config-1 ()
   (eldev--test-run "project-a" ("--setup-first" `(setf eldev-skip-project-config t)
                                 "--setup" `(when package-archives (error "fail!"))
