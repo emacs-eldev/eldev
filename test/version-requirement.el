@@ -38,7 +38,7 @@
 (ert-deftest eldev-require-version-eval ()
   (eldev--test-require-version "project-a" ("eval") nil))
 
-(ert-deftest eldev-require-version-emacs-1 ()
+(ert-deftest eldev-require-version-exec-1 ()
   (eldev--test-require-version "project-a" ("exec") nil))
 
 (ert-deftest eldev-require-version-help-1 ()
