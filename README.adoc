@@ -1619,6 +1619,33 @@ variables in file `Eldev`.
 It can also make sense to change the variable’s value in `Eldev-local`
 if you want certain features to always be available for quick testing.
 
+{since-0-11} If you have larger scripts to evaluate (but still not as
+standard as to abstract as a custom builder or a command), you can
+evaluate expressions stored in a file using `--file` (`-f`) option:
+
+    $ eldev eval -f useful-expressions.el
+
+Note that this is _not_ performed using Elisp file loading.  Instead,
+the file is parsed as a sequence of Elisp expression and those are
+then evaluated/executed as if specified on the command line.  In
+particular, for command `eval` results are still printed after every
+expression, even if they all come from the same file.  As in several
+other places, when variable `eldev-dwim` (“do what I mean”) is
+non-nil, option `-f` can be omitted as long as filename ends in `.el`.
+In other words, you can just invoke:
+
+    $ eldev eval useful-expressions.el
+
+for the expected effect.
+
+To simplify command-line usage a bit, commands accept multiple
+expressions in one parameter, to reduce the number of quotes to type.
+E.g.:
+
+    $ eldev eval "(+ 1 2) (+ 3 4)"
+    3
+    7
+
 {since-0-11} These commands also have a few options aimed at code
 profiling.  See <<profiling-eval,relevant section below>>.
 
@@ -1708,17 +1735,17 @@ memory and both together using options `--cpu`, `--mem` and `cpu-mem`
 
 Profiling is most useful with commands `eval` and `exec`.
 Additionally, those have certain options targeted especially at
-profiling, though they could, of course, be useful in other cases.
+profiling, though they could, of course, be used in other cases.
 
 Options `--macroexpand` and `--compile` (`-m` and `-c`) make the
-commands preprocess their expressions accordingly: by default
-expressions are evaluated using Elisp interpreter.
+commands preprocess their expressions accordingly; by default
+expressions are simply evaluated using Elisp interpreter.
 
 Option `--repeat` (`-n`) lets you evaluate the same expression(s)
 multiple times.  This is useful if normal evaluation is too fast for a
 meaningful profile.  If the command `eval` is used, only the last
-result is printed.  However, with `exec` any side effects (including
-printing) will be observable that many times, so keep that in mind!
+result is printed.  However, any side effects (including printing)
+will be observable that many times, so keep that in mind!
 
 For example:
 
