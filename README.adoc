@@ -9,6 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
@@ -52,6 +53,7 @@ endif::[]
 :since-0-8: image:https://img.shields.io/badge/since-0.8-8be[Since 0.8,float=right]
 :since-0-9: image:https://img.shields.io/badge/since-0.9-8be[Since 0.9,float=right]
 :since-0-10: image:https://img.shields.io/badge/since-0.10-8be[Since 0.10,float=right]
+:since-0-11: image:https://img.shields.io/badge/since-0.11-8be[Since 0.11,float=right]
 
 = Eldev
 
@@ -202,12 +204,13 @@ first invocation.
 --
     $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
 
-This will install `eldev` script to `~/.eldev/bin`.
+This will install `eldev` script to `~/.local/bin`.
 --
 
-. Add the directory to your `PATH`; e.g. in `~/.profile` add this:
+. Generally, {uri-xdg}[this directory should already be in your
+  `PATH`].  But if not, e.g. in `~/.profile` add this:
 +
-    export PATH="$HOME/.eldev/bin:$PATH"
+    export PATH="$HOME/.local/bin:$PATH"
 
 * On Windows:
 . Execute:
@@ -215,12 +218,12 @@ This will install `eldev` script to `~/.eldev/bin`.
 --
     > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
 
-This will install `eldev.bat` script to `%USERPROFILE%\.eldev\bin`.
+This will install `eldev.bat` script to `%USERPROFILE%\.local\bin`.
 --
 
 . Add this directory to your `PATH`:
 +
-    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.eldev\bin;%PATH%" /f
+    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.local\bin;%PATH%" /f
 
 Afterwards Eldev will bootstrap itself as needed on first invocation.
 
@@ -373,7 +376,7 @@ After this step, Eldev is ready to work with your project.
 Now that we have created file `Eldev`, it makes sense to go over the
 full startup process:
 
-* Load file `~/.eldev/config`
+* Load file `~/.config/eldev/config`
 * Load file `Eldev` in the current directory
 * Load file `Eldev-local` in the current directory
 * Execute setup forms specified on the command line
@@ -382,11 +385,17 @@ None of these Elisp files and forms are required.  They are also not
 restricted in what they do.  However, their _intended_ usage is
 different.
 
-File `~/.eldev/config` is _user-specific_.  It is meant mostly for
-customizing Eldev to your personal preferences.  For example, if you
-hate coloring of Eldev output, add form `(setf eldev-coloring-mode
+File `~/.config/eldev/config` is _user-specific_.  It is meant mostly
+for customizing Eldev to your personal preferences.  For example, if
+you hate coloring of Eldev output, add form `(setf eldev-coloring-mode
 nil)` to it.  Then every Eldev process started for any project will
 default to using uncolored output.
+
+NOTE: {since-0-11} More precisely, if directory `~/.eldev` exists (for
+pre-0.11 Eldev installations), file `~/.eldev/config` is used.
+Otherwise, if {uri-xdg}[environment variable `XDG_CONFIG_HOME`] is
+set, file `$XDG_CONFIG_HOME/eldev/config` is used.  And finally,
+`~/.config/eldev/config` is the default fallback.
 
 File `Eldev` is _project-specific_.  It is the only configuration file
 that should be added to project’s VCS (Git, Mercurial, etc.).  Typical
@@ -463,8 +472,8 @@ for continuous integration or for working on packages that you do not
 have — for whatever reason — installed normally.  It is also difficult
 to test on <<different-emacs-versions,different Emacs versions>> in
 external directory mode.  Therefore, it is not the default.  But, as
-usual in Eldev, you can make it the default in file `~/.eldev/config`
-if you want.
+usual in Eldev, you can make it the default in file
+`~/.config/eldev/config` if you want.
 
 
 == Project dependencies
@@ -775,7 +784,7 @@ archive contents expires in one hour.  However, if you use command
 refreshed.
 
 Cache usage is not controllable from command line.  However, you can
-customize it somewhat in `~/.eldev/config`.  Variable
+customize it somewhat in `~/.config/eldev/config`.  Variable
 `eldev-enable-global-package-archive-cache` lets you disable the
 global cache outright.  Using
 `eldev-global-cache-archive-contents-max-age` you can adjust how long
@@ -1266,15 +1275,17 @@ option, `-B`, is surprisingly useful.  In many cases backtraces don’t
 actually give any useful information, especially when the tests
 contain only a single assertion, and only clutter the output.  If you
 have different preferences compared to Eldev, you can customize
-variable `eldev-test-print-backtraces` in file `~/.eldev/config`.
+variable `eldev-test-print-backtraces` in file
+`~/.config/eldev/config`.
 
 How exactly tests are executed depends on _test runner_.  If you
 dislike the default behavior of Eldev, you can choose a different test
 runner using `--runner` (`-r`) option of `test` command; see the list
 of available test runners with their descriptions using
 `--list-runners` option.  If you always use a different test runner,
-it is a good idea to set it as the default in file `~/.eldev/config`.
-Finally, you can even write your own runner.
+it is a good idea to set it as the default in file
+`~/.config/eldev/config`.  Finally, you can even write your own
+runner.
 
 [#frameworks]
 === Frameworks
@@ -1524,7 +1535,7 @@ documentation) like this:
 --
 
 If you dislike these simplifications, set `eldev-dwim` to `nil` in
-`~/.eldev/config`.
+`~/.config/eldev/config`.
 
 
 [#linting]
@@ -1627,6 +1638,36 @@ variables in file `Eldev`.
 It can also make sense to change the variable’s value in `Eldev-local`
 if you want certain features to always be available for quick testing.
 
+{since-0-11} If you have larger scripts to evaluate (but still not as
+standard as to abstract as a custom builder or a command), you can
+evaluate expressions stored in a file using `--file` (`-f`) option:
+
+    $ eldev eval -f useful-expressions.el
+
+Note that this is _not_ performed using Elisp file loading.  Instead,
+the file is parsed as a sequence of Elisp expression and those are
+then evaluated/executed as if specified on the command line.  In
+particular, for command `eval` results are still printed after every
+expression, even if they all come from the same file.  As in several
+other places, when variable `eldev-dwim` (“do what I mean”) is
+non-nil, option `-f` can be omitted as long as filename ends in `.el`.
+In other words, you can just invoke:
+
+    $ eldev eval useful-expressions.el
+
+for the expected effect.
+
+To simplify command-line usage a bit, commands accept multiple
+expressions in one parameter, to reduce the number of quotes to type.
+E.g.:
+
+    $ eldev eval "(+ 1 2) (+ 3 4)"
+    3
+    7
+
+{since-0-11} These commands also have a few options aimed at code
+profiling.  See <<profiling-eval,relevant section below>>.
+
 
 == Running Emacs
 
@@ -1670,6 +1711,64 @@ to Emacs, otherwise it will probably fail on your `~/.emacs` since it
 will not see your usual packages.  To illustrate:
 
     $ eldev emacs -- -q foo.bar
+
+
+[#profiling]
+== Profiling
+
+{since-0-11} Eldev has limited built-in support for profiling your
+project.  The largest limitation here is Emacs itself: it is difficult
+to receive a useful code profile, as provided functionality is really
+basic and crude.
+
+Profiling is implemented as a “prefix” command, which takes the “real”
+command as an argument.  This way, anything can be profiled, though of
+course it is really useful only with commands `eval`, `exec` and
+`test`, maybe occasionally with `compile` and similar.
+
+The basic usage is like this:
+
+    $ eldev profile --open eval "(my-project-function)"
+
+Option `--open` tells Eldev to send resulting profile(s) to your
+normal Emacs and open there.  It provides the quickest way to examine
+results of profiling.  For it to work, Emacs must run a server, see
+function `server-start`.  Another alternative is to store results into
+a file, using `--file` option, though opening this in Emacs is
+currently (28.1) fairly difficult.  At least one of `--open` and
+`--file` (can be abbreviated as `-o` and `-f`) is required.
+
+Eldev is smart enough to start profiling only immediately before
+running code from your project, i.e. to avoid profiling project
+dependency installation (if that is needed) and so on.  However, it is
+apparently not possible to exclude irrelevant stuff from backtraces,
+so those will, unfortunately, contain quite a lot of entries not
+related to your project.
+
+Like with Elisp function `profiler-start`, you can choose between CPU,
+memory and both together using options `--cpu`, `--mem` and `cpu-mem`
+(or `-c`, `-m` and `-M`).  Default profiling mode is CPU.
+
+[#profiling-eval]
+=== Useful evaluation options
+
+Profiling is most useful with commands `eval` and `exec`.
+Additionally, those have certain options targeted especially at
+profiling, though they could, of course, be used in other cases.
+
+Options `--macroexpand` and `--compile` (`-m` and `-c`) make the
+commands preprocess their expressions accordingly; by default
+expressions are simply evaluated using Elisp interpreter.
+
+Option `--repeat` (`-n`) lets you evaluate the same expression(s)
+multiple times.  This is useful if normal evaluation is too fast for a
+meaningful profile.  If the command `eval` is used, only the last
+result is printed.  However, any side effects (including printing)
+will be observable that many times, so keep that in mind!
+
+For example:
+
+    $ eldev profile -o eval -c -n 10000 "..."
 
 
 [#different-emacs-versions]
@@ -1975,9 +2074,9 @@ Eldev scripts.
   backtraces to your screen width and thus make them more readable at
   the expense of completeness (by default, Eldev doesn’t truncate
   backtrace lines).  It is a good idea to change the default in file
-  `.eldev/config`.  Starting with 0.10 this also affects backtraces
-  printed if Eldev or code from the project it executes fails with a
-  signal (see also option `--debug`).
+  `~/.config/eldev/config`.  Starting with 0.10 this also affects
+  backtraces printed if Eldev or code from the project it executes
+  fails with a signal (see also option `--debug`).
 
 * Global option `-T` (`--time`) prepends timestamps to all lines of
   Eldev output, making it easier to spot performance problems.
@@ -2262,10 +2361,10 @@ evaluated in turn — and so on, until everything is resolved.
 
 Eldev is written to be not just configurable, but also extensible.  It
 makes perfect sense to have additional code in file `Eldev` — if your
-project has uncommon building steps.  And also in `~/.eldev/config` —
-if you want a special command for your own needs, for example.  Or
-maybe in `Eldev-local` — if you need something extra only for one
-specific project that you maintain.
+project has uncommon building steps.  And also in
+`~/.config/eldev/config` — if you want a special command for your own
+needs, for example.  Or maybe in `Eldev-local` — if you need something
+extra only for one specific project that you maintain.
 
 [#hooks]
 === Hooks
@@ -2670,8 +2769,11 @@ A few environment variables can affect Eldev’s behavior.
 `ELDEV_DIR`::
 
     Directory where user’s configuration file, Eldev’s bootstrapping
-    files etc. are located, defaults to `~/.eldev`.  Used by Eldev’s
-    own regression tests, should be of no interest for typical use.
+    files etc. are located.  When not set, configuration files are
+    looked up either in `~/.eldev` if that exists, else in
+    `~/.config/eldev`; runtime files are placed either in `~/.eldev`
+    or `~/.cache/eldev`.  Used by Eldev’s own regression tests, should
+    be of no interest for typical use.
 
 
 == See also
