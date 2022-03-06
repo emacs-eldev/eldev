@@ -1530,6 +1530,7 @@ is non-nil when this function is called."
 ;; create a simple test for this.  I don't want to argue a month over three lines and be
 ;; ignored in the end, as usually.  Test `eldev-loading-modes-2' fails without this.
 (when (fboundp 'package--reload-previously-loaded)
+  (declare-function directory-files-recursively "files")
   (declare-function package--library-stem "package")
   ;; I'd rather use an advice, but don't see a way to do this without affecting `load' at
   ;; the end of the function, which would have potential to create another subtle bug.
