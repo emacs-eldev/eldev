@@ -856,6 +856,7 @@ applied to backtraces printed because of `--debug' option.
  Since 0.10.")
 
 (defvar backtrace-line-length)
+(defvar print-escape-control-characters)
 
 (declare-function backtrace-get-frames "backtrace")
 (declare-function backtrace-frames "backtrace")
@@ -916,7 +917,6 @@ See `eldev-backtrace' for more information.  Since 0.10."
               (print-level                     (or print-level 8))
               (print-escape-control-characters t)
               (print-escape-newlines           t))
-          ;(mapatoms (lambda (x) (when (and (boundp x) (string-prefix-p "print-" (symbol-name x))) (eldev-warn "%S %S" x (symbol-value x)))))
           (dolist (frame frames)
             (princ "  ")
             (let ((fn   (nth 1 frame))
@@ -1530,6 +1530,7 @@ is non-nil when this function is called."
 ;; create a simple test for this.  I don't want to argue a month over three lines and be
 ;; ignored in the end, as usually.  Test `eldev-loading-modes-2' fails without this.
 (when (fboundp 'package--reload-previously-loaded)
+  (declare-function package--library-stem "package")
   ;; I'd rather use an advice, but don't see a way to do this without affecting `load' at
   ;; the end of the function, which would have potential to create another subtle bug.
   (defun package--reload-previously-loaded (pkg-desc)
@@ -1548,20 +1549,25 @@ byte-compilation of the new package to fail."
                               (cl-remove-if-not #'stringp
                                                 (mapcar #'car load-history)))))
         (dolist (file files)
-          (when-let ((library (package--library-stem
-                               (file-relative-name file dir)))
-                     (canonical (locate-library library nil load-path-sans-dir))
-                     ;; Treat `.el' and `.elc' interchangeably.
-                     (truename (file-truename canonical))
-                     (found (or (member truename history)
-                                (member (if (string-suffix-p ".el" truename)
-                                            (replace-regexp-in-string (rx ".el" eos) ".elc" truename t)
-                                          (replace-regexp-in-string (rx ".elc" eos) ".el" truename t))
-                                        history)))
-                     (recent-index (length found)))
-            (unless (equal (file-name-base library)
-                           (format "%s-autoloads" (package-desc-name pkg-desc)))
-              (push (cons (expand-file-name library dir) recent-index) result))))
+          ;; Rewriting `when-let' with a series of `let' and `when', else byte-compilation
+          ;; on older versions issues warnings.
+          (let ((library (package--library-stem
+                          (file-relative-name file dir))))
+            (when library
+              (let ((canonical (locate-library library nil load-path-sans-dir)))
+                (when canonical
+                  ;; Treat `.el' and `.elc' interchangeably.
+                  (let* ((truename (file-truename canonical))
+                         (found (or (member truename history)
+                                    (member (if (string-suffix-p ".el" truename)
+                                                (replace-regexp-in-string (rx ".el" eos) ".elc" truename t)
+                                              (replace-regexp-in-string (rx ".elc" eos) ".el" truename t))
+                                            history))))
+                    (when found
+                      (let ((recent-index (length found)))
+                        (unless (equal (file-name-base library)
+                                       (format "%s-autoloads" (package-desc-name pkg-desc)))
+                          (push (cons (expand-file-name library dir) recent-index) result))))))))))
         (mapc (lambda (c) (load (car c) nil t))
               (sort result (lambda (x y) (< (cdr x) (cdr y)))))))))
 
