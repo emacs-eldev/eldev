@@ -4424,7 +4424,8 @@ being that it doesn't print form results."
   ("Load project and its dependencies before evaluating"
    :options       (--load)
    :hidden-if     :default)
-  ("Don't load project and its dependencies; only Eldev itself and Emacs built-ins will be available"
+  ("Don't load project and its dependencies;
+only Eldev itself and Emacs built-ins will be available"
    :options       (--dont-load)
    :hidden-if     eldev-eval-load-project)
   :for-command    (eval exec))
@@ -5129,9 +5130,11 @@ used"
   (setf eldev-build-sets (append eldev-build-sets (list (eldev-validate-standard-fileset name)))))
 
 (eldev-defbooloptions eldev-build-load-before-byte-compiling eldev-build-byte-compile-straight-away eldev-build-load-before-byte-compiling
-  ("Load `.el' files before byte-compiling them; this is how Emacs packaging system behaves"
+  ("Load `.el' files before byte-compiling them;
+this is how Emacs packaging system behaves"
    :options       (-l --load-before-compiling))
-  ("Byte-compile `.el' without loading them first; this might require adding some `eval-and-compile' forms in your code"
+  ("Byte-compile `.el' without loading them first;
+this might require adding some `eval-and-compile' forms in your code"
    :options       (-L --dont-load-before-compiling --byte-compile-straight-away))
   :for-command    (build compile package))
 
@@ -5204,7 +5207,8 @@ declares"
   (setf eldev-package-output-dir dir))
 
 (eldev-defbooloptions eldev-package-print-filename eldev-package-dont-print-filename eldev-package-print-filename
-  ("Print absolute package filename and word “generated” or “up-to-date” as two last lines of output"
+  ("Print absolute package filename and word “generated” or “up-to-date”
+as two last lines of output"
    :options       --print-filename)
   ("Don't add special ouput"
    :options       --dont-print-filename
