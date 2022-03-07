@@ -722,7 +722,15 @@ Since 0.2.1.")
 
 (defvar eldev-executing-command-hook nil)
 (defvar eldev-too-old nil)
-(defvar eldev--setup-step nil)
+
+(defvar eldev-ongoing-named-steps nil
+  "List (stack) of currently performed named steps.
+Each entry has the form of (TYPE . NAME), where both values are
+strings; TYPE can also be nil.  If an error happens during one,
+user will be hinted when exactly the error occurred.  Don't
+modify this directly, use macro `eldev-named-step' instead.
+
+Since 1.0.")
 
 (defvar eldev-preprocessed-command-line nil
   "Command line to be returned from `eldev-parse-options'.
@@ -813,7 +821,7 @@ Used by Eldev startup script."
               (eldev-error (eldev--print-eldev-error error command))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))
-                 (eldev--maybe-inform-about-setup-step)
+                 (eldev--inform-about-named-steps)
                  (eldev-print :stderr "Run with `--debug' (`-d') option to see error backtrace")))
       (remove-hook 'kill-emacs-hook #'eldev-backtrace)
       (eldev-trace "Finished %s on %s" (if (eq exit-code 0) "successfully" "erroneously") (replace-regexp-in-string " +" " " (current-time-string))))
@@ -822,6 +830,30 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+(defmacro eldev-named-step (type name &rest body)
+  "Execute BODY as a named step of given TYPE.
+If an error occurs in BODY, user will be shown step description,
+thus hopefully making debugging easier.
+
+Since 1.0."
+  (declare (indent 2) (debug (sexp sexp body)))
+  `(prog1 (progn (push (cons ,type ,name) eldev-ongoing-named-steps)
+                 ,@body)
+     ;; This shouldn't be performed as cleanup in an `unwind-protect' form: the
+     ;; whole purpose of the variable is to keep the name of the failed step if an
+     ;; error occurs!
+     (pop eldev-ongoing-named-steps)))
+
+(defun eldev-current-step-name (&optional upcase-first)
+  "Name of the current step, possibly with first letter upcased.
+See macro `eldev-named-step'.
+
+Since 1.0."
+  (let ((name (cdar eldev-ongoing-named-steps)))
+    (if (and upcase-first name)
+        (eldev-message-upcase-first name)
+      name)))
 
 (defun eldev--execute-command (command-line)
   (let* ((command      (intern (car command-line)))
@@ -878,11 +910,11 @@ Used by Eldev startup script."
       (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
     (when hint-about-command
       (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))
-    (eldev--maybe-inform-about-setup-step)))
+    (eldev--inform-about-named-steps)))
 
-(defun eldev--maybe-inform-about-setup-step ()
-  (when eldev--setup-step
-    (eldev-print :stderr "Failed setup step: %s" eldev--setup-step)))
+(defun eldev--inform-about-named-steps ()
+  (dolist (step eldev-ongoing-named-steps)
+    (eldev-print :stderr "Failed%s step: %s" (if (car step) (format " %s" (car step)) "") (cdr step))))
 
 (defun eldev-extract-error-message (error)
   "Extract the message from an `eldev-error'.
@@ -897,9 +929,9 @@ Since 0.2."
 (defun eldev--set-up ()
   (let (loaded-project-config)
     (dolist (form (reverse eldev-setup-first-forms))
-      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line" form))
-      (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
-      (eval form t))
+      (eldev-named-step "setup" (eldev-format-message "evaluating form `%S' specified on the command line" form)
+        (eldev-trace "%s..." (eldev-current-step-name t))
+        (eval form t)))
     (dolist (config '((eldev-user-config-file . "No file `%s', not applying user-specific configuration")
                       (eldev-file             . "No file `%s', project building uses only defaults")
                       (eldev-local-file       . "No file `%s', not customizing build")))
@@ -922,17 +954,16 @@ Since 0.2."
                          (insert-file-contents file nil 0 100)
                          (looking-at (rx "#!"))))
                   (eldev-verbose "File `%s' appears to be a script on a case-insensitive file system, ignoring" file)
-                (progn (setf eldev--setup-step (eldev-format-message "loading file `%s'" filename))
-                       (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
-                       (load file nil t t)
-                       (when (memq symbol '(eldev-file eldev-local-file))
-                         (setf loaded-project-config t))))
+                (eldev-named-step "setup" (eldev-format-message "loading file `%s'" filename)
+                  (eldev-trace "%s..." (eldev-current-step-name t))
+                  (load file nil t t))
+                (when (memq symbol '(eldev-file eldev-local-file))
+                  (setf loaded-project-config t)))
             (eldev-verbose (cdr config) filename)))))
     (dolist (form (reverse eldev-setup-forms))
-      (setf eldev--setup-step (eldev-format-message "evaluating form `%S' specified on the command line" form))
-      (eldev-trace "%s..." (eldev-message-upcase-first eldev--setup-step))
-      (eval form t))
-    (setf eldev--setup-step nil)
+      (eldev-named-step "setup" (eldev-format-message "evaluating form `%S' specified on the command line" form)
+        (eldev-trace "%s..." (eldev-current-step-name t))
+        (eval form t)))
     (when loaded-project-config
       ;; This is an undocumented flag file indicating that `Eldev' or `Eldev-local' have
       ;; been loaded at least once in this project.
@@ -3486,8 +3517,9 @@ for details."
                                       (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
                                  (if already-loaded
                                      (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
-                                   (eldev-verbose "Loading test file `%s'..." file)
-                                   (load absolute-without-el nil t nil t))))))
+                                   (eldev-named-step nil (eldev-format-message "loading test file `%s'" file)
+                                     (eldev-trace "%s..." (eldev-current-step-name t))
+                                     (load absolute-without-el nil t nil t)))))))
                          (setf found-any-files t)
                          (let* ((runner-name (or eldev-test-runner 'simple))
                                 (runner      (or (cdr (assq runner-name eldev--test-runners))
@@ -4365,8 +4397,9 @@ being that it doesn't print form results."
     (eldev-autoinstalling-implicit-dependencies eldev-eval-load-project
       (when (and eldev-eval-load-project eldev-eval-require-main-feature)
         (dolist (feature (eldev-required-features eldev-eval-required-features))
-          (eldev-verbose "Autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
-          (require feature)))
+          (eldev-named-step nil (eldev-format-message "autorequiring feature `%s' before %s" feature (if print-results "evaluating" "executing"))
+            (eldev-verbose "%s..." (eldev-current-step-name t))
+            (require feature))))
       (dolist (form (nreverse forms))
         (eldev-verbose (if print-results "Evaluating expression `%s'%s:" "Executing form `%s'%s...")
                        (cadr form) (if (nth 2 form) (eldev-format-message " (from file `%s')" (nth 2 form)) ""))
