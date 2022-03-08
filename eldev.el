@@ -2513,7 +2513,9 @@ descriptor."
                   (end-of-line)
                   (let ((file (buffer-substring-no-properties point (point))))
                     (forward-line)
-                    (push `(,dependency-name ,file ,(looking-at "up-to-date")) eldev--local-dependency-packages))))))))
+                    (unless (looking-at (rx bol (or "up-to-date" "generated") eol))
+                      (error "Unable to parse child Eldev process output"))
+                    (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-dependency-packages))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 
 ;; This is a hackish function only working for packages loaded in `as-is' and similar
