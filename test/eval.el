@@ -131,4 +131,27 @@
     (should (= exit-code 0))))
 
 
+(ert-deftest eldev-eval-magic-variables-1 ()
+  (eldev--test-run "trivial-project" ("eval" `(+ 1 2) `(* @ @))
+    (should (string= stdout (eldev--test-lines "3" "9")))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-eval-magic-variables-2 ()
+  ;; May not be referenced in the first form.
+  (eldev--test-run "trivial-project" ("eval" `@)
+    (should (string-match-p "value as variable is void: @" stderr))
+    (should (= exit-code 1))))
+
+(ert-deftest eldev-eval-magic-variables-3 ()
+  (eldev--test-run "trivial-project" ("eval" `(+ 1 2) `(+ 3 4) `(* @1 @2))
+    (should (string= stdout (eldev--test-lines "3" "7" "21")))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-eval-magic-variables-4 ()
+  ;; Referencing to a yet-unknown result variable.
+  (eldev--test-run "trivial-project" ("eval" `(+ 1 2) `@2)
+    (should (string-match-p "value as variable is void: @2" stderr))
+    (should (= exit-code 1))))
+
+
 (provide 'test/eval)
