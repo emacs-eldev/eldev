@@ -100,8 +100,8 @@
 
 
 (ert-deftest eldev-exec-magic-variables-1 ()
-  (eldev--test-run "trivial-project" ("exec" `(require 'seq) `(message "%s" @))
-    (should (string= stderr "seq\n"))
+  (eldev--test-run "trivial-project" ("exec" `(require 'pcase) `(message "%s" @))
+    (should (string= stderr "pcase\n"))
     (should (= exit-code 0))))
 
 
