@@ -54,6 +54,7 @@ endif::[]
 :since-0-9: image:https://img.shields.io/badge/since-0.9-8be[Since 0.9,float=right]
 :since-0-10: image:https://img.shields.io/badge/since-0.10-8be[Since 0.10,float=right]
 :since-0-11: image:https://img.shields.io/badge/since-0.11-8be[Since 0.11,float=right]
+:since-1-1: image:https://img.shields.io/badge/since-1.1-8be[Since 1.1,float=right]
 
 = Eldev
 
@@ -1646,12 +1647,12 @@ evaluate expressions stored in a file using `--file` (`-f`) option:
 
 Note that this is _not_ performed using Elisp file loading.  Instead,
 the file is parsed as a sequence of Elisp expression and those are
-then evaluated/executed as if specified on the command line.  In
-particular, for command `eval` results are still printed after every
-expression, even if they all come from the same file.  As in several
-other places, when variable `eldev-dwim` (“do what I mean”) is
-non-nil, option `-f` can be omitted as long as filename ends in `.el`.
-In other words, you can just invoke:
+then evaluated/executed in exactly the same way as if specified on the
+command line.  In particular, for command `eval` results are still
+printed after every expression, even if they all come from the same
+file.  As in several other places, when variable `eldev-dwim` (“do
+what I mean”) is non-nil, option `-f` can be omitted as long as
+filename ends in `.el`.  In other words, you can just invoke:
 
     $ eldev eval useful-expressions.el
 
@@ -1665,8 +1666,33 @@ E.g.:
     3
     7
 
-{since-0-11} These commands also have a few options aimed at code
-profiling.  See <<profiling-eval,relevant section below>>.
+{since-1-1} There are “magic” variables called `@`, `@1`, `@2` and so
+on, aimed at simplifying accessing to previous form results from
+subsequent forms.  Variable `@` always holds the result of previous
+form evaluation; it is thus not available in the very first form.
+Variables `@N`, where `N` is a number, hold result of `N`’s form (`N`
+starts with 1, not 0).  They can be used both in `eval` and `exec`,
+even if the latter doesn’t print the results.
+
+All forms for evaluation/execution are indexed with the same number
+sequence, regardless if they come from command line (including
+multiple forms per parameter) or from a file.
+
+To illustrate:
+
+    $ eldev eval "(generate-new-buffer \"abc\") (buffer-name @)"
+    #<buffer abc>
+    "abc"
+
+Or:
+
+    $ eldev eval "(+ 1 2) (+ 3 4) (* @1 @2)"
+    3
+    7
+    21
+
+{since-0-11} Commands `eval` and `exec` also have a few options aimed
+at code profiling.  See <<profiling-eval,relevant section below>>.
 
 
 == Running Emacs
