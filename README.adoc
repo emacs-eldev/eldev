@@ -499,25 +499,31 @@ init`).  For example:
 ----
 
 Eldev knows about three “standard” archives, which should cover most
-of your needs: `gnu`, `nongnu` (since 0.10) and `melpa`.  When using
-MELPA, you can also explicitly choose `melpa-stable` or
-`melpa-unstable` instead.
+of your needs: `gnu-elpa`, `nongnu-elpa` and `melpa`.
+
+You can also explicitly choose stable (a.k.a. release: `gnu`, `nongnu`
+and `melpa-stable`) or unstable (a.k.a. snapshot or development:
+`gnu-devel`, `nongnu-devel` and `melpa-unstable`) variants instead.
+There are some naming inconsistencies here, because for GNU and NonGNU
+only the stable variants had been added at first (`nongnu` only in
+0.10), nonstable (development) were added later, in 1.1.
 
 {since-0-5} A better way is provided by two global options: `--stable`
 (the default) and `--unstable`.  Normally, Eldev will try to install
-everything from MELPA Stable (you wouldn’t want your tests fail only
-because a dependency in an unstable version has a bug).  However, if a
-package is not available (at all or in the required version) from the
-stable archive, unstable will be used automatically.  If you specify
-`--unstable` on the command line, Eldev will behave in the opposite
-way: prefer the unstable archive and use the stable only as a
-fallback.
+everything from stable archive variants (you wouldn’t want your tests
+fail only because a dependency in an unstable version has a bug).
+However, if a package is not available (at all or in the required
+version) from the stable archive, unstable will be used automatically.
+If you specify `--unstable` on the command line, Eldev will behave in
+the opposite way: prefer the unstable archive and use the stable only
+as a fallback.
 
 Emacs 25 and up supports package archive priorities.  Eldev backports
 this to Emacs 24 and utilizes the feature to assign the standard
-archives it knows about priorities 300 (GNU ELPA), 250 (NonGNU ELPA),
-and 200 and 100 (MELPA Stable/Unstable).  A dependency from a package
-with a lower priority is installed only if there are no other options.
+archives it knows about priorities 300/190 (GNU ELPA, stable/unstable
+variants), 250/150 (NonGNU ELPA), and 200/100 (MELPA).  A dependency
+from a package with a lower priority is installed only if there are no
+other options.
 
 If dependencies for your project are only available from some other
 archive, you can still use the same function.  Just substite the
