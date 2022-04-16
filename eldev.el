@@ -1150,9 +1150,9 @@ the data."
 
 (eval-and-compile
   (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
-                                          (gnu-devel      ("gnu-devel"      . "https://elpa.gnu.org/devel/")        290)
+                                          (gnu-devel      ("gnu-devel"      . "https://elpa.gnu.org/devel/")        190)
                                           (nongnu         ("nongnu"         . "https://elpa.nongnu.org/nongnu/")    250)
-                                          (nongnu-devel   ("nongnu-devel"   . "https://elpa.nongnu.org/devel/")     240)
+                                          (nongnu-devel   ("nongnu-devel"   . "https://elpa.nongnu.org/devel/")     150)
                                           (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
                                           (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
                                           (gnu-elpa       (:stable gnu          :unstable gnu-devel))
@@ -1191,10 +1191,10 @@ of (ID . URL), same as you would use in `package-archives'.
 Standard archives:
 
   - gnu            (https://elpa.gnu.org/packages/)
-  - gnu-devel      (https://elpa.gnu.org/devel/, since 1.1)
   - nongnu         (https://elpa.nongnu.org/nongnu/, since 0.10)
-  - nongnu-devel   (https://elpa.nongnu.org/devel/, since 1.1)
   - melpa-stable   (https://stable.melpa.org/packages/)
+  - gnu-devel      (https://elpa.gnu.org/devel/, since 1.1)
+  - nongnu-devel   (https://elpa.nongnu.org/devel/, since 1.1)
   - melpa-unstable (https://melpa.org/packages/)
 
 Since 0.5 an archive can also be a plist with properties
@@ -1209,7 +1209,7 @@ plus, since 1.1:
 
 If PRIORITY is non-nil, ARCHIVE is given this priority (see
 `package-archive-priorities').  Standard archives get priorities
-300, 290, 250, 240, 200 and 100 in the order they are listed
+300, 250, 200, 190, 150 and 100 in the order they are listed
 above, unless you specify something explicitly.  Varying
 differences between the numbers are only since the list has
 accumulated over time, not created in one step.
