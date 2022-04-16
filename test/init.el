@@ -18,8 +18,8 @@
 ; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
-;(eldev-use-package-archive 'gnu)
-;(eldev-use-package-archive 'nongnu)
+;(eldev-use-package-archive 'gnu-elpa)
+;(eldev-use-package-archive 'nongnu-elpa)
 ;(eldev-use-package-archive 'melpa)
 "))
       (should (= exit-code 0)))))
@@ -36,8 +36,8 @@
 ; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
-;(eldev-use-package-archive 'gnu)
-;(eldev-use-package-archive 'nongnu)
+;(eldev-use-package-archive 'gnu-elpa)
+;(eldev-use-package-archive 'nongnu-elpa)
 ;(eldev-use-package-archive 'melpa)
 "))
       (should (= exit-code 0)))))
@@ -107,8 +107,8 @@
 ; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
-;(eldev-use-package-archive 'gnu)
-;(eldev-use-package-archive 'nongnu)
+;(eldev-use-package-archive 'gnu-elpa)
+;(eldev-use-package-archive 'nongnu-elpa)
 ;(eldev-use-package-archive 'melpa)
 "))
       (should (= exit-code 0)))))
@@ -121,8 +121,8 @@
 ; -*- mode: emacs-lisp; lexical-binding: t -*-
 
 ;; Uncomment some calls below as needed for your project.
-;(eldev-use-package-archive 'gnu)
-;(eldev-use-package-archive 'nongnu)
+;(eldev-use-package-archive 'gnu-elpa)
+;(eldev-use-package-archive 'nongnu-elpa)
 ;(eldev-use-package-archive 'melpa)
 
 (eldev-use-plugin 'autoloads)

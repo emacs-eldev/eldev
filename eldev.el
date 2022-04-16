@@ -264,9 +264,11 @@ Since 0.5")
 (defvar eldev-known-tool-packages
   '((buttercup    :version "1.24"   :archive  melpa)
     (ecukes       :version "0.6.18" :archive  melpa)
-    (package-lint :version "0.14"   :archives (melpa gnu))
-    (relint       :version "1.18"   :archive  gnu)
-    (elisp-lint                     :archives (melpa gnu))
+    ;; Need GNU ELPA for `let-alist' on older Emacs versions.
+    (package-lint :version "0.14"   :archives (melpa gnu-elpa))
+    (relint       :version "1.18"   :archive  gnu-elpa)
+    ;; Need GNU ELPA for `let-alist' on older Emacs versions.
+    (elisp-lint                     :archives (melpa gnu-elpa))
     ;; This is for a plugin, but probably no reason not to have it unconditionally.
     (undercover   :version "0.8"    :archive  melpa))
   "Alist of known external tool packages.
@@ -1148,16 +1150,22 @@ the data."
 
 (eval-and-compile
   (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
+                                          (gnu-devel      ("gnu-devel"      . "https://elpa.gnu.org/devel/")        290)
                                           (nongnu         ("nongnu"         . "https://elpa.nongnu.org/nongnu/")    250)
+                                          (nongnu-devel   ("nongnu-devel"   . "https://elpa.nongnu.org/devel/")     240)
                                           (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
                                           (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
+                                          (gnu-elpa       (:stable gnu          :unstable gnu-devel))
+                                          (nongnu-elpa    (:stable nongnu       :unstable nongnu-devel))
                                           (melpa          (:stable melpa-stable :unstable melpa-unstable)))))
 
 ;; Initial value means that even if `melpa-stable' and `melpa-unstable' are added
 ;; separately, they will be swappable with relevant options.  For other archives calling
 ;; `eldev-use-package-archive' with a stable/unstable pair is required.
-(defvar eldev--stable/unstable-archives (eval-when-compile `((,(cdr   (cadr (assq 'melpa-stable   eldev--known-package-archives)))
-                                                              . ,(cdr (cadr (assq 'melpa-unstable eldev--known-package-archives)))))))
+(defvar eldev--stable/unstable-archives (eval-when-compile (mapcar (lambda (entry)
+                                                                     `(,(cdr   (cadr (assq (plist-get (cadr entry) :stable)   eldev--known-package-archives)))
+                                                                       . ,(cdr (cadr (assq (plist-get (cadr entry) :unstable) eldev--known-package-archives)))))
+                                                                   (eldev-filter (keywordp (car (cadr it))) eldev--known-package-archives))))
 
 ;; This variable is used only on early Emacses: archive priorities are important at least
 ;; for our tests.  But let's not define `package-archive-priorities' variable to avoid
@@ -1183,7 +1191,9 @@ of (ID . URL), same as you would use in `package-archives'.
 Standard archives:
 
   - gnu            (https://elpa.gnu.org/packages/)
+  - gnu-devel      (https://elpa.gnu.org/devel/, since 1.1)
   - nongnu         (https://elpa.nongnu.org/nongnu/, since 0.10)
+  - nongnu-devel   (https://elpa.nongnu.org/devel/, since 1.1)
   - melpa-stable   (https://stable.melpa.org/packages/)
   - melpa-unstable (https://melpa.org/packages/)
 
@@ -1192,10 +1202,17 @@ Since 0.5 an archive can also be a plist with properties
 
   - melpa          (:stable melpa-stable :unstable melpa-unstable)
 
+plus, since 1.1:
+
+  - gnu-elpa       (:stable gnu    :unstable gnu-devel)
+  - nongnu-elpa    (:stable nongnu :unstable nongnu-devel)
+
 If PRIORITY is non-nil, ARCHIVE is given this priority (see
 `package-archive-priorities').  Standard archives get priorities
-300, 250, 200 and 100 in the order they are listed above, unless
-you specify something explicitly.
+300, 290, 250, 240, 200 and 100 in the order they are listed
+above, unless you specify something explicitly.  Varying
+differences between the numbers are only since the list has
+accumulated over time, not created in one step.
 
 If archive is stable/unstable plist, given PRIORITY is used for
 the unstable variant, stable receives priority 100 higher (these
@@ -4181,7 +4198,6 @@ least one warning."
   "Check package metadata, e.g. correctness of its dependencies."
   :aliases        (package-lint pack)
   :default        t
-  ;; Need GNU ELPA for `let-alist' on older Emacs versions.
   (eldev-add-extra-dependencies 'runtime '(:tool package-lint))
   (eldev-load-extra-dependencies 'runtime)
   ;; This linter needs access to package archive contents, so at least fetch all archives
@@ -4242,7 +4258,6 @@ least one warning."
 also runs `package-lint', so you either shouldn't run both or
 change `elisp-lint's configuration."
   :aliases        (elisp-lint el)
-  ;; Need GNU ELPA for `let-alist' on older Emacs versions.
   (eldev-add-extra-dependencies 'runtime '(:tool elisp-lint))
   ;; This linter might need access to package dependencies for byte-compilation.
   (eldev-load-project-dependencies 'runtime nil t)
