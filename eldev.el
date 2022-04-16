@@ -1292,6 +1292,11 @@ two variants."
     t))
 
 (defun eldev--stable/unstable-archive-counterpart (archive &optional value-if-not-used)
+  "Return the stable/unstable counterpart of ARCHIVE.
+E.g. `melpa-stable' and `melpa-unstable' are each other's
+counterparts.  If there is no counterpart, this function returns
+nil.  If there is a counterpart, but it is not used (i.e. is not
+in `package-archives', it returns VALUE-IF-NOT-USED."
   (let ((match (or (cdr (assoc  (cdr archive) eldev--stable/unstable-archives))
                    (car (rassoc (cdr archive) eldev--stable/unstable-archives)))))
     (when match
@@ -2829,7 +2834,11 @@ required version of Emacs itself.")
 (eldev-defcommand eldev-archives (&rest parameters)
   "List package archives used to look up dependencies.  Archives
 can be registered using function `eldev-use-package-archive' in
-project's `Eldev' file."
+project's `Eldev' file.
+
+With the option `--list-known', instead list the “standard”
+archives Eldev knows about.  Most projects use some of those, but
+it is also possible to use any other."
   :aliases        arch
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
@@ -2837,15 +2846,44 @@ project's `Eldev' file."
   (if package-archives
       (dolist (archive (sort package-archives (lambda (a b) (> (eldev-package-archive-priority (car a))
                                                                (eldev-package-archive-priority (car b))))))
-        (eldev-output "%s: %s%s"
-                      (eldev-colorize (car archive) 'name)
-                      (eldev-colorize (cdr archive) 'url)
-                      (eldev-format-message "  (priority: %s)" (eldev-package-archive-priority (car archive) "0, defaulted"))))
+        (eldev--archives-print archive))
     (eldev-print "None specified; add form `(eldev-use-package-archive ...)' in file `%s'" eldev-file)))
 
 (defun eldev-package-archive-priority (archive &optional default)
   (or (cdr (assoc archive (if (eq eldev--package-archive-priorities t) package-archive-priorities eldev--package-archive-priorities)))
       default 0))
+
+(eldev-defoption eldev-archives-list-known ()
+  "List known package archives and exit"
+  :options        (-L --list-known)
+  :for-command    archives
+  (eldev-print "Package archives marked with `*' are currently used by the project\n")
+  (dolist (entry eldev--known-package-archives)
+    (let ((archive (cadr entry)))
+      (cond ((eldev--stable/unstable-archive-p archive)
+             (let* ((stable        (assq (plist-get archive :stable)   eldev--known-package-archives))
+                    (unstable      (assq (plist-get archive :unstable) eldev--known-package-archives))
+                    (stable-used   (rassq (cdr (nth 1 stable))   package-archives))
+                    (unstable-used (rassq (cdr (nth 1 unstable)) package-archives)))
+               (eldev-output "%s%s:"
+                             (eldev-colorize (car entry) 'name)
+                             (if (and stable-used unstable-used) " [*]" ""))
+               (eldev--archives-print (nth 1 stable)   (nth 2 stable)   1 (when (and stable-used   (not unstable-used)) " [*]"))
+               (eldev--archives-print (nth 1 unstable) (nth 2 unstable) 1 (when (and unstable-used (not stable-used))   " [*]"))))
+            ((null (eldev--stable/unstable-archive-counterpart archive t))
+             (eldev--archives-print archive (nth 2 entry) 0 (when (rassq (cdr archive) package-archives) " [*]"))))))
+  (eldev-print "\nIt is also possible to use other archives by specifying URL explicitly")
+  (signal 'eldev-quit 0))
+
+(defun eldev--archives-print (archive &optional default-to-priority indentation-level special-mark)
+  (eldev-output "%s%s%s: %s%s"
+                (make-string (* (or indentation-level 0) 2) ? )
+                (eldev-colorize (car archive) 'name)
+                (or special-mark "")
+                (eldev-colorize (cdr archive) 'url)
+                (eldev-format-message "  (%spriority: %s)"
+                                      (if default-to-priority "default " "") (or default-to-priority (eldev-package-archive-priority (car archive) "0, defaulted")))))
+
 
 (eldev-defcommand eldev-dependencies (&rest parameters)
   "List dependencies of the current project.
