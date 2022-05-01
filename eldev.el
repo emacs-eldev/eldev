@@ -493,7 +493,7 @@ truncate backtrace lines"
   :default-value  (if (and (integerp eldev-backtrace-style) (> eldev-backtrace-style 1))
                       eldev-backtrace-style
                     "untruncated")
-  (setf eldev-backtrace-style (if width (string-to-number width) t)))
+  (setf eldev-backtrace-style (if width (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number width :min 0)) t)))
 
 (eldev-defoption eldev-set-loading-mode (mode)
   "Set the project's loading mode"
@@ -3251,7 +3251,7 @@ At least one of options `--file' and `--open' is required."
   :for-command    profile
   :value          MILLISECONDS
   :default-value  (progn (require 'profiler) (/ profiler-sampling-interval 1000000.0))
-  (setf profiler-sampling-interval (round (* (string-to-number millis) 1000000))))
+  (setf profiler-sampling-interval (round (* (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number millis :floating-point t :min 0.000001)) 1000000))))
 
 (eldev-defoption eldev-profile-set-max-stack-depth (depth)
   "Maximum stack depth"
@@ -3259,7 +3259,7 @@ At least one of options `--file' and `--open' is required."
   :for-command    profile
   :value          FRAMES
   :default-value  profiler-max-stack-depth
-  (unless (> (setf profiler-max-stack-depth (string-to-number depth)) 0)
+  (unless (> (setf profiler-max-stack-depth (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number depth :min 0))) 0)
     ;; Emacs dies with "really" unlimited depth, e.g. `most-positive-fixnum'.  With a big
     ;; number like 0x10000 it eats so much memory that machine gets stuck.  And even with
     ;; anything above ~30 backtrace displaying in `profiler-mode' becomes useless.
@@ -3863,7 +3863,7 @@ in `crop' stack frame style."
                           eldev-test-stop-on-unexpected
                         "right away")
                     :no-default)
-  (setf eldev-test-stop-on-unexpected (if num-failures (string-to-number num-failures) t)))
+  (setf eldev-test-stop-on-unexpected (if num-failures (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number num-failures :min 0)) t)))
 
 (eldev-defoption eldev-test-continue-mode ()
   "Execute all scheduled tests regardless of results"
@@ -3882,7 +3882,7 @@ global option `-b'"
                     (`nil            :no-default)
                     ((pred integerp) (if (> eldev-test-print-backtraces 0) eldev-test-print-backtraces "untruncated"))
                     (_               "use global style"))
-  (setf eldev-test-print-backtraces (if width (string-to-number width) t)))
+  (setf eldev-test-print-backtraces (if width (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number width :min 0)) t)))
 
 (eldev-defoption eldev-test-omit-backtraces ()
   "Omit failure backtraces for brevity"
@@ -3896,7 +3896,7 @@ global option `-b'"
   :options        (-X --expect)
   :for-command    (test test-ert test-buttercup test-ecukes)
   :value          N
-  (setf eldev-test-expect-at-least (string-to-number n)))
+  (setf eldev-test-expect-at-least (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number n :min 0))))
 
 (eldev-defoption eldev-test-runner (name)
   "Choose test runner"
@@ -4562,7 +4562,7 @@ only Eldev itself and Emacs built-ins will be available"
   :value          N
   :for-command    (eval exec)
   :default-value  (if eldev-eval-repeat (max (round eldev-eval-repeat) 1) 1)
-  (setf eldev-eval-repeat (string-to-number n)))
+  (setf eldev-eval-repeat (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number n :min 1))))
 
 (eldev-defoption eldev-eval-printer (function)
   "Use given function to print results"

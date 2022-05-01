@@ -372,6 +372,15 @@ altered."
   `(let (,@(mapcar (lambda (variable) `(,variable (eldev-environment-value ',variable ,environment))) variables))
      ,@body))
 
+(defmacro eldev-with-errors-as (signal-type &rest body)
+  "Evaluate BODY, resignalling any errors using SIGNAL-TYPE.
+Since 1.2."
+  (declare (indent 1) (debug (symbolp body)))
+  (let ((error (make-symbol "$error")))
+    `(condition-case ,error
+         ,(macroexp-progn body)
+       (error (signal ,signal-type (cdr ,error))))))
+
 
 (defun eldev--guess-url-from-file-error (error)
   ;; Another example of marvelous Elisp design.  It is sometimes first (installing
@@ -421,6 +430,45 @@ form is executed at the end.
                  `((unwind-protect ,(macroexp-progn body) ,cleanup))
                `(,@body ,cleanup))
            body))))
+
+
+(defun eldev-parse-number (string &rest options)
+  "Similar to `string-to-number', but with error checking.
+Useful in user interface to give feedback on erroneous input.
+Signalled errors are of generic type, use `eldev-with-errors-as'
+to rebrand as needed.
+
+Supported OPTIONS:
+
+    :floating-point
+
+        Also parse floating-point numbers; by default only
+        integers are accepted.
+
+    :min, :max
+
+        Throw an error if the number is outside this range.
+
+Since 1.2."
+  (let (floating-point
+        min
+        max)
+    (while options
+      (eldev-pcase-exhaustive (pop options)
+        (:floating-point (setf floating-point (pop options)))
+        (:min            (setf min            (pop options)))
+        (:max            (setf max            (pop options)))))
+    (unless (string-match-p (if floating-point
+                                (rx bos (? (any "+-")) (| (seq (+ digit) (? (| (seq "." (* digit)) (seq (any "eE") (? (any "+-")) (+ digit))))) (seq "." (* digit)) eos))
+                              (rx bos (? (any "+-")) (+ digit) eos))
+                            string)
+      (error (eldev-format-message "`%s' it not a valid number" string)))
+    (let ((number (string-to-number string)))
+      (when (and min (< number min))
+        (error (eldev-format-message "minimum allowed value is %s" min)))
+      (when (and max (> number max))
+        (error (eldev-format-message "maximum allowed value is %s" max)))
+      number)))
 
 
 
