@@ -27,9 +27,7 @@ if "%CON_ANSI_SUPPORT?%" == "t" (
 @[(eldev-bat-quote :init)]@
 
 "%ELDEV_EMACS%" --batch --no-site-file --no-site-lisp ^
-                --execute  @[(eldev-bat-quote :string (eldev-file-contents "bin/bootstrap.el.part" 0 1))]@  ^
-                --execute "(kill-emacs (eldev-cli (append (cdr (member """--""" command-line-args)) nil)))" ^
-                -- @[(eldev-bat-quote :args)]@
+                --execute  @[(progn (require 'subr-x) (eldev-bat-quote :string (string-trim (eldev-file-contents "bin/bootstrap.el.part" 0 1))))]@ --execute "(kill-emacs (eldev-cli (append (cdr (member """--""" command-line-args)) nil)))" -- @[(eldev-bat-quote :args)]@
 REM forward emacs exit status
 exit /b %errorlevel%
 

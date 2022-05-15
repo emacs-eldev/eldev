@@ -99,10 +99,7 @@ REM the newline variable above MUST be followed by two empty lines.
         (package-activate-1 eldev-pkg) !NL!^
         (advice-remove #'load autoloads-disabler)))) !NL!^
   (require 'eldev) !NL!^
-  (eldev-start-up)) !NL!^
-"  ^
-                --execute "(kill-emacs (eldev-cli (append (cdr (member """--""" command-line-args)) nil)))" ^
-                -- !ARGS!
+  (eldev-start-up))" --execute "(kill-emacs (eldev-cli (append (cdr (member """--""" command-line-args)) nil)))" -- !ARGS!
 REM forward emacs exit status
 exit /b %errorlevel%
 
