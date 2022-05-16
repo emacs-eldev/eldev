@@ -281,7 +281,7 @@ parameter, but it's not needed in noninteractive use."
 
        ;; close the quoted text with a double quote.
        (goto-char (point-max))
-       (insert "\n\"")
+       (insert "\"")
 
        ;; escape special characters with ^
        (goto-char (point-min))
