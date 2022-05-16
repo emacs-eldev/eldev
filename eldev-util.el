@@ -374,7 +374,7 @@ altered."
 
 (defmacro eldev-with-errors-as (signal-type &rest body)
   "Evaluate BODY, resignalling any errors using SIGNAL-TYPE.
-Since 1.2."
+Since 1.1.1."
   (declare (indent 1) (debug (symbolp body)))
   (let ((error (make-symbol "$error")))
     `(condition-case ,error
@@ -449,7 +449,7 @@ Supported OPTIONS:
 
         Throw an error if the number is outside this range.
 
-Since 1.2."
+Since 1.1.1."
   (let (floating-point
         min
         max)
