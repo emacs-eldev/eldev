@@ -23,5 +23,5 @@ mkdir %ELDEV_BIN_DIR%
 
 curl.exe  -fsSL %URL% -o %ELDEV_BIN_DIR%\eldev.bat || exit /b
 
-echo %ELDEV_BIN_DIR% >> %GITHUB_PATH%
+echo %ELDEV_BIN_DIR%>> %GITHUB_PATH%
 

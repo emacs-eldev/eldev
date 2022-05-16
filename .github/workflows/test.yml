@@ -122,20 +122,29 @@ jobs:
           await io.rmRF(expandTilde("~/.local/bin"));
 
     # GitHub-specific installation specifically for workflows.
-    - name: Test GitHub-specific installation
-      uses: actions/github-script@v3
-      with:
-        script: |
-          const fs = require('fs');
-          const exec = require('util').promisify(require('child_process').exec);
-          const {getRawUrl,downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
-          if (fs.existsSync(expandTilde("~/.local/bin/eldev")))
-              throw("~/.local/bin/eldev already exists");
-          await io.mkdirP('tmp');
-          const script = await downloadScript(github, context, "webinstall/github-eldev", 'tmp');
-          const eldev_bin_url = getRawUrl(context,"bin/eldev");
-          await exec(`${script} ${eldev_bin_url}`);
-          const eldev_out = await exec(expandTilde("~/.local/bin/eldev"));
-          console.log(eldev_out.stdout);
-          await io.rmRF(expandTilde("~/.local/bin"));
+    - name: Test GitHub-specific installation (1/2)
+      if: "!startsWith (matrix.os, 'windows')"
+      run: |
+        if command -v eldev &> /dev/null
+        then
+         echo eldev is already installed.
+         exit 1
+        else
+          curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+        fi
 
+    - name: Test GitHub-specific installation on MS-Windows (1/2)
+      if: startsWith (matrix.os, 'windows')
+      run: |
+        if (Get-Command "eldev" -ErrorAction SilentlyContinue)
+        {
+          throw 'eldev is already installed.'
+        }
+        else
+        {
+          curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev.bat | cmd /Q
+        }
+
+    - name: Test GitHub-specific installation (2/2)
+      run: |
+        eldev help && rm ~/.local/bin/eldev*
