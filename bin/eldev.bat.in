@@ -1,5 +1,5 @@
 @echo off
-REM Eldev --- Elisp Development Tool.
+REM Eldev --- Elisp development tool.
 REM
 REM Copyright (C) 2021-2022 Paul Pogonyshev
 REM

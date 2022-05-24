@@ -63,7 +63,7 @@ image:https://img.shields.io/github/release/doublep/eldev.svg[Latest release, li
 image:http://stable.melpa.org/packages/eldev-badge.svg[MELPA Stable, link=http://stable.melpa.org/#/eldev]
 image:https://github.com/doublep/eldev/workflows/CI/badge.svg[CI, link=https://github.com/doublep/eldev/actions?query=workflow%3ACI]
 
-Eldev (Elisp Development Tool) is an Emacs-based build tool, targeted
+Eldev (Elisp development tool) is an Emacs-based build tool, targeted
 solely at Elisp projects.  It is an alternative to Cask.  Unlike Cask,
 Eldev itself is fully written in Elisp and its configuration files are
 also Elisp programs.  If you are familiar with Java world, Cask can be

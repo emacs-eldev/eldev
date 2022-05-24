@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp Development Tool  -*- lexical-binding: t -*-
+;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2019-2022 Paul Pogonyshev
 
@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; Eldev (Elisp Development Tool) is an Emacs-based build system,
+;; Eldev (Elisp development tool) is an Emacs-based build system,
 ;; targeted solely at Elisp projects.  It is an alternative to Cask.
 ;; Unlike Cask, Eldev itself is fully written in Elisp and its
 ;; configuration files are also Elisp programs.  If you are familiar
