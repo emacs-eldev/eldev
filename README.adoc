@@ -136,9 +136,7 @@ think real-world usage provides better models.
 {uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
     This project has several dependencies, so it needs to instruct
-    Eldev how to find them.  Additionally, it deactivates (i.e. makes
-    it do nothing even if specified) one option provided by Eldev,
-    because of what seems like a bug in Emacs 24.
+    Eldev how to find them.
 
 {uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]; its file {uri-datetime}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
