@@ -1,6 +1,7 @@
 (progn
   (require 'bytecomp)
-  (let ((byte-compile-error-on-warn t))
+  (let ((byte-compile-warnings      '(not docstrings))
+        (byte-compile-error-on-warn t))
     (push default-directory load-path)
     (unless (and (byte-compile-file "eldev-util.el")
                  (byte-compile-file "eldev.el")
