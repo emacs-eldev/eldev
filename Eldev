@@ -9,6 +9,11 @@
                                                                   (`all         '("./test/*/" "!./test/integration")))
                                                                 "./webinstall")))
 
+;; I don't want to "fix" docstrings, especially since they are mostly meant to be printed
+;; to console in this project.
+(with-eval-after-load 'bytecomp
+  (setf byte-compile-warnings '(not docstrings)))
+
 
 (defvar eldev-test-type 'main)
 
