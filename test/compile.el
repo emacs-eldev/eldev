@@ -173,8 +173,11 @@
 (ert-deftest eldev-compile-warnings-as-errors-2 ()
   (eldev--test-without-files "project-b" "project-b.elc"
     (eldev--test-run nil ("compile" "--warnings-as-errors")
-      ;; Compilation must produce a warning, which is elevated and
-      ;; causes build to fail.
+      ;; Compilation must produce two warnings, which are elevated and cause build to
+      ;; fail.  Previously Eldev would use built-in `byte-compile-error-on-warn' and thus
+      ;; stop after the first warning.  Now we require that both are printed.
+      (should (string-match-p "project-b-never-declared-this-variable" stderr))
+      (should (string-match-p "noprefixforthisvar"                     stderr))
       (should (= exit-code 1)))))
 
 

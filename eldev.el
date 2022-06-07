@@ -5257,6 +5257,9 @@ this might require adding some `eval-and-compile' forms in your code"
    :hidden-if     :default)
   :for-command    (build compile package))
 
+;; If both `eldev-build-treat-warnings-as-errors' and this are specified, the former
+;; should take precedence (it's up to specific builders).  I.e. warnings treated as errors
+;; are no longer considered warnings and are, therefore, not silenced.
 (eldev-defbooloptions eldev-build-suppress-warnings eldev-build-show-warnings eldev-build-suppress-warnings
   ("Suppress all warnings"
    :options       (-w --suppress-warnings))
