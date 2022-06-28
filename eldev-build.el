@@ -594,8 +594,10 @@ possible to build arbitrary targets this way."
                                           ;; Not available on old Emacs versions.
                                           (have-warning-function             (boundp 'byte-compile-log-warning-function))
                                           (original-warning-function         (when have-warning-function byte-compile-log-warning-function))
-                                          (byte-compile-log-warning-function (when (and have-warning-function (not recursive))
-                                                                               (cond (eldev-build-treat-warnings-as-errors
+                                          (byte-compile-log-warning-function (when have-warning-function
+                                                                               (cond (recursive
+                                                                                      original-warning-function)
+                                                                                     (eldev-build-treat-warnings-as-errors
                                                                                       (lambda (string &optional position fill _level &rest etc)
                                                                                         (setf resulted-in-elevated-warnings t)
                                                                                         (apply original-warning-function string position fill :error etc)))
