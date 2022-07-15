@@ -1327,7 +1327,7 @@ Also, eat up several options from BODY if present:
                   (`(:file ,_))  ; Handled below
                   (`(,stdout ,(and (or `nil `t (pred stringp)) stderr))
                    (unless (eq stderr t)
-                     (setf stderr-buffer (generate-new-buffer " *stderr*" t))
+                     (setf stderr-buffer (generate-new-buffer " *stderr*"))
                      (when stderr
                        (setf stderr-file stderr)))
                    (setf destination stdout)))
