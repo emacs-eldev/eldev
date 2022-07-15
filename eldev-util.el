@@ -164,6 +164,21 @@ conditionally.
          (when ,fn
            (advice-remove ,symbol ,fn))))))
 
+(defmacro eldev-with-kill-handler (function &rest body)
+  "Execute BODY with given FUNCTION on `kill-emacs-hook'.
+The function can be nil, in which case it is simply ignored.
+
+Since 1.2."
+  (declare (indent 1) (debug (sexp body)))
+  (let ((fn (make-symbol "$fn")))
+    `(let ((,fn ,function))
+       (when ,fn
+         (add-hook 'kill-emacs-hook ,fn))
+       (unwind-protect
+           ,(macroexp-progn body)
+         (when ,fn
+           (remove-hook 'kill-emacs-hook ,fn))))))
+
 
 (defsubst eldev-listify (x)
   "Make a list out of X.
@@ -1200,9 +1215,10 @@ See also variable `eldev-docker-executable'."
 
 (defmacro eldev-call-process (executable command-line &rest body)
   "Execute given process synchronously.
-Put output (both stderr and stdout) to a temporary buffer.  Run
-BODY with this buffer set as current and variable `exit-code'
-bound to the exit code of the process.
+Put output, both stdout and stderr, into a temporary buffer
+(but see option `:destination' below) and run BODY with this
+buffer set as current and variable `exit-code' bound to the exit
+code of the process.
 
 Since 0.8:
 
@@ -1227,7 +1243,11 @@ Also, eat up several options from BODY if present:
     :destination DESTINATION
 
         Use given destination (evaluated) instead of the
-        defaults.  See function `call-process' for details.
+        defaults.  Analogous to function `call-process', but here
+        t stands for the temporary buffer created by the macro
+        itself.  You may specify a different buffer, in which
+        case a temporary won't be created and the current buffer
+        is not changed.
 
     :infile FILE
 
@@ -1241,7 +1261,9 @@ Also, eat up several options from BODY if present:
         the executable name.  Process output is also printed with
         `eldev-warn'."
   (declare (indent 2) (debug (form sexp body)))
-  (let ((destination t)
+  (let ((evaluated-destination (make-symbol "$evaluated-destination"))
+        (temp-buffer           (make-symbol "$temp-buffer"))
+        (destination           t)
         infile
         pre-execution
         trace-command-line
@@ -1253,23 +1275,97 @@ Also, eat up several options from BODY if present:
         (:destination        (setf destination        (pop body)))
         (:infile             (setf infile             (pop body)))
         (:die-on-error       (setf die-on-error       (pop body)))))
-    `(let ((executable   ,executable)
-           (command-line ,command-line))
-       (with-temp-buffer
-         ,@(nreverse pre-execution)
-         ,@(when trace-command-line
-             `((eldev-trace "%s:\n  %s"
-                            ,(if (eq trace-command-line t) "Full command line" trace-command-line)
-                            (eldev-message-command-line executable command-line))))
-         (let ((exit-code (apply #'call-process executable ,infile ,destination nil command-line)))
-           (goto-char 1)
-           ,@(when die-on-error
-               `((when (/= exit-code 0)
-                   (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
-                     (unless (= (point-min) (point-max))
-                       (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
-                     (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
-           ,@(or body '(exit-code)))))))
+    `(let* ((executable             ,executable)
+            (command-line           ,command-line)
+            (,evaluated-destination ,destination)
+            ;; The temporary buffer is created only if it will be used.
+            (,temp-buffer           (when (or (eq ,evaluated-destination t) (eq (car-safe ,evaluated-destination) t))
+                                      (generate-new-buffer " *temp*"))))
+       (unwind-protect
+           (with-current-buffer (or ,temp-buffer (current-buffer))
+             ,@(nreverse pre-execution)
+             ,@(when trace-command-line
+                 `((eldev-trace "%s:\n  %s"
+                                ,(if (eq trace-command-line t) "Full command line" trace-command-line)
+                                (eldev-message-command-line executable command-line))))
+             ;; I have no idea why `save-excursion' around `eldev--do-call-process'
+             ;; wouldn't do shit, presumably on Emacs 25+.  Had to emulate it.
+             (let ((output-begin (point))
+                   (exit-code    (eldev--do-call-process executable ,infile ,evaluated-destination command-line)))
+               (goto-char output-begin)
+               ,@(when die-on-error
+                   `((when (/= exit-code 0)
+                       (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
+                         (unless (= (point-min) (point-max))
+                           (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
+                         (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
+               ,@(or body '(exit-code))))
+         (when (buffer-live-p ,temp-buffer)
+           (kill-buffer ,temp-buffer))))))
+
+(declare-function make-process nil)
+(declare-function make-pipe-process nil)
+
+(defun eldev--do-call-process (executable infile destination command-line)
+  (if (fboundp 'make-process)
+      ;; On Emacs 25 and up we emulate using `make-process'.  This allows us to kill the
+      ;; process if Eldev itself gets killed with C-c; currently, this should be the only
+      ;; difference compared to just using `call-process'.
+      (let* (stdout-buffer
+             stdout-file
+             stderr-buffer
+             stderr-file
+             process
+             stderr-pipe
+             dont-wait)
+        (eldev-with-kill-handler (lambda ()
+                                   (when (process-live-p process)
+                                     (interrupt-process process)))
+          (unwind-protect
+              (progn
+                (pcase destination
+                  (`(:file ,_))  ; Handled below
+                  (`(,stdout ,(and (or `nil `t (pred stringp)) stderr))
+                   (unless (eq stderr t)
+                     (setf stderr-buffer (generate-new-buffer " *stderr*" t))
+                     (when stderr
+                       (setf stderr-file stderr)))
+                   (setf destination stdout)))
+                (eldev-pcase-exhaustive destination
+                  (`nil)
+                  (`0                                      (setf dont-wait     t))
+                  (`t                                      (setf stdout-buffer (current-buffer)))
+                  ((pred bufferp)                          (setf stdout-buffer destination))
+                  (`(:file ,(and (pred stringp) filename)) (setf stdout-file   filename)))
+                (setf stderr-pipe (when stderr-buffer
+                                    (make-pipe-process :name (format "%s stderr" executable)
+                                                       :buffer stderr-buffer
+                                                       :sentinel #'ignore
+                                                       :noquery t))
+                      process     (make-process :name executable
+                                                :command `(,executable ,@command-line)
+                                                :buffer stdout-buffer
+                                                :stderr stderr-pipe
+                                                :sentinel #'ignore
+                                                :noquery t))
+                (when infile
+                  (with-temp-buffer
+                    (insert-file-contents-literally infile)
+                    (process-send-string process (buffer-string))))
+                (unless dont-wait
+                  (while (or (process-live-p process) (process-live-p stderr-pipe))
+                    (accept-process-output))))
+            (when stdout-file
+              (with-current-buffer stdout-buffer
+                (write-region nil nil stdout-file)))
+            (when stderr-file
+              (with-current-buffer stderr-buffer
+                (write-region nil nil stderr-file)))
+            (when stderr-buffer
+              (kill-buffer stderr-buffer))))
+        (unless dont-wait
+          (process-exit-status process)))
+    (apply #'call-process executable infile destination nil command-line)))
 
 (defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
   (if (= (point-min) (point-max))

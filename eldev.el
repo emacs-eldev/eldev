@@ -4917,24 +4917,19 @@ Currently only Linux and macOS systems are supported."
             eldev--container-bootstrap-cmd-fn))
          (args (append
                 (eldev--docker-args img escaped-params as-gui exp-local-eldev))))
-    (eldev-call-process
-        docker-exec
-        args
-      :pre-execution
-      (eldev-verbose "Running command '%s %s'"
-                     docker-exec
-                     (mapconcat #'identity args " "))
-      :die-on-error
-      (progn
-        (delete-directory (eldev--docker-home) t)
-        (when (string-match-p ".*unavailable, simulating -nw.*" (buffer-string))
-          (eldev-warn "It appears your X server is not accepting connections from the docker container")
-          (eldev-warn "Have you run `xhost +local:root' (remember about security issues, though)?\n"))
-        (format "%s run" docker-exec))
-      (eldev--forward-process-output
-       (format "Output of the %s process:" docker-exec)
-       (format "%s process produced no output" docker-exec)))
-    (delete-directory (eldev--docker-home) t)))
+    (unwind-protect
+        (eldev-call-process docker-exec args
+          :pre-execution (eldev-verbose "Full command line to run a Docker process:\n  %s"
+                                        (eldev-message-command-line executable command-line))
+          :destination '(t nil)
+          (eldev--forward-process-output "Output of the Docker process:" "Docker process produced no output")
+          ;; Using custom code instead of `:die-on-error' because of the hint.
+          (when (/= exit-code 0)
+            (signal 'eldev-error `(:hint (when (string-match-p "unavailable, simulating -nw" (buffer-string))
+                                           '("It appears your X server is not accepting connections from the Docker container"
+                                             "Have you run `xhost +local:root' (remember about security issues, though)?"))
+                                         "Docker process exited with error code %d" exit-code))))
+      (delete-directory (eldev--docker-home) t))))
 
 
 
