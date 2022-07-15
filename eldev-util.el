@@ -1317,7 +1317,9 @@ Also, eat up several options from BODY if present:
              stderr-file
              process
              stderr-pipe
-             dont-wait)
+             dont-wait
+             (still-running t)
+             (common-sentinel (lambda (&rest _ignored) (setf still-running (or (process-live-p process) (process-live-p stderr-pipe))))))
         (eldev-with-kill-handler (lambda ()
                                    (when (process-live-p process)
                                      (interrupt-process process)))
@@ -1340,20 +1342,20 @@ Also, eat up several options from BODY if present:
                 (setf stderr-pipe (when stderr-buffer
                                     (make-pipe-process :name (format "%s stderr" executable)
                                                        :buffer stderr-buffer
-                                                       :sentinel #'ignore
+                                                       :sentinel common-sentinel
                                                        :noquery t))
                       process     (make-process :name executable
                                                 :command `(,executable ,@command-line)
                                                 :buffer stdout-buffer
                                                 :stderr stderr-pipe
-                                                :sentinel #'ignore
+                                                :sentinel common-sentinel
                                                 :noquery t))
                 (when infile
                   (with-temp-buffer
                     (insert-file-contents-literally infile)
                     (process-send-string process (buffer-string))))
                 (unless dont-wait
-                  (while (or (process-live-p process) (process-live-p stderr-pipe))
+                  (while still-running
                     (accept-process-output))))
             (when stdout-file
               (with-current-buffer stdout-buffer
