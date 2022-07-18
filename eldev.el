@@ -185,14 +185,24 @@ Additionally, whenever any of these filesets is resolved,
 `eldev-standard-excludes' is always “subtracted” from the
 result.")
 
-(defvar eldev-files-to-package
-  '(:and ("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir")
-         ;; Since 1.2 we exclude the autoloads file specifically.  Pre-29 Emacs versions
-         ;; seemed to cope with it fine, 29 does not.  However, text "Do not include any
-         ;; file named ‘NAME-autoloads.el’" has been in the documentations since years, so
-         ;; this change in behavior cannot be considered an Emacs 29 bug.
-         (concat "!./" (eldev-package-autoloads-file-name)))
+(defvar eldev-files-to-package '("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir")
   "Files that are copied to built packages.")
+
+;; Since 1.2 we exclude the autoloads file specifically.  Pre-29 Emacs versions seemed to
+;; cope with it fine, 29 does not.  However, text "Do not include any file named
+;; ‘NAME-autoloads.el’" has been in the documentations since years, so this change in
+;; behavior cannot be considered an Emacs 29 bug.
+(defvar eldev-files-to-exclude-from-package '(concat "./" (eldev-package-autoloads-file-name))
+  "Files to be excluded from packaging.
+Default value excludes only file `PACKAGE-autoloads.el' and is
+only important if you have this file in your source code or
+created externally (not with the Eldev plugin).
+
+Ideally, this would be part of `eldev-files-to-package', but
+since its advertised use implicitly made its value a simple
+fileset, this variable was created separately.
+
+Since 1.2.")
 
 (defvar eldev-makeinfo-sources '("./*.texi" "./*.texinfo" "./doc/*.texi" "./doc/*.texinfo")
   "Files used as `makeinfo' sources.")
@@ -5385,7 +5395,7 @@ as two last lines of output"
   :type           many-to-many
   :short-name     "PACK"
   :message        targets
-  :source-files   (:and eldev-files-to-package (eldev-standard-fileset 'main))
+  :source-files   (:and eldev-files-to-package (:not eldev-files-to-exclude-from-package) (eldev-standard-fileset 'main))
   :targets        (lambda (sources)
                     ;; FIXME: We rely on `eldev-build-find-targets' special-casing us so
                     ;;        that we know number of sources from the start.  Find a
