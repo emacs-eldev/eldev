@@ -1561,6 +1561,14 @@ Since 0.9."
     (when package
       (format "%s-pkg.el" (package-desc-name package)))))
 
+(defun eldev-package-autoloads-file-name (&optional project-dir skip-cache)
+  "Return the name of autoloads file for the package in PROJECT-DIR.
+Since 1.2."
+  ;; Different from `eldev--package--autoloads-file-name'!
+  (let ((package (ignore-errors (eldev-package-descriptor project-dir skip-cache))))
+    (when package
+      (format "%s-autoloads.el" (package-desc-name package)))))
+
 (defun eldev-find-package-descriptor (package-name &optional version only-if-activated)
   "Find descriptor of the package with given name."
   (unless (and only-if-activated (not (memq package-name package-activated-list)))

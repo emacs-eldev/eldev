@@ -185,7 +185,13 @@ Additionally, whenever any of these filesets is resolved,
 `eldev-standard-excludes' is always “subtracted” from the
 result.")
 
-(defvar eldev-files-to-package '("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir")
+(defvar eldev-files-to-package
+  '(:and ("*.el" "./*.info" "./dir" "./doc/*.info" "./doc/dir")
+         ;; Since 1.2 we exclude the autoloads file specifically.  Pre-29 Emacs versions
+         ;; seemed to cope with it fine, 29 does not.  However, text "Do not include any
+         ;; file named ‘NAME-autoloads.el’" has been in the documentations since years, so
+         ;; this change in behavior cannot be considered an Emacs 29 bug.
+         (concat "!./" (eldev-package-autoloads-file-name)))
   "Files that are copied to built packages.")
 
 (defvar eldev-makeinfo-sources '("./*.texi" "./*.texinfo" "./doc/*.texi" "./doc/*.texinfo")
@@ -3951,8 +3957,9 @@ Should normally be specified only from command line.")
 
 (defvar eldev-lint-ignored-fileset '(eldev-package-descriptor-file-name)
   "Never lint files matching this fileset.
-Default value includes only the package descriptor file,
-i.e. `PACKAGE-pkg.el'.
+Default value includes only the package descriptor file and,
+since 1.2, its autoloads file.  In other words, `PACKAGE-pkg.el'
+and `PACKAGE-autoloads.el'.
 
 Since 0.9.")
 
@@ -4979,12 +4986,15 @@ Can be either a list of filenames or symbol t, meaning “all of
 them”.  Targets that are built from these sources or depend on
 them will never be found up-to-date.")
 
-(defvar eldev-build-ignored-target-fileset '(concat (eldev-package-descriptor-file-name) "c")
+(defvar eldev-build-ignored-target-fileset '(:or (concat (eldev-package-descriptor-file-name) "c")
+                                                 (concat (eldev-package-autoloads-file-name)  "c"))
   "Fileset of apparent targets that should be ignored.
 If a builder specifies a target that matches this fileset, it is
 ignored completely: not even listed in `eldev targets' output.
 Default value includes byte-compiled file for package descriptor
-file, i.e. `PACKAGE-pkg.elc'.
+file, i.e. `PACKAGE-pkg.elc' and (since 1.2) byte-compiled file
+for package `autoloads' file (might be important if this file is
+generated with an external tool and not with the Eldev plugin).
 
 Since 0.9.")
 
