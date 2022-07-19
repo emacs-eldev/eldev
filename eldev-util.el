@@ -1680,53 +1680,6 @@ is non-nil when this function is called."
    (package-desc-dir pkg-desc)))
 
 
-;; For Emacs 29 (?).  It's pointless to suggest improvements upstream, since I can't
-;; create a simple test for this.  I don't want to argue a month over three lines and be
-;; ignored in the end, as usually.  Test `eldev-loading-modes-2' fails without this.
-(when (fboundp 'package--reload-previously-loaded)
-  (declare-function directory-files-recursively "files")
-  (declare-function package--library-stem "package")
-  ;; I'd rather use an advice, but don't see a way to do this without affecting `load' at
-  ;; the end of the function, which would have potential to create another subtle bug.
-  (defun package--reload-previously-loaded (pkg-desc)
-    "Force reimportation of files in PKG-DESC already present in `load-history'.
-New editions of files contain macro definitions and
-redefinitions, the overlooking of which would cause
-byte-compilation of the new package to fail."
-    (with-demoted-errors "Error in package--load-files-for-activation: %s"
-      (let* (result
-             (dir (package-desc-dir pkg-desc))
-             ;; `sans-dir' is not really "without package directory" in our fixed version.
-             (load-path-sans-dir (or (bound-and-true-p find-function-source-path)
-                                     load-path))
-             (files (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
-             (history (mapcar #'file-truename
-                              (cl-remove-if-not #'stringp
-                                                (mapcar #'car load-history)))))
-        (dolist (file files)
-          ;; Rewriting `when-let' with a series of `let' and `when', else byte-compilation
-          ;; on older versions issues warnings.
-          (let ((library (package--library-stem
-                          (file-relative-name file dir))))
-            (when library
-              (let ((canonical (locate-library library nil load-path-sans-dir)))
-                (when canonical
-                  ;; Treat `.el' and `.elc' interchangeably.
-                  (let* ((truename (file-truename canonical))
-                         (found (or (member truename history)
-                                    (member (if (string-suffix-p ".el" truename)
-                                                (replace-regexp-in-string (rx ".el" eos) ".elc" truename t)
-                                              (replace-regexp-in-string (rx ".elc" eos) ".el" truename t))
-                                            history))))
-                    (when found
-                      (let ((recent-index (length found)))
-                        (unless (equal (file-name-base library)
-                                       (format "%s-autoloads" (package-desc-name pkg-desc)))
-                          (push (cons (expand-file-name library dir) recent-index) result))))))))))
-        (mapc (lambda (c) (load (car c) nil t))
-              (sort result (lambda (x y) (< (cdr x) (cdr y)))))))))
-
-
 
 ;; Fileset basics.
 

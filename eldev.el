@@ -1869,6 +1869,40 @@ Since 0.2."
 ;; local dependencies that can change unpredictably and also requirement that certain
 ;; dependencies are installed only from certain archives.  Roll our own.
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
+  (eldev-advised ('package--reload-previously-loaded
+                  ;; For Emacs 29.  Pointless to suggest improvements upstream, since I can't create a simple
+                  ;; test (eventually did this though: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56614,
+                  ;; but don't expect any results).  Test `eldev-loading-modes-2' fails without this.  Have to
+                  ;; use these several advices to avoid affecting calls inside `load'.  Also, better to fail
+                  ;; if `package--reload-previously-loaded' is rewritten than to break it.
+                  :around (lambda (original pkg-desc &rest etc)
+                            (let ((dir     (package-desc-dir pkg-desc))
+                                  (history (mapcar #'file-truename (eldev-filter (stringp it) (mapcar #'car load-history))))
+                                  inside-load)
+                              (eldev-advised ('cl-remove-if :around (lambda (original predicate seq &rest etc)
+                                                                      (if (or inside-load (not (funcall predicate dir)))
+                                                                          (apply original predicate seq etc)
+                                                                        seq)))
+                                ;; I'd advise `member' here, but it is a built-in, so the advise is ignored if
+                                ;; `package--reload-previously-loaded' is byte-compiled (i.e. always in practice).
+                                (eldev-advised ('file-truename :around (lambda (original filename &rest etc)
+                                                                         (let ((truename (apply original filename etc)))
+                                                                           (unless (or inside-load (member truename history))
+                                                                             (setf truename (if (string-suffix-p ".el" truename)
+                                                                                                (replace-regexp-in-string (rx ".el" eos) ".elc" truename t)
+                                                                                              (replace-regexp-in-string (rx ".elc" eos) ".el" truename t))))
+                                                                           truename)))
+                                  (eldev-advised ('load :around (lambda (original &rest etc)
+                                                                  ;; Cannot just let-bind a local variable shared across several closures.
+                                                                  (let ((was-inside inside-load))
+                                                                    (setf inside-load t)
+                                                                    (unwind-protect
+                                                                        (apply original etc)
+                                                                      (setf inside-load was-inside)))))
+                                    (apply original pkg-desc etc)))))))
+    (eldev--do-install-or-upgrade-dependencies core additional-sets to-be-upgraded dry-run activate main-command-effect no-error-if-missing)))
+
+(defun eldev--do-install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
   ;; See comments in `eldev-cli'.
   (let* ((eldev-message-rerouting-destination :stderr)
          (self                              (eq core 'eldev))
