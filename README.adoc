@@ -55,6 +55,7 @@ endif::[]
 :since-0-10: image:https://img.shields.io/badge/since-0.10-8be[Since 0.10,float=right]
 :since-0-11: image:https://img.shields.io/badge/since-0.11-8be[Since 0.11,float=right]
 :since-1-1: image:https://img.shields.io/badge/since-1.1-8be[Since 1.1,float=right]
+:since-1-2: image:https://img.shields.io/badge/since-1.2-8be[Since 1.2,float=right]
 
 = Eldev
 
@@ -1043,8 +1044,9 @@ Previously, the recommended way was
 
 However, this is wrong because it assumes that
 `eldev-files-to-package` is a <<simple-filesets,simple fileset>> which
-will change in Eldev 1.2.  Replace this with code similar to the new
-recommendation above; it works with any Eldev version.
+is no longer true since Eldev 1.2.  Replace this with code similar to
+the new recommendation above; it works with any Eldev version.  See
+also section <<modifying-filesets,on modifying filesets>>.
 ====
 
 Normally, packages are generated in subdirectory `dist` (more
@@ -2403,6 +2405,40 @@ Example of an evaluated fileset can be seen from return value of
 
 As the result contains references to two variables, they will be
 evaluated in turn — and so on, until everything is resolved.
+
+[#modifying-filesets]
+=== Modifying filesets
+
+Eldev contains quite a few variables with filesets that may be
+modified by the projects, for example, `eldev-test-fileset`,
+`eldev-standard-excludes` or `eldev-files-to-package`.  To modify
+those, you should create a <<composite-filesets,composite fileset>>
+that refers to the previous value.  For example like this:
+
+[source]
+----
+;; Make sure included sample projects are not compiled etc.
+(setf eldev-standard-excludes
+      `(:or ,eldev-standard-excludes "./samples"))
+----
+
+Previously Eldev documentation and its own source code would use
+`append` or `push` to modify existing filesets.  This turned out to be
+a bad advice, because this implicitly assumes that the modified
+filesets are <<simple-filesets,simple>> and might lead to unexpected
+results (stacktraces or filesets that don’t do what is expected) for
+any other fileset type.
+
+{since-1-2} Starting with version 1.2 Eldev will print a warning
+whenever it detects a “suspicious” modification in any of its standard
+filesets, to avoid potential bugs: `eldev-files-to-package` is no
+longer a simple filesets starting with that version, some others may
+be changed in the future too.  If your project triggers this warning,
+please modify the erroneous code (in file `Eldev` or `Eldev-local`) to
+be similar to the example above.  If you still get warnings, but are
+certain that all fileset-modifying code is correct, you can set
+variable `eldev-warn-about-suspicious-fileset-var-modifications` to
+`nil` in file `Eldev`.
 
 
 [#extending-eldev]
