@@ -1941,7 +1941,7 @@ operation, will do nothing if Emacs is too old (pre-26).
 
 Since 1.2."
   (when (fboundp 'add-variable-watcher)
-    (add-variable-watcher var (lambda (_ new-value operation _)
+    (add-variable-watcher var (lambda (_symbol new-value operation _where)
                                 (when (and eldev-warn-about-suspicious-fileset-var-modifications
                                            (memq operation '(set let))
                                            (let ((current-value (symbol-value var)))
