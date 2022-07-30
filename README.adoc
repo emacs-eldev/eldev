@@ -1015,20 +1015,37 @@ Files that are copied to the package `.tar` default to Elisp files
 plus standard documentation: `\*.info`, `doc/*.info` and files `dir`
 along those.  However, if you need to package additional files, just
 modify variable `eldev-files-to-package`.  Its value must be a
-<<filesets,fileset>>.  Best is to _add_ to the default value rather
-than replace it.  Here is an example from Eldev’s own file `Eldev`:
+<<filesets,fileset>>.  In particular, you can extend the default
+value, making a <<composite-filesets,composite fileset>>, instead of
+replacing it.  Here is an example from Eldev’s own file `Eldev`:
 
 [source]
 ----
 (setf eldev-files-to-package
-      (append eldev-files-to-package
-              '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+      `(:or ,eldev-files-to-package
+            '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
 ----
 
-Here we instruct package builder to additionally copy all files from
-subdirectory `bin`, except those with names ending in `.in` or
-`.part`.  If you distribute your package through MELPA, you will
-unfortunately need to repeat these instructions in MELPA recipe.
+Here we instruct package builder to copy all files from subdirectory
+`bin`, except those with names ending in `.in` or `.part`,
+additionally to the standard files.  If you distribute your package
+through MELPA, you will unfortunately need to repeat these
+instructions in MELPA recipe.
+
+[IMPORTANT]
+====
+Previously, the recommended way was
+
+[source]
+----
+(setf eldev-files-to-package (append eldev-files-to-package ...))
+----
+
+However, this is wrong because it assumes that
+`eldev-files-to-package` is a <<simple-filesets,simple fileset>> which
+will change in Eldev 1.2.  Replace this with code similar to the new
+recommendation above; it works with any Eldev version.
+====
 
 Normally, packages are generated in subdirectory `dist` (more
 precisely, in directory specified by `eldev-dist-dir` variable).  If
@@ -2292,6 +2309,7 @@ those: when customizing for your project you can use any valid fileset
 as a value for any of these variables.  However, for most cases simple
 filesets are all that you really need.
 
+[#simple-filesets]
 === Simple filesets
 
 From Lisp point of view, a simple fileset is a list of strings.  A
@@ -2338,6 +2356,7 @@ and subdirectories.  Git manual says: _“It is not possible to
 re-include a file if a parent directory of that file is excluded.”_
 Eldev filesets have no such exceptions.
 
+[#composite-filesets]
 === Composite filesets
 
 Eldev also supports composite filesets.  They are built using common

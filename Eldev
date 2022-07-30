@@ -1,13 +1,14 @@
 ; -*- mode: emacs-lisp; lexical-binding: t -*-
 
-(setf eldev-files-to-package (append eldev-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+(setf eldev-files-to-package `(:or ,eldev-files-to-package '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
 
-;; Avoid including files in test "projects".
-(setf eldev-standard-excludes (append eldev-standard-excludes '((eldev-pcase-exhaustive eldev-test-type
-                                                                  (`main        "./test/*/")
-                                                                  (`integration '("./test/"   "!./test/integration"))
-                                                                  (`all         '("./test/*/" "!./test/integration")))
-                                                                "./webinstall")))
+(setf eldev-standard-excludes `(:or ,eldev-standard-excludes
+                                    ;; Avoid including files in test "projects".
+                                    (eldev-pcase-exhaustive eldev-test-type
+                                                            (`main        "./test/*/")
+                                                            (`integration '("./test/"   "!./test/integration"))
+                                                            (`all         '("./test/*/" "!./test/integration")))
+                                    "./webinstall"))
 
 ;; I don't want to "fix" docstrings, especially since they are mostly meant to be printed
 ;; to console in this project.

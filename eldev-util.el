@@ -1683,6 +1683,10 @@ is non-nil when this function is called."
 
 ;; Fileset basics.
 
+(defvar eldev-warn-about-suspicious-fileset-var-modifications t
+  "Whether to warn about potentially wrong fileset modifications.
+Since 1.2")
+
 (defvar eldev-fileset-max-iterations 10
   "Fail if computed fileset elements cannot be resolved in this many iterations.")
 
@@ -1925,6 +1929,44 @@ absolute paths, but are traced without them.  See
       (or (null pattern-path-rest)
           (eldev--do-path-matches actual-path pattern-path-rest)
           (and actual-path-rest (eldev--do-path-matches actual-path-rest pattern-path))))))
+
+
+(declare-function add-variable-watcher nil)
+
+(defun eldev-watch-fileset-for-suspicious-modifications (var)
+  "Watch VAR containing a fileset for typical modification errors.
+Eldev user gets warned if any such operation is detected (or
+suspected), but otherwise they are allowed to proceed.  Optional
+operation, will do nothing if Emacs is too old (pre-26).
+
+Since 1.2."
+  (when (fboundp 'add-variable-watcher)
+    (add-variable-watcher var (lambda (_ new-value operation _)
+                                (when (and eldev-warn-about-suspicious-fileset-var-modifications
+                                           (memq operation '(set let))
+                                           (let ((current-value (symbol-value var)))
+                                             ;; Catch and warn about prepending or appending values to a
+                                             ;; fileset.  As explained in the online documentation, this is
+                                             ;; likely an error.
+                                             (and current-value new-value
+                                                  (or (eldev--smaller-list-prefix-p current-value new-value) (eldev--smaller-list-suffix-p current-value new-value)))))
+                                  (eldev-warn "Suspicious %s `%s' detected; please see https://github.com/doublep/eldev#modifying-filesets"
+                                              (if (eq operation 'set) "assignment to" "let-binding of")
+                                              var new-value)
+                                  (eldev-warn "This might result in misbehavior of code using this variable"))))))
+
+(defun eldev--smaller-list-prefix-p (list1 list2)
+  (ignore-errors
+    (while (and list1 list2 (equal (car list1) (car list2)))
+      (setf list1 (cdr list1)
+            list2 (cdr list2)))
+    (and (null list1) list2)))
+
+(defun eldev--smaller-list-suffix-p (list1 list2)
+  (ignore-errors
+    (let ((length1 (length list1))
+          (length2 (length list2)))
+      (and (< length1 length2) (equal list1 (nthcdr (- length2 length1) list2))))))
 
 
 (provide 'eldev-util)
