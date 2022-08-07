@@ -4763,10 +4763,10 @@ be passed to Emacs, else it will most likely fail."
                     (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
                                             (eldev-required-features eldev-emacs-required-features)))
                     parameters))
-        :pre-execution (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
-        :pre-execution (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
-        :die-on-error  "child Emacs"
-        (eldev--forward-process-output "Output of the child Emacs process:" "Child Emacs process produced no output")))))
+        :pre-execution  (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
+        :pre-execution  (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
+        :forward-output t
+        :die-on-error   "child Emacs"))))
 
 
 
@@ -4966,7 +4966,7 @@ Currently only Linux and macOS systems are supported."
         (eldev-call-process docker-exec args
           :pre-execution (eldev-verbose "Full command line to run a Docker process:\n  %s"
                                         (eldev-message-command-line executable command-line))
-          (eldev--forward-process-output "Output of the Docker process:" "Docker process produced no output")
+          :forward-output t
           ;; Using custom code instead of `:die-on-error' because of the hint.
           (when (/= exit-code 0)
             (signal 'eldev-error `(:hint ,(when (string-match-p "unavailable, simulating -nw" (buffer-string))
@@ -5400,8 +5400,8 @@ as two last lines of output"
                    :aliases (info dot-info)
                    :default t)
   (eldev-call-process (eldev-makeinfo-executable) `("--no-split" ,source "--output" ,target ,@(when eldev-build-suppress-warnings '("--no-warn")))
-    :die-on-error t
-    (eldev--forward-process-output)))
+    :forward-output t
+    :die-on-error t))
 
 (eldev-defbuilder eldev-builder-info-dir (sources target)
   :type           many-to-one
@@ -5413,8 +5413,8 @@ as two last lines of output"
                    "Delete `dir' file generated from `.info'."
                    :default t)
   (eldev-call-process (eldev-install-info-executable) `("--dir-file" ,target ,@sources ,@(when eldev-build-suppress-warnings '("--silent")))
-    :die-on-error t
-    (eldev--forward-process-output)))
+    :forward-output t
+    :die-on-error t))
 
 
 (declare-function eldev--do-package 'eldev-build)

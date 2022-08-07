@@ -752,9 +752,8 @@ possible to build arbitrary targets this way."
               (eldev-verbose "%s" (eldev-message-enumerate-files "Packaging the following file%s: %s (%d)" sources))
               (eldev-call-process (eldev-tar-executable) `("-cf" ,(expand-file-name package-target eldev-project-dir) ,@(nreverse files-to-tar))
                 :trace-command-line "Full command line to create package tarball"
-                (if (= exit-code 0)
-                    (eldev--forward-process-output)
-                  (eldev-warn "`tar' output (ran from directory `%s'):" working-dir)
+                :forward-output t
+                (when (/= exit-code 0)
                   (signal 'eldev-build-failed `("Failed to create package tarball `%s'" ,package-target)))))
             ;; Note that if packaging fails, `working-dir' and `descriptor-file' are not
             ;; deleted.  This is intentional.

@@ -1216,9 +1216,9 @@ See also variable `eldev-docker-executable'."
 (defmacro eldev-call-process (executable command-line &rest body)
   "Execute given process synchronously.
 Put output, both stdout and stderr, into a temporary buffer
-(but see option `:destination' below) and run BODY with this
-buffer set as current and variable `exit-code' bound to the exit
-code of the process.
+(but see options `:destination' and `:forward-output' below) and
+run BODY with this buffer set as current and variable `exit-code'
+bound to the exit code of the process.
 
 Since 0.8:
 
@@ -1247,7 +1247,8 @@ Also, eat up several options from BODY if present:
         t stands for the temporary buffer created by the macro
         itself.  You may specify a different buffer, in which
         case a temporary won't be created and the current buffer
-        is not changed.
+        is not changed.  If `:forward-output' is also specified,
+        both must either separate stdout/stderr or not.
 
     :infile FILE
 
@@ -1259,28 +1260,50 @@ Also, eat up several options from BODY if present:
         anything but zero code.  Can also be a string or a form
         evaluating to one, in which case it is used instead of
         the executable name.  Process output is also printed with
-        `eldev-warn'."
+        `eldev-warn'.
+
+Since 1.2:
+
+    :forward-output TYPE
+
+        Forward output of the child process to our stdout/stderr.
+        TYPE may evaluate to t, `stdout' and `stderr' or (also by
+        default) nil.  If TYPE is t, both stdout and stderr are
+        forwarded; however, due to Elisp limitations, they both
+        end up in our stdout!  Especially when forwarding only
+        stdout or stderr, there might be unnecessary delays,
+        again, due to Elisp limitations.  On Emacs 24
+        “forwarding” happens only after the process has finished.
+        If `:destination' is also specified, both must either
+        separate stdout/stderr or not."
   (declare (indent 2) (debug (form sexp body)))
-  (let ((evaluated-destination (make-symbol "$evaluated-destination"))
-        (temp-buffer           (make-symbol "$temp-buffer"))
-        (destination           t)
-        infile
-        pre-execution
-        trace-command-line
-        die-on-error)
+  (let* ((evaluated-destination    (make-symbol "$evaluated-destination"))
+         (evaluated-forward-output (make-symbol "$evaluated-forward-output"))
+         (temp-buffer              (make-symbol "$temp-buffer"))
+         ;; These values mean that destinations haven't been specified.
+         (destination              evaluated-destination)
+         (forward-output           evaluated-forward-output)
+         infile
+         pre-execution
+         trace-command-line
+         die-on-error)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:pre-execution      (push (pop body) pre-execution))
         (:trace-command-line (setf trace-command-line (pop body)))
         (:destination        (setf destination        (pop body)))
+        (:forward-output     (setf forward-output     (pop body)))
         (:infile             (setf infile             (pop body)))
         (:die-on-error       (setf die-on-error       (pop body)))))
-    `(let* ((executable             ,executable)
-            (command-line           ,command-line)
-            (,evaluated-destination ,destination)
+    `(let* ((executable                ,executable)
+            (command-line              ,command-line)
+            (,evaluated-destination    ,(if (eq destination evaluated-destination)
+                                            (if (eq forward-output evaluated-forward-output) t nil)
+                                          destination))
+            (,evaluated-forward-output ,(if (eq forward-output evaluated-forward-output) nil forward-output))
             ;; The temporary buffer is created only if it will be used.
-            (,temp-buffer           (when (or (eq ,evaluated-destination t) (eq (car-safe ,evaluated-destination) t))
-                                      (generate-new-buffer " *temp*"))))
+            (,temp-buffer              (when (or (eq ,evaluated-destination t) (eq (car-safe ,evaluated-destination) t))
+                                         (generate-new-buffer " *temp*"))))
        (unwind-protect
            (with-current-buffer (or ,temp-buffer (current-buffer))
              ,@(nreverse pre-execution)
@@ -1291,7 +1314,7 @@ Also, eat up several options from BODY if present:
              ;; I have no idea why `save-excursion' around `eldev--do-call-process'
              ;; wouldn't do shit, presumably on Emacs 25+.  Had to emulate it.
              (let ((output-begin (point))
-                   (exit-code    (eldev--do-call-process executable ,infile ,evaluated-destination command-line)))
+                   (exit-code    (eldev--do-call-process executable ,infile ,evaluated-destination ,evaluated-forward-output command-line)))
                (goto-char output-begin)
                ,@(when die-on-error
                    `((when (/= exit-code 0)
@@ -1306,70 +1329,124 @@ Also, eat up several options from BODY if present:
 (declare-function make-process nil)
 (declare-function make-pipe-process nil)
 
-(defun eldev--do-call-process (executable infile destination command-line)
-  (if (fboundp 'make-process)
-      ;; On Emacs 25 and up we emulate using `make-process'.  This allows us to kill the
-      ;; process if Eldev itself gets killed with C-c; currently, this should be the only
-      ;; difference compared to just using `call-process'.
-      (let* (stdout-buffer
-             stdout-file
-             stderr-buffer
-             stderr-file
-             process
-             stderr-pipe
-             dont-wait
-             (still-running t)
-             (common-sentinel (lambda (&rest _ignored) (setf still-running (or (process-live-p process) (process-live-p stderr-pipe))))))
-        (eldev-with-kill-handler (lambda ()
-                                   (when (process-live-p process)
-                                     (interrupt-process process)))
-          (unwind-protect
-              (progn
-                (pcase destination
-                  (`(:file ,_))  ; Handled below
-                  (`(,stdout ,(and (or `nil `t (pred stringp)) stderr))
-                   (unless (eq stderr t)
-                     (setf stderr-buffer (generate-new-buffer " *stderr*"))
-                     (when stderr
-                       (setf stderr-file stderr)))
-                   (setf destination stdout)))
-                (eldev-pcase-exhaustive destination
-                  (`nil)
-                  (`0                                      (setf dont-wait     t))
-                  (`t                                      (setf stdout-buffer (current-buffer)))
-                  ((pred bufferp)                          (setf stdout-buffer destination))
-                  (`(:file ,(and (pred stringp) filename)) (setf stdout-file   filename)))
-                (setf stderr-pipe (when stderr-buffer
-                                    (make-pipe-process :name (format "%s stderr" executable)
-                                                       :buffer stderr-buffer
-                                                       :sentinel common-sentinel
-                                                       :noquery t))
-                      process     (make-process :name executable
-                                                :command `(,executable ,@command-line)
-                                                :buffer stdout-buffer
-                                                :stderr stderr-pipe
-                                                :sentinel common-sentinel
-                                                :noquery t))
-                (when infile
-                  (with-temp-buffer
-                    (insert-file-contents-literally infile)
-                    (process-send-string process (buffer-string))))
-                (unless dont-wait
-                  (while still-running
-                    (accept-process-output))))
-            (when stdout-file
-              (with-current-buffer stdout-buffer
-                (write-region nil nil stdout-file)))
-            (when stderr-file
-              (with-current-buffer stderr-buffer
-                (write-region nil nil stderr-file)))
-            (when stderr-buffer
-              (kill-buffer stderr-buffer))))
-        (unless dont-wait
-          (process-exit-status process)))
-    (apply #'call-process executable infile destination nil command-line)))
+(defun eldev--do-call-process (executable infile destination forward-output command-line)
+  (unless (memq forward-output '(nil t stdout stderr))
+    (error "Unknown value of `:forward-output': %S" forward-output))
+  (when (and destination forward-output (eldev-xor (eq destination t) (eq forward-output t)))
+    (error "Incompatible `:destination' (%S) and `:forward-output' (%S)" destination forward-output))
+  (let ((use-make-process     (fboundp 'make-process))
+        (original-destination destination)
+        stdout-buffer
+        temp-stdout
+        stdout-file
+        stderr-buffer
+        stderr-file
+        dont-wait)
+    (unwind-protect
+        (progn
+          (pcase destination
+            (`(:file ,_))  ; Handled below
+            (`(,stdout ,(and (or `nil `t (pred stringp)) stderr))
+             (unless (eq stderr t)
+               (when use-make-process
+                 (setf stderr-buffer (generate-new-buffer " *stderr*")))
+               (when stderr
+                 (setf stderr-file stderr)))
+             (setf destination stdout)))
+          (eldev-pcase-exhaustive destination
+            (`nil)
+            (`0                                      (setf dont-wait     t))
+            (`t                                      (setf stdout-buffer (current-buffer)))
+            ((pred bufferp)                          (setf stdout-buffer destination))
+            (`(:file ,(and (pred stringp) filename)) (setf stdout-buffer (generate-new-buffer " *stdout*")
+                                                           temp-stdout   t
+                                                           stdout-file   filename)))
+          (setf destination original-destination)
+          (when (and (memq forward-output '(t stdout)) (null stdout-buffer))
+            (setf stdout-buffer (generate-new-buffer " *stdout*")
+                  temp-stdout   t))
+          (if use-make-process
+              ;; On Emacs 25 and up we emulate using `make-process'.  This allows us to
+              ;; kill the process if Eldev itself gets killed with C-c; currently, this
+              ;; should be the only difference compared to just using `call-process'.
+              (let* (process
+                     stderr-pipe
+                     (still-running t)
+                     (common-sentinel (lambda (&rest _ignored) (setf still-running (or (process-live-p process) (process-live-p stderr-pipe))))))
+                (eldev-with-kill-handler (lambda ()
+                                           (when (process-live-p process)
+                                             (interrupt-process process)))
+                  (when (and (eq forward-output 'stderr) (null stderr-buffer))
+                    (setf stderr-buffer (generate-new-buffer " *stderr*")))
+                  (unwind-protect
+                      (progn
+                        ;; When forwarding only stdout, we create a dummy pipe for stderr
+                        ;; only to discard it.
+                        (setf stderr-pipe (when (or stderr-buffer (eq forward-output 'stdout))
+                                            (make-pipe-process :name     (format "%s stderr" executable)
+                                                               :buffer   stderr-buffer
+                                                               :filter   (when (eq forward-output 'stderr)
+                                                                           (lambda (process string)
+                                                                             (message "%s" string)
+                                                                             (internal-default-process-filter process string)))
+                                                               :sentinel common-sentinel
+                                                               :noquery  t))
+                              process     (make-process :name     executable
+                                                        :command  `(,executable ,@command-line)
+                                                        :buffer   stdout-buffer
+                                                        :filter   (when (memq forward-output '(t stdout))
+                                                                    (lambda (process string)
+                                                                      (princ string)
+                                                                      (internal-default-process-filter process string)))
+                                                        :stderr   stderr-pipe
+                                                        :sentinel common-sentinel
+                                                        :noquery  t))
+                        (when infile
+                          (with-temp-buffer
+                            (insert-file-contents-literally infile)
+                            (process-send-string process (buffer-string))))
+                        (unless dont-wait
+                          (while still-running
+                            (accept-process-output))
+                          (process-exit-status process)))
+                    (when stdout-file
+                      (with-current-buffer stdout-buffer
+                        (write-region nil nil stdout-file)))
+                    (when stderr-file
+                      (with-current-buffer stderr-buffer
+                        (write-region nil nil stderr-file))))))
+            ;; For ancient Emacs 24 we just “forward” everything at once the process has
+            ;; finished.  I guess no-one uses it by now anyway, just want to make sure it
+            ;; still sort-of-works, since we officially support 24.4 and up.
+            (let ((temp-stderr-file (and (memq forward-output '(stdout stderr)) (null stderr-file))))
+              (unwind-protect
+                  (progn
+                    (when temp-stdout
+                      (setf (if (consp destination) (car destination) destination) stdout-buffer))
+                    (when temp-stderr-file
+                      (setf stderr-file (make-temp-file "eldev-stderr" nil "out"))
+                      (if (consp destination)
+                          (setf (cadr destination) stderr-file)
+                        (setf destination `(,destination ,stderr-file))))
+                    (prog1 (apply #'call-process executable infile destination nil command-line)
+                      (when (memq forward-output '(t stdout))
+                        (with-current-buffer stdout-buffer
+                          (princ (buffer-string))))
+                      (when (eq forward-output 'stderr)
+                        (with-temp-buffer
+                          (insert-file-contents-literally stderr-file)
+                          (message "%s" (buffer-string))))))
+                (when temp-stderr-file
+                  (ignore-errors (delete-file stderr-file)))))))
+      (when (and temp-stdout (buffer-live-p stdout-buffer))
+        (kill-buffer stdout-buffer))
+      (when (and stderr-buffer (buffer-live-p stderr-buffer))
+        (kill-buffer stderr-buffer)))))
 
 (defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
+  "Forward output captured by `eldev-call-process'.
+This is now superseded by `:forward-output' option of the latter,
+but has different enough semantics to remain useful occasionally."
   (if (= (point-min) (point-max))
       (when header-if-empty-output
         (eldev-verbose header-if-empty-output))
