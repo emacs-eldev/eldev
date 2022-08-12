@@ -12,6 +12,7 @@ endif::[]
 :empty:
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
+:uri-git-hooks: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks#_git_hooks
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
@@ -392,6 +393,23 @@ instruct Eldev to use specific package archives to download project
 dependencies.
 
 After this step, Eldev is ready to work with your project.
+
+=== Initializing a checkout
+
+If your project uses {uri-git-hooks}[Git hooks], you can take
+advantage of Eldev’s command `githooks` to install them:
+
+    $ eldev githooks
+    Installed as symbolic link: ‘.git/hooks/pre-commit’ -> ‘githooks/pre-commit’
+
+Eldev doesn’t try to enforce any hooks on you, instead, it only
+symlinks the files the project has in directory `githooks` to the
+place Git expects them.  For security reasons, Git doesn’t activate
+any hooks by default upon repository cloning, this has to be an
+explicit decision — be that copying by hands or an Eldev invocation.
+
+If you don’t have such a subdirectory, command will not do anything
+and will also not be shown in the output of `eldev help`.
 
 [#setup-procedure]
 == Setup procedure in details
