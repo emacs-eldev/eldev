@@ -5505,6 +5505,8 @@ will fail if the project already has file named `Eldev'."
 
 (defvar eldev-githooks-command-active #'eldev--githooks-command-active)
 
+(declare-function eldev--do-githooks 'eldev-vc)
+
 ;; This is also about initializing, only the checkout.
 (eldev-defcommand eldev-githooks (&rest parameters)
   "Install project-recommended Git hooks.  All files from
