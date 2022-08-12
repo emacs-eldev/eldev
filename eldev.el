@@ -5477,7 +5477,7 @@ documentation."
 
 
 
-;; eldev init
+;; eldev init, eldev githooks
 
 (defvar eldev-init-interactive t)
 
@@ -5498,6 +5498,36 @@ will fail if the project already has file named `Eldev'."
   ("Don't ask any questions"
    :options       (-n --non-interactive))
   :for-command    init)
+
+
+(defvar eldev-githooks-force nil
+  "Overwrite existing hooks if needed.")
+
+(defvar eldev-githooks-command-active #'eldev--githooks-command-active)
+
+;; This is also about initializing, only the checkout.
+(eldev-defcommand eldev-githooks (&rest parameters)
+  "Install project-recommended Git hooks.  All files from
+subdirectory `githooks' in the project root get symlinked to
+`.git/hooks'."
+  :aliases        install-githooks
+  :hidden-if      (not (funcall eldev-githooks-command-active))
+  (when parameters
+    (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
+  (require 'eldev-vc)
+  (eldev--do-githooks))
+
+(eldev-defbooloptions eldev-githooks-force-mode eldev-githooks-keep-existing-mode eldev-githooks-force
+  ("Overwrite existing installed Git hooks"
+   :options       (-f --force))
+  ("Keep existing installed Git hooks"
+   :options       --keep-installed
+   :hidden-if     :default)
+  :for-command    githooks)
+
+(defun eldev--githooks-command-active ()
+  (and (eldev-find-files "./githooks/*")
+       (eq (eldev-vc-detect) 'Git)))
 
 
 (provide 'eldev)

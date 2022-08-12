@@ -276,4 +276,24 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
         nil))))
 
 
+(defun eldev--do-githooks ()
+  (unless (eq (eldev-vc-detect) 'Git)
+    (signal 'eldev-error `("Directory `%s' doesn't appear to be a Git checkout" ,(abbreviate-file-name eldev-project-dir))))
+  (let ((num-installed 0)
+        (num-other     0))
+    (dolist (hook (eldev-find-files "./githooks/*"))
+      (let ((link-as (replace-regexp-in-string (rx bos "githooks") ".git/hooks" hook t t)))
+        (condition-case nil
+            (progn (make-symbolic-link (expand-file-name hook eldev-project-dir) (expand-file-name link-as eldev-project-dir) eldev-githooks-force)
+                   (setf num-installed (1+ num-installed))
+                   (eldev-print "Installed as symbolic link: `%s' -> `%s'" link-as hook))
+          (file-already-exists (unless (file-equal-p link-as hook)
+                                 (eldev-warn "Hook file `%s' exists and doesn't match `%s'" link-as hook)
+                                 (setf num-other (1+ num-other)))))))
+    (if (> num-other 0)
+        (eldev-print "Use option `--force' to replace %s" (if (= num-other 1) "the existing hook file" "existing hook files"))
+      (when (= num-installed 0)
+        (eldev-print "Nothing to do")))))
+
+
 (provide 'eldev-vc)

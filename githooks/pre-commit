@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# This can be used in a comment as a reminder to self.
+git diff-index --cached -S "DONOTCOMMIT" HEAD --patch --exit-code ":!githooks" \
+    || { echo; echo "Have you forgotten about the “DONOTCOMMIT”?"; exit 1; }
