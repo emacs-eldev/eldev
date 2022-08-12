@@ -9,6 +9,7 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:empty:
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
 :uri-flycheck: https://www.flycheck.org/
@@ -41,6 +42,7 @@ endif::[]
 :uri-logview: https://github.com/doublep/logview
 :uri-datetime: https://github.com/doublep/datetime
 :uri-docker-emacs: https://github.com/Silex/docker-emacs
+:uri-emacs-forwarding: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
@@ -79,15 +81,35 @@ toc::[]
 
 Eldev features:
 
-* Eldev configuration is Elisp.  It can change many defaults or even
-  define additional commands and options.
-* Built-in support for regression/unit testing.
-* There are _four_ levels of configuration — you can customize most
-  aspects of Eldev for your project needs and personal preferences.
-* You can use local dependencies, even those that don’t use Eldev
-  (though some restrictions do apply, of course).  This is similar to
-  Cask linking, but with more flexibility.
-* Runs on all major operating systems: Linux, macOS, Windows.
+* Eldev configuration is Elisp.  It can change many defaults, add
+  special cases for Emacs versions and much more — even define
+  additional Eldev commands and options.
+* Built-in <<testing,support for regression/unit testing>>.
+* Blends nicely into <<continuous-integration,continuous
+  integration>> setups.
+* Can run on <<different-emacs-versions,different Emacs version>> even
+  on the same machine; can also use <<docker,Docker>> for that.
+* There are <<setup-procedure,_four_ levels of configuration>> — you
+  can customize most aspects of Eldev for your project needs and
+  personal preferences.
+* <<dependencies,Project dependency>> downloading, installation etc.
+  is fully automated, you only need to specify which Elisp package
+  archive(s) to use.
+* You can also use <<local-dependencies,local dependencies>>, even
+  those that don’t use Eldev (some restrictions still apply).  This
+  is similar to Cask linking, but with more flexibility.
+* Full support for <<autoloads,autoloads>> during development.
+* Miscellaneous operations useful during development:
+  <<running-emacs,running Emacs>> with only your project,
+  <<linting,linting>> source code, <<evaluating,evaluating
+  expressions>> in project’s context, <<profiling,profiling>>.
+* Eldev by default <<project-isolation,isolates>> your project for
+  development, helping you to distinguish between problems with setup
+  or configuration and inherent bugs in the project.
+* Full-featured <<build-system,build system>> for complex projects.
+* Can <<debugging-features,help you debug your code>>.
+* <<requirements,Runs on all major operating systems>>: Linux, macOS,
+  Windows.
 * Eldev is fast.
 
 Drawbacks:
@@ -99,8 +121,8 @@ Drawbacks:
 * Eldev depends much more on Emacs internals.  It is more likely to
   break with future Emacs versions than Cask.
 
-Eldev is not widely used, but as of April 2021 there are
-{uri-search-github}[around 50 projects on GitHub] that include file
+Eldev is not widely used, but as of August 2022 there are
+{uri-search-github}[around 120 projects on GitHub] that include file
 `Eldev`, so it is already quite well tested in the wild.
 Additionally, Eldev contains a fairly large regression test
 collection.
@@ -154,6 +176,7 @@ Various elements of files `Eldev` in these projects are documented
 below.
 
 
+[#requirements]
 == Requirements
 
 Eldev runs on Emacs 24.4 and up.  On earlier Emacs versions it will be
@@ -476,6 +499,7 @@ usual in Eldev, you can make it the default in file
 `~/.config/eldev/config` if you want.
 
 
+[#dependencies]
 == Project dependencies
 
 Eldev picks up project dependencies from package declaration,
@@ -863,6 +887,7 @@ You can always ask Eldev for a full list:
 
     $ eldev --list-modes
 
+[#autoloads]
 === Autoloads
 
 {since-0-6} Autoloaded functions of installed Elisp packages can be
@@ -882,6 +907,7 @@ loading mode.  If the autoloads file is kept up-to-date using
 needed in local dependencies too.
 
 
+[#build-system]
 == Build system
 
 Eldev comes with quite a sofisticated build system.  While by default
@@ -1625,6 +1651,7 @@ linting in <<continuous-integration,continuous integration>> should
 you want to do that.
 
 
+[#evaluating]
 == Quickly evaluating expressions
 
 It is often useful to evaluate Elisp expressions in context of the
@@ -1718,6 +1745,7 @@ Or:
 at code profiling.  See <<profiling-eval,relevant section below>>.
 
 
+[#running-emacs]
 == Running Emacs
 
 Sometimes you want to run Emacs with _just_ your project installed and
@@ -1859,6 +1887,7 @@ ____
 Therefore, if you use byte-compilation and switch Emacs versions,
 don’t forget to clean the directory.
 
+[#docker]
 === Using Docker
 
 Alternatively, if you are on a Linux or macOS system and have
@@ -1885,10 +1914,12 @@ or evaluate something using project’s functions:
 
     $ eldev docker 26.3 eval "(my-project-read-data \"foo.bin\")"
 
-Because of Elisp limitations, however, output generated by such
-commands will be available only all at once, after they have finished.
-So, it is possible to have a long delay without any output.  In a
-future version, Eldev might try to improve on this.
+Docker’s output is forwarded to normal Eldev output, however, because
+of {uri-emacs-forwarding}[Elisp limitations], it all ends up on
+Eldev’s stdout!  There might also be unwieldy delays, so that output
+doesn’t come smoothly as generated by the process inside Docker, but
+instead in larger chunks.  Before Eldev 1.2 the output would instead
+only appear when Docker has exited.
 
 It is also possible to use a custom image.  For this, replace Emacs
 version argument (26.3 in the last example above) with the full image
@@ -2112,7 +2143,7 @@ Eldev scripts.
 
 * Global option `-d` (`--debug`) makes Eldev print backtrace if it
   dies with a Elisp signal (except certain well-defined and explained
-  errors like missing dependency).
+  errors like a missing dependency).
 
 * {since-0-3} Global option `-Q` (`--backtrace-on-abort`) makes Eldev
   print backtrace if it is aborted with `^C`.  This is useful if your
