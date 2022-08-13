@@ -3,7 +3,7 @@
 
 ;; Not profiling itself, only setup.  Don't create a test per name pair to avoid unneeded
 ;; noise: this is not some important functionality.
-(ert-deftest eldev--test-profile-derive-memory-file-1 ()
+(ert-deftest eldev-profile-derive-memory-file-1 ()
   (dolist (names '(("cpu.prof"                  "mem.prof")
                    ("~/cpu/bar/cpu.prof"        "~/cpu/bar/mem.prof")
                    ("cpu-cpu.prof"              "mem-mem.prof")

@@ -161,6 +161,7 @@
     (eldev--test-run nil ("init" "--non-interactive")
       (should (string= stdout (eldev-format-message "Created file `%s' for this project\nModified property `svn:ignore'\n" eldev-file)))
       (eldev-call-process (eldev-svn-executable) '("propget" "svn:ignore" ".")
+        :discard-ansi t
         (should (string= (string-trim (buffer-string)) (eldev-format-message "\
 .eldev
 Eldev-local")))

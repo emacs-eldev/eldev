@@ -486,6 +486,27 @@ Since 1.1.1."
       number)))
 
 
+(defmacro eldev-with-file-buffer (file &rest body)
+  "Execute in a buffer with FILE and write results back.
+Since 1.2."
+  (declare (indent 1) (debug (stringp sexp body)))
+  (let ((filename (make-symbol "$filename")))
+    `(let ((,filename ,file))
+       (with-temp-buffer
+         (ignore-errors (insert-file-contents ,filename t))
+         ,@body
+         (let ((backup-inhibited t))
+           (eldev--silence-file-writing-message ,filename
+             (save-buffer)))))))
+
+(defun eldev-write-to-file (file &optional from to)
+  "Write current buffer's contents to FILE.
+Since 1.2."
+  (if (or from to)
+      (write-region (or from (point-min)) (or to (point-max)) file nil 'no-message)
+    (write-region nil nil file nil 'no-message)))
+
+
 
 ;; Output.
 
@@ -894,7 +915,8 @@ Since 0.2."
   (declare (indent 1) (debug (sexp body)))
   `(eldev-advised (#'message :around (when (< emacs-major-version 25)
                                        (lambda (original &rest arguments)
-                                         (unless (and (member (car arguments) '("Wrote %s" "Saving file %s...")) (equal (cadr arguments) ,filename))
+                                         (unless (or (equal (car arguments) "(No changes need to be saved)")
+                                                     (and (member (car arguments) '("Wrote %s" "Saving file %s...")) (equal (cadr arguments) ,filename)))
                                            (apply original arguments)))))
      ,@body))
 
@@ -1275,18 +1297,27 @@ Since 1.2:
         again, due to Elisp limitations.  On Emacs 24
         “forwarding” happens only after the process has finished.
         If `:destination' is also specified, both must either
-        separate stdout/stderr or not."
+        separate stdout/stderr or not.
+
+    :discard-ansi
+
+        Discard ANSI control sequences in all destination
+        buffers; see `eldev-discard-ansi-control-sequences'.
+        Note that this doesn't affected forwarded output: that
+        may still have control sequences."
   (declare (indent 2) (debug (form sexp body)))
   (let* ((evaluated-destination    (make-symbol "$evaluated-destination"))
          (evaluated-forward-output (make-symbol "$evaluated-forward-output"))
          (temp-buffer              (make-symbol "$temp-buffer"))
+         (output-begin             (make-symbol "$output-begin"))
          ;; These values mean that destinations haven't been specified.
          (destination              evaluated-destination)
          (forward-output           evaluated-forward-output)
          infile
          pre-execution
          trace-command-line
-         die-on-error)
+         die-on-error
+         discard-ansi)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:pre-execution      (push (pop body) pre-execution))
@@ -1294,7 +1325,8 @@ Since 1.2:
         (:destination        (setf destination        (pop body)))
         (:forward-output     (setf forward-output     (pop body)))
         (:infile             (setf infile             (pop body)))
-        (:die-on-error       (setf die-on-error       (pop body)))))
+        (:die-on-error       (setf die-on-error       (pop body)))
+        (:discard-ansi       (setf discard-ansi       (pop body)))))
     `(let* ((executable                ,executable)
             (command-line              ,command-line)
             (,evaluated-destination    ,(if (eq destination evaluated-destination)
@@ -1313,9 +1345,9 @@ Since 1.2:
                                 (eldev-message-command-line executable command-line))))
              ;; I have no idea why `save-excursion' around `eldev--do-call-process'
              ;; wouldn't do shit, presumably on Emacs 25+.  Had to emulate it.
-             (let ((output-begin (point))
-                   (exit-code    (eldev--do-call-process executable ,infile ,evaluated-destination ,evaluated-forward-output command-line)))
-               (goto-char output-begin)
+             (let ((,output-begin (point))
+                   (exit-code     (eldev--do-call-process executable ,infile ,evaluated-destination ,evaluated-forward-output ,discard-ansi command-line)))
+               (goto-char ,output-begin)
                ,@(when die-on-error
                    `((when (/= exit-code 0)
                        (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
@@ -1329,7 +1361,7 @@ Since 1.2:
 (declare-function make-process nil)
 (declare-function make-pipe-process nil)
 
-(defun eldev--do-call-process (executable infile destination forward-output command-line)
+(defun eldev--do-call-process (executable infile destination forward-output discard-ansi command-line)
   (unless (memq forward-output '(nil t stdout stderr))
     (error "Unknown value of `:forward-output': %S" forward-output))
   (when (and destination forward-output (eldev-xor (eq destination t) (eq forward-output t)))
@@ -1409,12 +1441,18 @@ Since 1.2:
                           (while still-running
                             (accept-process-output))
                           (process-exit-status process)))
-                    (when stdout-file
+                    (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer
-                        (write-region nil nil stdout-file)))
-                    (when stderr-file
+                        (when discard-ansi
+                          (eldev-discard-ansi-control-sequences))
+                        (when stdout-file
+                          (eldev-write-to-file stdout-file))))
+                    (when (buffer-live-p stderr-buffer)
                       (with-current-buffer stderr-buffer
-                        (write-region nil nil stderr-file))))))
+                        (when discard-ansi
+                          (eldev-discard-ansi-control-sequences))
+                        (when stderr-file
+                          (eldev-write-to-file stderr-file)))))))
             ;; For ancient Emacs 24 we just “forward” everything at once the process has
             ;; finished.  I guess no-one uses it by now anyway, just want to make sure it
             ;; still sort-of-works, since we officially support 24.4 and up.
@@ -1435,7 +1473,15 @@ Since 1.2:
                       (when (eq forward-output 'stderr)
                         (with-temp-buffer
                           (insert-file-contents-literally stderr-file)
-                          (message "%s" (buffer-string))))))
+                          (message "%s" (buffer-string))))
+                      ;; Only discard after "forwarding".
+                      (when discard-ansi
+                        (when (buffer-live-p stdout-buffer)
+                          (with-current-buffer stdout-buffer
+                            (eldev-discard-ansi-control-sequences)))
+                        (when stderr-file
+                          (eldev-with-file-buffer stderr-file
+                            (eldev-discard-ansi-control-sequences))))))
                 (when temp-stderr-file
                   (ignore-errors (delete-file stderr-file)))))))
       (when (and temp-stdout (buffer-live-p stdout-buffer))
@@ -1455,6 +1501,14 @@ but has different enough semantics to remain useful occasionally."
     (if only-when-verbose
         (eldev-verbose "%s" (buffer-string))
       (eldev-output :nolf "%s" (buffer-string)))))
+
+
+(defun eldev-discard-ansi-control-sequences ()
+  "Discard all ANSI control sequences in the current buffer.
+Since 1.2."
+  (eval-and-compile (require 'ansi-color))
+  (let ((ansi-color-context-region nil))
+    (ansi-color-filter-region (point-min) (point-max))))
 
 
 

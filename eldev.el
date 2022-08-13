@@ -1410,7 +1410,7 @@ as-is.  Otherwise, it is formatted with `prin1-to-string'."
   (with-temp-buffer
     (insert-file-contents source)
     (eldev-substitute-in-buffer open-string close-string)
-    (write-region nil nil target nil 'no-message)))
+    (eldev-write-to-file target)))
 
 (defun eldev-substitute-in-buffer (&optional open-string close-string)
   "Substitute Elisp expressions in the current buffer.
@@ -1850,7 +1850,7 @@ Since 0.2."
                       (when (and (boundp 'url-http-response-status) (eq url-http-response-status 200))
                         (make-directory (file-name-directory cache-path) t)
                         (let ((coding-system-for-write 'binary))
-                          (write-region nil nil cache-path nil 'no-message))))
+                          (eldev-write-to-file cache-path))))
                     ;; Discard any cached signatures.
                     (unless (string-suffix-p ".sig" filename)
                       (ignore-errors (delete-file (concat cache-path ".sig")))))
@@ -2573,6 +2573,7 @@ descriptor."
                                     (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
               (eldev--forward-process-output "Output of the child Eldev process:" "Child Eldev process produced no output" t)
               (when (string= (car command) "package")
+                (eldev-discard-ansi-control-sequences)
                 (goto-char (point-max))
                 (forward-line -2)
                 (let ((point (point)))
@@ -4675,7 +4676,10 @@ obligations."
               (setf eldev--internal-eval-cache-modified t)
               (eldev-trace "Discarded cached value for form `%S' in directory `%s' as `Eldev' and/or `Eldev-local' are newer" form project-dir))))
         (let ((default-directory project-dir))
-          (eldev-call-process (eldev-shell-command) `("--quiet" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
+          ;; In this particular case it's probably better not to do anything with the output, since
+          ;; the evaluated form might, in principle, result in anything.  Just tell the child
+          ;; process not to use the color and hope that sticks.
+          (eldev-call-process (eldev-shell-command) `("--quiet" "--color=never" "exec" "--dont-load" ,(prin1-to-string `(prin1 ,form)))
             :destination   '(t nil)
             :pre-execution (eldev-trace "Starting a child Eldev process to evaluate form `%S' in directory `%s'" form project-dir)
             ;; Not using `:die-on-error' because we need a custom message.

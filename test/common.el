@@ -62,8 +62,9 @@
        (unwind-protect
            ;; Using `eldev-call-process' here mostly for a bit of testing for it.
            (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) ,actual-command-line)
-             :destination `(t ,stderr-file)
-             :infile      process-input-file
+             :destination  `(t ,stderr-file)
+             :discard-ansi t
+             :infile       process-input-file
              (let* ((stdout    (buffer-string))
                     (stderr    (with-temp-buffer
                                  (insert-file-contents stderr-file)

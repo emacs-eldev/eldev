@@ -252,7 +252,8 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
       (if (eq backend 'SVN)
           ;; This can return non-null status if there is no such property yet.
           (eldev-call-process (eldev-svn-executable) '("propget" "svn:ignore" ".")
-            :destination `(,(current-buffer) nil))
+            :destination  `(,(current-buffer) nil)
+            :discard-ansi t)
         (condition-case nil
             (insert-file-contents .ignore t)
           ;; Pre-26 Emacsen don't know about `file-missing', so catch broadly.
@@ -272,7 +273,7 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                 "\n"))
       (if (eq backend 'SVN)
           (/= (eldev-call-process (eldev-svn-executable) `("propset" "svn:ignore" ,(buffer-string) ".")) 0)
-        (write-region nil nil .ignore nil 'quiet)
+        (eldev-write-to-file .ignore)
         nil))))
 
 
