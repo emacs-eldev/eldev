@@ -82,7 +82,7 @@
 (eval-and-compile
   (dolist (autoloads '(("eldev-build"   eldev-build-find-targets eldev-get-target-dependencies eldev-set-target-dependencies eldev-build-target-status eldev-build-target)
                        ("eldev-plugins" eldev-active-plugins eldev-use-plugin)
-                       ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev-vc-synchronize-dir
+                       ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev--vc-set-up-buffer eldev-vc-synchronize-dir
                                         eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))

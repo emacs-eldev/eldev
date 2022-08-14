@@ -18,7 +18,8 @@
 ;;; Code:
 
 (require 'eldev)
-(eval-when-compile (require 'eldev-vc))
+(require 'eldev-vc)
+(require 'lisp-mnt)
 
 
 ;; To silence byte-compilation warnings on Emacs 24-25 and also make code in
