@@ -233,7 +233,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
      ,@body))
 
 (defun eldev--test-switch-vc-branch (vc-backend branch-name)
-  (unless (eldev-external-filename (file-relative-name (eldev--test-project-dir) eldev-project-dir))
+  (unless (eldev-external-or-absolute-filename (file-relative-name (eldev--test-project-dir) eldev-project-dir))
     (error "Refusing to switch branches in non-external project"))
   (let ((default-directory (eldev--test-project-dir)))
     (dolist (command (eldev-pcase-exhaustive vc-backend

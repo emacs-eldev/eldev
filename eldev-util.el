@@ -355,7 +355,10 @@ unmodified."
 
 (defsubst eldev-external-filename (filename)
   "Determine if FILENAME specifies a path outside current directory.
-This function doesn't handle absolute paths specially."
+This function doesn't handle absolute paths specially, so in most
+cases you should use `eldev-external-or-absolute-filename'
+instead.  Remember that `file-relative-name' may return an
+absolute path, when networking or Windows is involved."
   (or (string= filename "..") (string-prefix-p "../" filename)))
 
 (defsubst eldev-external-or-absolute-filename (filename)
