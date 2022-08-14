@@ -18,6 +18,7 @@
 ;;; Code:
 
 (require 'eldev)
+(eval-when-compile (require 'eldev-vc))
 
 
 ;; To silence byte-compilation warnings on Emacs 24-25 and also make code in
@@ -49,6 +50,7 @@ Since 0.3."
   (unless (assq plugin eldev--active-plugin-documentation)
     (push `(,plugin . ,(pcase plugin
                          (`autoloads  (eldev--autoloads-plugin  configuration))
+                         (`maintainer (eldev--maintainer-plugin configuration))
                          (`undercover (eldev--undercover-plugin configuration))
                          (_ (error "Unknown plugin `%s'" plugin))))
           eldev--active-plugin-documentation)))
@@ -149,6 +151,459 @@ out-of-date."
                  (let ((case-fold-search nil))
                    (re-search-forward (rx bol (0+ space) ";;;###autoload" (0+ space) eol) nil t)))
                (eldev-find-files eldev--collect-autoloads-from)))
+
+
+
+;; Maintainer.
+
+;; Various variables are defined in `eldev.el'.
+
+(defun eldev--maintainer-plugin (_configuration)
+  "Plugin adding commands for project maintainer use.  Currently,
+actually, only one command: `release' that helps you automate
+creation of project releases.
+
+It is recommended to modify various plugin-specific variables
+(`eldev-release-*') in file `Eldev', but let specific developers
+activate the plugin in their `Eldev-local'."
+  (eldev-defcommand eldev-release (&rest parameters)
+    "Prepare and create a release of the project.  When running
+interactively (the default), you can also type in VERSION at
+runtime.
+
+This will create one or two commits (depending on project
+configuration) and possibly a tag.  Additional project-specific
+operations that e.g. automatically update some documentation
+parts are possible too.  However, the commits will not be pushed.
+Instead, this is left for you to do once you have verified that
+the commits look like you want.
+
+This command has many variables (`eldev-release-*') that control
+its behavior and are not settable from the command line.
+Instead, they should be customized in file `Eldev', on a
+per-project basis."
+    :parameters   "VERSION"
+    (eldev--maintainer-release parameters))
+  (eldev-defbooloptions eldev-release-ignore-untracked eldev-release-notice-untracked eldev-release-ignore-untracked
+    ("Ignore untracked files"
+     :options       (-u --ignore-untracked))
+    ("Don't release if there are any untracked files"
+     :options       (-U --notice-untracked))
+    :for-command    release)
+  (eldev-defbooloptions eldev-release-skip-file-checks eldev-release-perform-file-checks eldev-release-skip-file-checks
+    ("Skip file contents checks"
+     :options       --no-file-checks)
+    ("Perform file contents checks as configured"
+     :options       (-F --perform-file-checks)
+     :hidden-if     :default)
+    :for-command    release)
+  (eldev-defbooloptions eldev-release-skip-testing eldev-release-perform-testing eldev-release-skip-testing
+    ("Skip any configured project testing"
+     :options       --no-testing)
+    ("Perform project testing as configured"
+     :options       (-T --perform-testing)
+     :hidden-if     :default)
+    :for-command    release)
+  (eldev-defoption eldev-release-set-commit-message (message)
+    "Set the message for release commit"
+    :options        (-m --message)
+    :for-command    release
+    :value          MESSAGE
+    :default-value  "see `eldev-release-commit-message'"
+    (setf eldev-release-commit-message message))
+  (eldev-defoption eldev-release-set-post-release-commit-message (message)
+    "Set the message for release commit"
+    :options        (-M --post-release-commit-message)
+    :for-command    release
+    :value          MESSAGE
+    :default-value  "see `eldev-release-post-release-commit-message'"
+    (setf eldev-release-commit-message message))
+  (eldev-defoption eldev-release-set-commit-message (message)
+    "Set the message for release commit"
+    :options        (-m --message)
+    :for-command    release
+    :value          MESSAGE
+    :default-value  "see variable `eldev-release-commit-message'"
+    (setf eldev-release-commit-message message))
+  (eldev-defbooloptions eldev-release-interactive-mode eldev-release-non-interactive-mode eldev-release-interactive
+    ("Ask before all non-trivial release steps"
+     :options       (-i --interactive))
+    ("Release without user interaction if configured validations pass"
+     :options       (-N --non-interactive --go))
+    :for-command    release)
+  (eldev-defbooloptions eldev-release-dry-run-mode eldev-release-do-release-mode eldev-release-dry-run-mode
+    ("Don't actually modify anything, just validate"
+     :options       (-n --dry-run))
+    ("Do release as requested"
+     :options       --do-release
+     :hidden-if     :default)
+    :for-command    release)
+  (eldev-documentation 'eldev--maintainer-plugin))
+
+
+(defun eldev--maintainer-release (parameters)
+  (let ((current-version (package-desc-version (eldev-package-descriptor))))
+    (when (cdr parameters)
+      (signal 'eldev-wrong-command-usage `(t "Unexpected parameters to the command")))
+    (unless parameters
+      (when eldev-release-interactive
+        (eldev-output "Enter a version or one of %s" (eldev-message-enumerate "string" eldev-release-version-incrementors 'car nil t))
+        (setf parameters `(,(eldev-read-string (eldev-format-message "Version to release (current is %s): " (eldev-message-version current-version t)))))))
+    (unless (and parameters (> (length (car parameters)) 0))
+      (signal 'eldev-wrong-command-usage `(t "Missing version to release")))
+    (let ((version (eldev--release-compute-new-version (car parameters) current-version)))
+      (eldev-print "Preparing to release %s %s..." (eldev-colorize (eldev-formatted-project-name) 'name) (eldev-message-version version t))
+      (eldev-named-step "releasing" "validating the release"
+        (eldev-verbose "%s..." (eldev-current-step-name t))
+        (dolist (validator (eldev-listify eldev-release-validators))
+          (funcall validator version)))
+      (eldev-print :color 'section "\nReleasing %s %s..." (eldev-formatted-project-name) (eldev-message-version version))
+      (eldev-named-step "releasing" "preparing the release commit"
+        (eldev-verbose "%s..." (eldev-current-step-name t))
+        ;; We call these functions even in dry-run mode, thus letting them produce
+        ;; essential output etc.  The functions themselves are supposed to refrain from
+        ;; modifying anything when in dry-run mode.
+        (dolist (preparator (eldev-listify eldev-release-preparators))
+          (funcall preparator version))
+        (eldev--release-write-new-version version current-version))
+      (eldev--release-commit "committing release changes"
+                             (eldev--release-format-message "Release commit message: " eldev-release-commit-message version))
+      (eldev-named-step "releasing" "tagging the release commit"
+        (eldev-verbose "%s..." (eldev-current-step-name t))
+        (let ((tag-name (when eldev-release-tag-function (funcall eldev-release-tag-function version))))
+          (if tag-name
+              (progn (unless eldev-release-dry-run-mode
+                       (eldev-with-errors-as 'eldev-error (eldev-vc-create-tag tag-name)))
+                     (eldev-print "\nTagged the release commit as `%s'" (eldev-colorize tag-name 'name)))
+            (eldev-verbose "Should not be tagged according to `eldev-release-tag-function'"))))
+      (let ((post-release-version (when eldev-release-post-release-commit version)))
+        (when (functionp eldev-release-post-release-commit)
+          (eldev-named-step "releasing" "computing post-release version"
+            (setf post-release-version (eldev--release-do-increment-version eldev-release-post-release-commit version))))
+        (when post-release-version
+          (when (version-list-< post-release-version version)
+            (signal 'eldev-error `("Post-release version %s is older than the released version %s"
+                                   (eldev-message-version post-release-version) (eldev-message-version version))))
+          (eldev-named-step "releasing" "preparing the post-release commit"
+            (eldev-verbose "%s..." (eldev-current-step-name t))
+            ;; Intentionally also called in dry-run mode, see above.
+            (dolist (post-release-preparator (eldev-listify eldev-release-post-release-preparators))
+              (funcall post-release-preparator version post-release-version))
+            (unless (equal post-release-version version)
+              (eldev--release-write-new-version post-release-version version)
+              (eldev-print "\nPost-release version: %s" (eldev-message-version post-release-version))))
+          (eldev--release-commit "committing post-release changes"
+                                 (eldev--release-format-message "Post-release commit message: " eldev-release-post-release-commit-message version))))
+      (eldev-print :color 'section "\nReleased %s %s" (eldev-formatted-project-name) (eldev-message-version version))
+      (eldev-print "Don't forget to push after verifying the created commits"))))
+
+(defun eldev--release-compute-new-version (as-string current-version)
+  (let* ((incrementor (cdr (assoc as-string eldev-release-version-incrementors)))
+         (min-length  (min (or eldev-release-min-version-size 1) 4))
+         (version     (eldev-named-step "releasing" (if incrementor
+                                                        (eldev-format-message "applying incrementor `%s' to version `%s'" as-string (eldev-message-version current-version))
+                                                      (eldev-format-message "parsing version `%s'" as-string))
+                        (condition-case error
+                            (if incrementor
+                                (let ((version (eldev--release-do-increment-version incrementor current-version)))
+                                  (when eldev-release-interactive
+                                    (unless (eldev-y-or-n-p (eldev-format-message "\nNew version number would be %s; proceed? " (eldev-message-version version t)))
+                                      (signal 'eldev-quit 1))
+                                    (eldev-print ""))
+                                  version)
+                              (version-to-list as-string))
+                          (eldev-quit (signal 'eldev-quit (cdr error)))
+                          (error (signal 'eldev-error `(,(error-message-string error))))))))
+    (when (< (length version) min-length)
+      (error (signal 'eldev-error `(:hint ,(eldev-format-message "Minimal number of components is %d according to `eldev-release-min-version-size'" min-length)
+                                          "Version `%s' has too few components (%d)" ,(eldev-message-version version) ,(length version)))))
+    version))
+
+(defun eldev--release-do-increment-version (incrementor version)
+  (setf version (funcall incrementor version))
+  (when (stringp version)
+    (setf version (version-to-list version)))
+  (while (and (consp version) (< (length version) (min (or eldev-release-min-version-size 1) 4)))
+    (setf version (append version '(0))))
+  version)
+
+(defun eldev--release-write-new-version (new-version current-version)
+  (let ((file (eldev-project-main-file)))
+    (eldev-trace "Replacing package version %s with %s in file `%s'..." (eldev-message-version current-version) (eldev-message-version new-version) file)
+    (unless eldev-release-dry-run-mode
+      (eldev-with-file-buffer file
+        (if (file-equal-p file (eldev-package-descriptor-file-name))
+            (let ((description-form (save-excursion (read (current-buffer)))))
+              (unless (and (eq (car-safe description-form) 'define-package)
+                           (let ((version (car-safe (cdr-safe (cdr description-form)))))
+                             (and (stringp version) (equal (version-to-list version) current-version))))
+                (error "Cannot detect package descriptor form in file `%s'" (file-relative-name file eldev-project-dir)))
+              (down-list)
+              (forward-sexp 3)
+              (let ((to (point)))
+                (forward-sexp -1)
+                (delete-region (point) to)
+                ;; FIXME: Escape the string?  Likely not needed for a version.
+                (insert (prin1-to-string (eldev-message-version new-version)))))
+          (let ((version (or (lm-header "package-version") (lm-header "version"))))
+            (unless (and version (equal (version-to-list version) current-version))
+              (error "Cannot detect package version header in file `%s'" (file-relative-name file eldev-project-dir)))
+            (delete-region (point) (save-excursion (end-of-line) (point)))
+            (insert (eldev-message-version new-version))))))))
+
+(defun eldev--release-format-message (prompt message version-list)
+  (setf message (if message
+                    (with-temp-buffer
+                      (insert message)
+                      (goto-char 1)
+                      (eldev-substitute-in-buffer nil nil `((formatted-name . ,(eldev-formatted-project-name))
+                                                            (version-string . ,(eldev-message-version version-list))))
+                      (buffer-string))
+                  ""))
+  ;; Tried to use `eldev-read-string', but non-interactive Emacs' editing facilities are
+  ;; awful; let user use the command line option to replace instead.
+  (ignore prompt)
+  message)
+
+(defun eldev--release-commit (step-name commit-message)
+  (unless eldev-release-dry-run-mode
+    (eldev-named-step "releasing" step-name
+      (eldev-verbose "%s..." (eldev-current-step-name t))
+      (eldev-with-vc-buffer nil
+        ;; Ignore VCS-untracked files: pre-existing could be ignored using command line
+        ;; option `-u'; if a commit preparator creates a file, then it needs to register it
+        ;; explicitly.
+        (let ((files (mapcar #'car (eldev-filter (memq (cdr it) '(edited added removed)) (vc-dir-child-files-and-states)))))
+          ;; Would "helpfully" issue a message about ending the commit message, even
+          ;; though we already provide it.
+          (let ((inhibit-message t))
+            (vc-checkin files backend commit-message)))
+        (eldev-print "\nCreated commit %s:" (eldev-colorize (eldev-vc-commit-id t) 'name))
+        (eldev-print "%s" commit-message)))))
+
+(defun eldev-release-next-major-version (version)
+  (eldev-release-next-pos-version version 0))
+
+(defun eldev-release-next-minor-version (version)
+  (eldev-release-next-pos-version version 1))
+
+(defun eldev-release-next-patch-version (version)
+  (eldev-release-next-pos-version version 2))
+
+(defun eldev-release-next-snapshot-version (version)
+  (setf version (copy-sequence version))
+  (let ((tail (memq eldev--snapshot version)))
+    (if tail
+        (append (butlast version (length tail)) `(,eldev--snapshot) (eldev-release-next-pos-version (or (cdr tail) '(1)) 0))
+      `(,@(eldev-release-next-pos-version version (1- (max eldev-release-min-version-size (length version)))) ,eldev--snapshot))))
+
+(defun eldev-release-next-snapshot-version-unless-already-snapshot (version)
+  (if (eldev-version-snapshot-p version)
+      version
+    (eldev-release-next-snapshot-version version)))
+
+(defun eldev-release-next-pos-version (version pos)
+  (let* ((length (length version))
+         (extra  (- length 1 pos)))
+    (catch 'done
+      (dotimes (n (min (+ pos 2) length))
+        (when (< (nth n version) 0)
+          (throw 'done (butlast version (- length n)))))
+      (setf version (if (> extra 0) (butlast version extra) (append version (make-list (- extra) 0))))
+      (append (butlast version) (list (1+ (or (nth pos version) -1)))))))
+
+(defun eldev-release-default-tag (version)
+  (unless (eldev-version-snapshot-p version)
+    (package-version-join version)))
+
+
+(defun eldev-release-validate-version (version)
+  "Validate project VERSION before releasing it.
+This function requires that the VERSION is larger than the
+current version.  Additionally, for packages that support
+pre-24.4 Emacsen, this forbids `snapshot' and similar components
+in the VERSION as unknown back then."
+  (eldev-named-step "releasing" "validating the new version number"
+    (eldev-verbose "%s..." (eldev-current-step-name t))
+    (let* ((package         (eldev-package-descriptor))
+           (current-version (package-desc-version package))
+           (required-emacs  (cadr (assq 'emacs (package-desc-reqs (eldev-package-descriptor))))))
+      (eldev-trace "The current project version is %s" (eldev-message-version current-version))
+      (unless (version-list-< current-version version)
+        (signal 'eldev-error `("Cannot release version %s: must be newer than the current project's version (%s)"
+                               ,(eldev-message-version version) ,(eldev-message-version current-version))))
+      ;; Even if Eldev doesn't support such old versions, maybe they are used by projects
+      ;; that do.
+      (when (and (version-list-< required-emacs '(24 4)) (eldev-any-p (< it -3) version))
+        (signal 'eldev-error `(:hint "Older Emacs versions don't understand words `snapshot', `git', `svn' etc. in version strings"
+                                     "Refusing to release version %s: it will not be understood by pre-24.4 Emacsen" ,(eldev-message-version version)))))))
+
+
+(defun eldev-release-validate-vcs (version)
+  "Validate project VCS before releasing given VERSION."
+  (eldev-named-step "releasing" "validating VCS working directory of the project"
+    (eldev-verbose "%s..." (eldev-current-step-name t))
+    (let ((backend (eldev-vc-detect)))
+      ;; Here we further restrict the list of supported backends (Subversion support is
+      ;; unfinished).
+      (unless (memq backend '(Git Hg))
+        (signal 'eldev-error `(:hint "Currently supported: Git and Mercurial"
+                                     "Can only create releases in projects maintained by a supported VCS")))
+      (eldev-verbose "Detected VCS backend `%s'" (eldev-vc-full-name backend))
+      (eldev-call-process (eldev-vc-executable backend)
+          (eldev-pcase-exhaustive backend
+            (`Git `("status" "--porcelain=v1" ,(format "--untracked=%s" (if eldev-release-ignore-untracked "no" "normal"))))
+            (`Hg  `("--color=never" "--pager=never" "status" "--modified" "--added" "--removed" "--deleted" ,@(unless eldev-release-ignore-untracked '("--unknown"))))
+            (`SVN `("status")))
+        :destination  '(t nil)
+        :die-on-error t
+        ;; I don't see an option for this, so let's just delete unwanted output.
+        (when (and eldev-release-ignore-untracked (eq backend 'SVN))
+          (while (re-search-forward (rx bol "?") nil t)
+            (beginning-of-line)
+            (kill-line 1)))
+        (unless (= (point-min) (point-max))
+          (signal 'eldev-error `(:hint ,(eldev-format-message "Status as reported by %s:\n%s" (eldev-vc-full-name backend) (eldev-message-enumerate "x" (buffer-string)))
+                                       "Refusing to release: working directory is not clean"))))
+      (when eldev-release-allowed-branch
+        (let* ((current-branch   (eldev-vc-branch-name))
+               (allowed-branches (if (functionp eldev-release-allowed-branch)
+                                     (funcall eldev-release-allowed-branch version current-branch backend)
+                                   eldev-release-allowed-branch)))
+          (eldev-trace "VCS branch is found to be `%s'" current-branch)
+          (unless (eq allowed-branches t)
+            (setf allowed-branches (eldev-listify allowed-branches))
+            (unless (member current-branch allowed-branches)
+              (signal 'eldev-error `(:hint ,(if allowed-branches
+                                                (eldev-message-enumerate '("Allowed branch:" "Allowed branches:") allowed-branches nil nil t)
+                                              "See variable `eldev-release-allowed-branch'")
+                                           "Refusing to release version `%s' from branch `%s'" ,(eldev-message-version version) ,current-branch)))))))))
+
+(defun eldev-release-only-from-main-branch (_version branch vc-backend)
+  (let ((main-branch (eldev-pcase-exhaustive vc-backend
+                       (`Git "master")
+                       (`Hg  "default")
+                       (`SVN "trunk"))))
+    (if (string= branch main-branch)
+        t
+      (signal 'eldev-error `(:hint "See variable `eldev-release-allowed-branch'"
+                             "Refusing to release from non-main (i.e. not `%s') branch `%s'" ,main-branch ,branch)))))
+
+
+(defun eldev-release-validate-files (_version)
+  "Validate project files before creating a release."
+  (if eldev-release-skip-file-checks
+      (eldev-verbose "Skipping file contents checks as requested")
+    (eldev-named-step "releasing" "checking project's files as configured"
+      (eldev-verbose "%s..." (eldev-current-step-name t))
+      (dolist (file (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'all) (:not ,eldev-release-file-check-ignored-files)) "file%s to check"))
+        (eldev-trace "Checking file `%s'..." file)
+        (with-temp-buffer
+          (insert-file-contents file)
+          (let ((case-fold-search nil))
+            (while (re-search-forward eldev-release-file-check-forbidden-regexp nil t)
+              (save-excursion
+                (let ((string (match-string    0))
+                      (from   (match-beginning 0))
+                      (to     (match-end       0))
+                      from-extended
+                      from-line
+                      to-extended
+                      to-line)
+                  (goto-char from)
+                  (ignore-errors (forward-line -2))
+                  (setf from-extended (point)
+                        from-line     (line-number-at-pos))
+                  (goto-char to)
+                  (ignore-errors (forward-line 3)
+                                 (when (bolp)
+                                   (end-of-line 0)))
+                  (setf to-extended (point)
+                        to-line     (line-number-at-pos))
+                  (eldev-output "\n%s:%d-%d" file from-line to-line)
+                  (eldev-output "%s%s%s" (buffer-substring from-extended from) (eldev-colorize (buffer-substring from to) 'warn) (buffer-substring to to-extended))
+                  (eldev-release-maybe-fail (eldev-format-message "file `%s' contains text `%s' at line %d" file string (line-number-at-pos from))))))))))))
+
+
+(defun eldev-release-test-project (_version)
+  "Optionally test the project before creating a release.
+Exact behavior depends on many configuration variables: this
+function can test with various Emacs executables, in Docker
+images or check status on continous integration servers."
+  (if eldev-release-skip-testing
+      (eldev-verbose "Skipping project testing step as requested")
+    (let ((any-tests (or eldev-release-test-local eldev-release-test-other-emacses eldev-release-test-docker-images)))
+      (if (or any-tests eldev-release-interactive)
+          (eldev-named-step "releasing" "testing the project as configured"
+            (eldev-verbose "%s..." (eldev-current-step-name t))
+            (when (or eldev-release-test-local
+                      (and eldev-release-interactive (not any-tests)
+                           (eldev-y-or-n-p "
+No pre-release testing configured.  If you have used a continuous integration
+server for testing the latest commit or have otherwise tested it, this is not
+a problem.
+
+Run the tests locally anyway? ")))
+              (eldev--release-do-test-locally nil nil))
+            (dolist (extra-emacs (eldev-listify eldev-release-test-other-emacses))
+              (eldev--release-do-test-locally extra-emacs nil))
+            (dolist (docker-image (eldev-listify eldev-release-test-docker-images))
+              (eldev--release-do-test-locally nil docker-image)))
+        (eldev-verbose "No project testing operations are configured")))))
+
+(defun eldev--release-do-test-locally (other-emacs docker-image)
+  (let* ((process-environment  `(,@(when other-emacs `(,(format "ELDEV_EMACS=%s" other-emacs))) ,@process-environment))
+         (test-command-line    (append (eldev-global-setting-options) eldev-release-test-global-options '("test") eldev-release-test-command-options))
+         (clean-command-line   '("--quiet" "clean" ".elc"))
+         (compile-command-line (append (eldev-global-setting-options) eldev-release-test-global-options '("compile") eldev-release-test-compile-command-options))
+         docker-description)
+    (when docker-image
+      (setf test-command-line    `("docker" ,docker-image ,@test-command-line)
+            clean-command-line   `("docker" ,docker-image ,@clean-command-line)
+            compile-command-line `("docker" ,docker-image ,@compile-command-line)
+            docker-description   (if (string-match-p "/" docker-image)
+                                     (eldev-format-message "Docker image `%s'" docker-image)
+                                   (eldev-format-message "Docker-provided Emacs version %s" docker-image))))
+    ;; Since this might take a really long in some projects (and also produce a lot of
+    ;; output), do print some header.
+    (eldev-print :color 'section "\n%s"
+                 (cond (docker-description (eldev-format-message "Running the project's tests using %s..." docker-description))
+                       (other-emacs        (eldev-format-message "Running the project's tests using executable `%s'..." other-emacs))
+                       (t                  (eldev-format-message "Running the project's tests..."))))
+    (eldev-call-process (eldev-shell-command) test-command-line
+      :forward-output t
+      (when (/= exit-code 0)
+        (eldev-release-maybe-fail (cond (docker-description (eldev-format-message "tests do not pass in %s" docker-description))
+                                        (other-emacs        (eldev-format-message "tests do not pass on `%s'" other-emacs))
+                                        (t                  "tests do not pass")))))
+    (when eldev-release-test-also-compile
+      (eldev-print :color 'section "\n%s"
+                   (cond (docker-description (eldev-format-message "Testing project byte-compilation using %s..." docker-description))
+                         (other-emacs        (eldev-format-message "Testing project byte-compilation using executable `%s'..." other-emacs))
+                         (t                  (eldev-format-message "Testing project byte-compilation..."))))
+      ;; Clean both before and after compilation, to avoid any cross-Emacs-version
+      ;; interference problems.  We don't expect this to fail, so don't write any special
+      ;; error messages.
+      (eldev-call-process (eldev-shell-command) clean-command-line
+        :die-on-error t)
+      (eldev-call-process (eldev-shell-command) compile-command-line
+        :forward-output t
+        (when (/= exit-code 0)
+          (eldev-release-maybe-fail (cond (docker-description (eldev-format-message "byte-compilation in %s failed" docker-description))
+                                          (other-emacs        (eldev-format-message "byte-compilation on `%s' failed" other-emacs))
+                                          (t                  "byte-compilation failed")))))
+      (eldev-call-process (eldev-shell-command) clean-command-line
+        :die-on-error t))))
+
+
+(defun eldev-release-maybe-fail (failure-message)
+  "Maybe abort release process with given FAILURE-MESSAGE.
+If running interactively, let the user decide."
+  (unless (when eldev-release-interactive
+            (eldev-error "%s" (eldev-message-upcase-first failure-message))
+            ;; Since this is supposed to be important, use `yes-or-no-p', not `y-or-n-p'.
+            (eldev-yes-or-no-p (eldev-format-message "\nContinue release process %s? " (eldev-colorize "anyway" 'warn))))
+    (signal 'eldev-error `("Refusing to release: %s" ,failure-message))))
 
 
 

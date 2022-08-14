@@ -82,7 +82,8 @@
 (eval-and-compile
   (dolist (autoloads '(("eldev-build"   eldev-build-find-targets eldev-get-target-dependencies eldev-set-target-dependencies eldev-build-target-status eldev-build-target)
                        ("eldev-plugins" eldev-active-plugins eldev-use-plugin)
-                       ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-vc-detect)))
+                       ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev-vc-synchronize-dir
+                                        eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))
 
@@ -149,6 +150,13 @@ empty.")
      . "Clean the project or dependency, then build target `:default'.  See
 `source' and `built' modes for more explanations.")))
 
+
+(defvar eldev-formatted-project-name nil
+  "User-level project name, e.g. with proper capitalization.
+If left to `nil', will default to Emacs package name.  Since 1.2.")
+
+(defvar eldev--formatted-project-names nil
+  "Cache for `eldev-formatted-project-name' function.")
 
 (defvar eldev-main-fileset '(:not (eldev-standard-filesets :or :no-excludes :except 'main))
   "Fileset used to find main project targets.
@@ -670,7 +678,7 @@ of the following keywords:
 
     :std-excludes or :no-excludes
 
-        Whether to use `eldev-standard-filesets' (default) or not."
+        Whether to use `eldev-standard-excludes' (default) or not."
   (let ((combination-mode :or)
         except
         no-excludes
@@ -893,8 +901,15 @@ Since 1.0."
           ;; tests.  So we set the target to stdout only now.
           (let ((eldev-message-rerouting-destination :stdout))
             (apply handler command-line)))
-      (eldev-error "Unknown command `%s'" command)
+      (eldev--complain-about-missing-command command)
       (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
+
+(defun eldev--complain-about-missing-command (command)
+  ;; FIXME: Generalize.  Not clear how, currently.
+  (let ((plugin (pcase command (`release "maintainer"))))
+    (if plugin
+        (eldev-error "Command `%s' will become available if plugin `%s' is activated" command plugin)
+      (eldev-error "Unknown command `%s'" command))))
 
 (defun eldev--maybe-rename-archive (archive external-dir)
   (catch 'renamed-as
@@ -980,6 +995,22 @@ Since 0.2."
       ;; This is an undocumented flag file indicating that `Eldev' or `Eldev-local' have
       ;; been loaded at least once in this project.
       (with-temp-file (expand-file-name "ever-initialized" (eldev-cache-dir nil t))))))
+
+(defun eldev-formatted-project-name (&optional project-dir skip-cache)
+  "Determine the user-level name of the project in PROJECT-DIR.
+This is the value of variable `eldev-formatted-project-name' or
+else defaults to Emacs package name.
+
+Since 1.2."
+  (unless project-dir
+    (setf project-dir eldev-project-dir))
+  (or (unless skip-cache
+        (cdr (assoc project-dir eldev--formatted-project-names)))
+      (let ((name (or (eldev--cross-project-internal-eval project-dir 'eldev-formatted-project-name t)
+                      (symbol-name (package-desc-name (eldev-package-descriptor project-dir skip-cache))))))
+        (unless skip-cache
+          (push (cons project-dir name) eldev--formatted-project-names))
+        name)))
 
 (defun eldev-usage ()
   "Print Eldev usage message."
@@ -1148,6 +1179,19 @@ the data."
   (if (eq system-type 'windows-nt)
       "eldev.bat"
     "eldev"))
+
+(defun eldev-global-setting-options ()
+  "Return a list of options to pass global settings to a child Eldev process.
+Loading mode is not included.  Since 1.2."
+  `(,(if debug-on-error "--debug" "--no-debug")
+    ,(pcase eldev-verbosity-level
+       (`quiet   "--quiet")
+       (`verbose "--verbose")
+       (`trace   "--trace")
+       (_        "--normal-output"))
+    ,(format "--color=%s" (if (eldev-output-colorized-p) "always" "never"))
+    ,(if load-prefer-newer "--load-newer" "--load-first")
+    ,(if eldev-prefer-stable-archives "--stable" "--unstable")))
 
 
 
@@ -1396,7 +1440,7 @@ Since 0.5."
       `((dependencies . ,(cdr (assq 'runtime eldev--extra-dependencies)))))))
 
 
-(defun eldev-substitute (source target &optional open-string close-string)
+(defun eldev-substitute (source target &optional open-string close-string extra-variables)
   "Substitute Elisp expressions in given file.
 Read text from SOURCE, write the result to TARGET.  All Elisp
 expressions between OPEN-STRING and CLOSE-STRING are evaluated
@@ -1409,10 +1453,10 @@ If expression evaluation result is a string, it is inserted
 as-is.  Otherwise, it is formatted with `prin1-to-string'."
   (with-temp-buffer
     (insert-file-contents source)
-    (eldev-substitute-in-buffer open-string close-string)
+    (eldev-substitute-in-buffer open-string close-string extra-variables)
     (eldev-write-to-file target)))
 
-(defun eldev-substitute-in-buffer (&optional open-string close-string)
+(defun eldev-substitute-in-buffer (&optional open-string close-string extra-variables)
   "Substitute Elisp expressions in the current buffer.
 Substitution starts from point and only spans visible buffer
 part.  See function `eldev-substitute' for more information."
@@ -1424,7 +1468,7 @@ part.  See function `eldev-substitute' for more information."
             (form (read (current-buffer))))
         (unless (looking-at (regexp-quote close-string))
           (error "Expected `%s' at position %d:%d" close-string (line-number-at-pos) (current-column)))
-        (let ((value (eval form t)))
+        (let ((value (eval form (or extra-variables t))))
           (delete-region from (+ (point) (length close-string)))
           (insert (if (stringp value) value (prin1-to-string value))))))))
 
@@ -1494,8 +1538,8 @@ show details about that command instead."
               (eldev-help-list-aliases real-command eldev--command-aliases "\n%s" '("Command alias:" "Command aliases:"))
               (eldev-options-help real-command)
               (eldev-output "\n%s" (or (eldev-documentation handler) "Not documented")))
-          (eldev-error "Unknown command `%s'" command)
-          (eldev-output "Run `%s help' for a list of known commands" (eldev-shell-command t))))
+          (eldev--complain-about-missing-command command)
+          (eldev-print "Run `%s help' for a list of known commands" (eldev-shell-command t))))
     (eldev-usage)
     (eldev-output "
 Options before the command are global for Eldev.  Many commands have additional
@@ -2797,7 +2841,7 @@ used"
   ("Don't delete anything, only print names of files to be deleted"
    :options       (-n --dont-delete --dry-run))
   ("Delete files and directories as requested"
-   :options       (-d --delete)
+   :options       (-d --delete --do-delete)
    :hidden-if     :default)
   :for-command    clean)
 
@@ -4381,6 +4425,7 @@ change `elisp-lint's configuration."
             (eldev-trace "%s" (eldev-message-enumerate-files "Ignored potential file%s to lint: %s (%d)" ignored))))))
     files))
 
+
 
 ;; eldev eval, eldev exec
 
@@ -4655,7 +4700,7 @@ obligations."
 
 (defun eldev--cross-project-internal-eval (project-dir form &optional use-caching)
   (setf project-dir (expand-file-name project-dir eldev-project-dir))
-  (if (string= (file-name-as-directory project-dir) (file-name-as-directory eldev-project-dir))
+  (if (file-equal-p project-dir eldev-project-dir)
       (eval form t)
     (when (and use-caching (null eldev--internal-eval-cache))
       (eldev-do-load-cache-file (expand-file-name "internal-eval.cache" (eldev-cache-dir t)) "internal evaluation cache" 1
@@ -5480,6 +5525,177 @@ documentation."
       (eldev-print "No plugins are activated for this project (see function `eldev-use-plugin')"))))
 
 
+;; We want the maintainer variables to be visible even if the plugin is not active.
+
+(defvar eldev-release-validators '(eldev-release-validate-version
+                                   eldev-release-validate-vcs
+                                   eldev-release-validate-files
+                                   eldev-release-test-project)
+  "List of functions to check if release is possible.
+Default value includes `eldev-release-validate-version',
+`eldev-release-validate-vcs', `eldev-release-validate-files' and
+`eldev-release-test-project'.  In future it may also include some
+other standard hooks, but those will likely be inactivated by
+default configuration.
+
+Each function is called with one argument: VERSION to be
+released, as a list.  Its return value is ignored.  If it wants
+to prevent release from occuring, it should signal an error,
+preferably an `eldev-error'.")
+
+(defvar eldev-release-preparators nil
+  "List of functions to call immediately before releasing.
+These functions should preferably not fail.  If you want to check
+release possibility in general, add your function to
+`eldev-release-validators' instead.
+
+Each function is called with one argument: VERSION to be
+released, as a list.  Its return value is ignored.  A function
+can modify project files; such modifications will be included
+into the release commit.
+
+The functions must respect `eldev-release-dry-run-mode': they are
+called regardless, in case they include important read-only
+operations too.")
+
+(defvar eldev-release-post-release-preparators nil
+  "List of functions to call before making a post-release commit.
+Each function is called with two argument: the released VERSION
+and POST-RELEASE-VERSION to be prepared, both as a list.  See
+`eldev-release-preparators' for more information.")
+
+(defvar eldev-release-file-check-forbidden-regexp (rx bow "DONOT" "RELEASE" eow)
+  "Regular expression that must not match any project file contents.
+In other words, if any file contains a match, release process is
+aborted.  Search is case-sensitive.")
+
+(defvar eldev-release-file-check-ignored-files nil
+  "Fileset to ignore when checking files before releasing.")
+
+(defvar eldev-release-test-local nil
+  "Whether to run project's tests before releasing.
+When non-nil, the tests must pass in the same Emacs version used
+to run Eldev.")
+
+(defvar eldev-release-test-other-emacses nil
+  "Additional Emacs executables to test with before releasing.
+Should be a string or a list of strings of installed different
+Emacs versions.")
+
+(defvar eldev-release-test-docker-images nil
+  "Additional Docker-provided images to test with before releasing.
+See command `docker' for details.  Should be a string or a list
+of strings of Emacs versions or image names.")
+
+(defvar eldev-release-test-global-options '("--packaged")
+  "List of global Eldev options to be used when testing.
+These options will be prepended with `--quiet', `--verbose'
+etc. to pass through the used verbosity level.  You can fix it by
+explicitly adding a level option to the list.")
+
+(defvar eldev-release-test-command-options '("--stop-on-unexpected")
+  "List of options to command `test' to be used before releasing.")
+
+(defvar eldev-release-test-also-compile t
+  "After testing, also ensure that byte-compilation succeeds.
+This only takes effect if any form of local testing is enabled,
+i.e. not by default.")
+
+(defvar eldev-release-test-compile-command-options '("--set=all" "--warnings-as-errors")
+  "List of options to command `compile' to be used before releasing.
+By default, everything (including tests) is byte-compiled and all
+warnings are treated as errors.")
+
+(defvar eldev-release-commit-message "Release @[formatted-name]@ @[version-string]@"
+  "Message (comment) given to the release commit.
+See function `eldev-substitute' for the explanation of
+formatting.  Available variables are `formatted-name',
+`version-string', `version-list', but you can also use arbitrary
+expressions.")
+
+(defvar eldev-release-tag-function 'eldev-release-default-tag
+  "Function that computes tag name for the release commit.
+It should accept a single argument — the release version as a
+list — and return tag name as a string or nil to skip tagging.
+Default function simply converts the version to a string, unless
+it's a snapshot version, in which case tagging is skipped.")
+
+(defvar eldev-release-post-release-commit nil
+  "Whether to create a post-release commit.
+t means that a post-release commit is created and
+`eldev-release-post-release-preparators' are called.
+
+If the value is a function, it is called with the released
+version as the only argument.  It may return a new version to be
+set in the post-release commit.  Any other return value is
+handled as described above.")
+
+(defvar eldev-release-post-release-version-incrementor 'eldev-release-next-snapshot-version-unless-already-snapshot
+  "How to increment project's version after a release.
+The incrementor can return the version (its argument) unmodified
+to skip version incrementing.")
+
+(defvar eldev-release-post-release-commit-message nil
+  "Message (comment) given to the post-release commit.
+See function `eldev-substitute' for the explanation of
+formatting.  Available variables are `formatted-name',
+`version-string', `version-list', but you can also use arbitrary
+expressions.")
+
+(defvar eldev-release-version-incrementors '(("major"    . eldev-release-next-major-version)
+                                             ("minor"    . eldev-release-next-minor-version)
+                                             ("patch"    . eldev-release-next-patch-version)
+                                             ("snapshot" . eldev-release-next-snapshot-version))
+  "Association list of strings to version incrementors.
+Names from this assoc list can be used on the command line
+instead of specific version number.  In this case, the
+corresponding incrementor function is called with the package's
+current version (as a list) to build the version to release.
+Incrementor can return a list or a string.")
+
+(defvar eldev-release-min-version-size 2
+  "Minimum version size, in the range 1-4.
+Default value of 2 means that the version will consist at least
+of major and minor components, e.g. '3.1'.  If a version is
+shorter than this (e.g. just '0' when the value is 3), it will be
+either right-padded with zeros if autobuilt from 'major', 'patch'
+etc., or not accepted.")
+
+(defvar eldev-release-allowed-branch 'eldev-release-only-from-main-branch
+  "Specifies allowed branches to make releases from.
+Can be a string, a list of strings, a function or nil (to allow
+any branch).
+
+Functions get called with three arguments: VERSION (as a list),
+BRANCH (a string) and VC-BACKEND.  They must return t (not any
+other non-nil value!) for the given branch to be accepted.
+Alternatively, they may return a string or a list of those to
+indicate accepted branch name(s).  A function may also signal an
+error.
+
+Default value allows to release only from the main branch
+(`master' in Git, `default' in Mercurial).")
+
+
+(defvar eldev-release-ignore-untracked nil
+  "Whether to ignore untracked files.
+If nil, you won't be able to create releases if there are
+untracked files in the working directory.  This is a precaution:
+maybe you have forgotten to add them to the repository.")
+
+(defvar eldev-release-skip-file-checks nil
+  "Whether to skip all file contents checks.")
+
+(defvar eldev-release-skip-testing nil
+  "Whether to skip any configured project testing.")
+
+(defvar eldev-release-interactive t
+  "Ask for confirmation before most releasing steps.")
+
+(defvar eldev-release-dry-run-mode nil
+  "Don't release if non-nil, just pretend to do so.")
+
+
 
 ;; eldev init, eldev githooks
 
@@ -5500,7 +5716,7 @@ will fail if the project already has file named `Eldev'."
   ("Create `Eldev' interactively"
    :options       (-i --interactive))
   ("Don't ask any questions"
-   :options       (-n --non-interactive))
+   :options       (-n --non-interactive --go))
   :for-command    init)
 
 

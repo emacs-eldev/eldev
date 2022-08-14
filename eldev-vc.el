@@ -18,7 +18,9 @@
 ;;; Code:
 
 (require 'eldev)
+(require 'subr-x)
 (require 'vc)
+(require 'vc-dir)
 
 
 (defconst eldev-vc-supported-backends '(Git Hg)
@@ -77,6 +79,41 @@ Since 0.8."
      (eldev-advised (#'vc-deduce-backend :override (lambda (&rest _ignored) backend))
        ,@body)))
 
+(defmacro eldev-with-vc-buffer (project-dir &rest body)
+  "Execute `vc' code in BODY in given PROJECT-DIR.
+If PROJECT-DIR is nil, `eldev-project-dir is used instead.  BODY
+has access to locally bound variable `backend'.   buffer is set a
+
+Since 0.8."
+  (declare (indent 1) (debug (sexp body)))
+  (let ((buffer (make-symbol "$buffer")))
+    `(let* ((default-directory (or ,project-dir eldev-project-dir))
+            (backend           (ignore-errors (vc-responsible-backend default-directory)))
+            (,buffer           (eldev--vc-set-up-buffer backend)))
+       (unwind-protect
+           (with-current-buffer ,buffer
+             ,@body)
+         (when (buffer-live-p ,buffer)
+           (with-current-buffer ,buffer
+             ;; Else it will ask pointless questions.
+             (vc-dir-kill-dir-status-process))
+           (kill-buffer ,buffer))))))
+
+(defvar use-vc-backend)
+(defun eldev--vc-set-up-buffer (backend)
+  (let ((buffer (vc-dir-prepare-status-buffer "*eldev-vc*" default-directory backend t)))
+    (with-current-buffer buffer
+      ;; Yeah, need to go into sort-of-undocumented-internals, as always.
+      (let ((use-vc-backend backend))
+        (vc-dir-mode))
+      (eldev-vc-synchronize-dir))
+    buffer))
+
+(defun eldev-vc-synchronize-dir ()
+  ;; Don't you love Elisp?  Joining a process?  Never hard of 'em.  Find a better way.
+  (while (vc-dir-busy)
+    (sleep-for 0.01)))
+
 
 (defun eldev-vc-detect (&optional project-dir)
   "Detect VCS used in given PROJECT-DIR.
@@ -90,6 +127,68 @@ Since 0.8."
     ;; This makes it easier to test and give some guarantees.
     (when (and (memq backend '(Git Hg SVN)) (let ((root (eldev-vc-root-dir))) (and root (file-equal-p root default-directory))))
       backend)))
+
+
+(defun eldev-vc-commit-id (&optional short project-dir)
+  "Determine the identifier of the current commit in given PROJECT-DIR.
+Return value is a string.  Unlike `vc-working-revision', this
+doesn't accept any `file' argument, but instead works for the
+whole checkout.
+
+Since 1.2."
+  (eldev-with-vc project-dir
+    (eldev-call-process (eldev-vc-executable backend)
+        (eldev-pcase-exhaustive backend
+          (`Git `("rev-parse" ,@(when short '("--short")) "HEAD"))
+          (`Hg  `("id" "--id"))
+          (`SVN `("info" "--show-item" "last-changed-revision")))
+      :destination  '(t nil)
+      :discard-ansi t
+      :die-on-error t
+      (string-trim (buffer-string)))))
+
+(defun eldev-vc-branch-name (&optional project-dir)
+  "Determine the current VCS branch in given PROJECT-DIR.
+Return value is a string.  For Git and Mercurial it is
+straightforward.  For Subversion it is instead the part of
+relative URL without leading \"^/\" and, if possible, beginning
+with word \"trunk\", \"branches\" or \"tags\".  If there is no
+such component in the relative URL, it is returned full.
+
+Since 1.2."
+  (eldev-with-vc project-dir
+    (eldev-call-process (eldev-vc-executable backend)
+        (eldev-pcase-exhaustive backend
+          ;; Cryptic way to get current branch name.  `branch --show-current' is too
+          ;; recent.
+          (`Git `("rev-parse" "--abbrev-ref" "HEAD"))
+          (`Hg  `("branch"))
+          (`SVN `("info" "--show-item" "relative-url")))
+      :destination  '(t nil)
+      :discard-ansi t
+      :die-on-error t
+      (let ((branch (string-trim (buffer-string))))
+        (when (eq backend 'SVN)
+          (setf branch (replace-regexp-in-string (rx bol "^/") "" branch))
+          ;; Relative URL can be e.g. `^/myfaces/core/branches/1.2.x/api', because
+          ;; Subversion has a pretty insane notion of a "branch".
+          (setf branch (replace-regexp-in-string (rx bol (0+ any) "/" (group (| "trunk" "branches" "tags") (| "/" eos))) "\\1" branch)))
+        branch))))
+
+(defun eldev-vc-create-tag (name &optional project-dir)
+  "Create a VCS tag with given NAME for PROJECT-DIR.
+Since 1.2."
+  ;; `vc-create-tag' sucks and is not even implemented for Mercurial.  So, we roll our own.
+  (eldev-with-vc project-dir
+    (eldev-call-process (eldev-vc-executable backend)
+        (eldev-pcase-exhaustive backend
+          ;; Cryptic way to get current branch name.  `branch --show-current' is too
+          ;; recent.
+          (`Git `("tag" ,name))
+          (`Hg  `("tag" ,name))
+          (`SVN (error "Tagging with Subversion is not currently implemented")))
+      (unless (= exit-code 0)
+        (error "%s" (string-trim (buffer-string)))))))
 
 
 
@@ -164,11 +263,7 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
     (if vc-backend
         (progn
           (eldev-trace "Detected a %s repository" vc-full-name)
-          (let ((filename (pcase vc-backend
-                            (`Git ".gitignore")
-                            (`Hg  ".hgignore")
-                            ;; Not really a file, but close enough.
-                            (`SVN "svn:ignore"))))
+          (let ((filename (eldev--vc-ignore-file vc-backend)))
             (when (if eldev-init-interactive
                       (eldev-y-or-n-p (eldev-format-message "Usage of %s detected; modify `%s' as appropriate? " vc-full-name filename))
                     (eldev-trace "Not in interactive mode, will modify `%s' by default" filename)

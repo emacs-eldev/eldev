@@ -642,10 +642,29 @@ package descriptor."
 
 (defun eldev-y-or-n-p (prompt)
   "Similar to `y-or-n-p'.
-Currently works exactly like that built-in, but may be changed
-later (preserving semantics)."
-  (y-or-n-p prompt))
+Currently the only difference is that it supports colorizing in
+PROMPT.  More can be added later (preserving semantics)."
+  (eldev-output-prompt prompt)
+  (y-or-n-p ""))
 
+(defun eldev-yes-or-no-p (prompt)
+  "Similar to `yes-or-no-p'.
+Currently the only difference is that it supports colorizing in
+PROMPT.  More can be added later (preserving semantics).  Since
+1.2."
+  (eldev-output-prompt prompt)
+  (yes-or-no-p ""))
+
+(defun eldev-read-string (prompt &optional initial-input)
+  "Similar to `read-string'.
+Currently the only difference is that it supports colorizing in
+PROMPT.  More can be added later (preserving semantics).  Since
+1.2."
+  (eldev-output-prompt prompt)
+  (read-string "" nil nil initial-input))
+
+(defun eldev-output-prompt (prompt)
+  (eldev-output :nolf "%s" prompt))
 
 (defun eldev-colorize (string &rest types)
   "Apply given Eldev colorizing to STRING."
@@ -663,16 +682,20 @@ Since 0.2."
   "Unconditionally format and print given message."
   (let (stderr
         nolf
-        nocolor)
+        nocolor
+        colors)
     (while (keywordp format-string)
       (pcase format-string
         (`:stdout  (setf stderr nil))
         (`:stderr  (setf stderr t))
         (`:nolf    (setf nolf t))
         (`:nocolor (setf nocolor t))
+        (`:color   (push (pop arguments) colors))
         (_         (error "Unknown option `%s'" format-string)))
       (setf format-string (pop arguments)))
     (let ((message (if format-string (apply #'eldev-format-message format-string arguments) "")))
+      (when colors
+        (setf message (apply #'eldev-colorize message colors)))
       (when eldev-output-time-diffs
         (let* ((elapsed         (- (float-time) eldev--time-diff-base))
                (elapsed-min     (floor (/ elapsed 60)))
@@ -1217,16 +1240,16 @@ See also variable `eldev-svnadmin-executable'."
     (executable-find "svnadmin")
     "Subversion is not installed (cannot find `svnadmin' executable)"))
 
+(defvar vc-svn-program)
+(with-eval-after-load 'vc-svn
+  (setf vc-svn-program (eldev-svn-executable t)))
+
 (defun eldev-docker-executable (&optional not-required)
   "Find `docker' executable.
 See also variable `eldev-docker-executable'."
   (eldev-find-executable eldev-docker-executable not-required
     (executable-find "docker")
     "Docker is not installed (cannot find `docker' executable)"))
-
-(defvar vc-svn-program)
-(with-eval-after-load 'vc-svn
-  (setf vc-svn-program (eldev-svn-executable t)))
 
 
 (defun eldev-directory-in-exec-path (directory)
@@ -1351,7 +1374,7 @@ Since 1.2:
                ,@(when die-on-error
                    `((when (/= exit-code 0)
                        (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
-                         (unless (= (point-min) (point-max))
+                         (unless (or (= (point-min) (point-max)) (memq ,evaluated-forward-output '(t stdout)))
                            (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
                          (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
                ,@(or body '(exit-code))))
@@ -1809,6 +1832,16 @@ is non-nil when this function is called."
   (expand-file-name
    (format "%s-autoloads" (package-desc-name pkg-desc))
    (package-desc-dir pkg-desc)))
+
+
+(defconst eldev--snapshot (cadr (version-to-list "0snapshot")))
+
+(defun eldev-version-snapshot-p (version)
+  "Determine if VERSION contains is a snapshot one.
+Both lists and strings are accepted.  Since 1.2."
+  (when (stringp version)
+    (setf version (version-to-list version)))
+  (eldev-any-p (<= it eldev--snapshot) (if (stringp version) (version-to-list version) version)))
 
 
 

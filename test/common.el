@@ -155,19 +155,22 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 (defmacro eldev--test-with-temp-copy (test-project vc-backend &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
-  (let ((ignores :std))
+  (let ((ignores :std)
+        after-copy)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
-        (:ignores (setf ignores (pop body)))))
+        (:ignores    (setf ignores    (pop body)))
+        (:after-copy (push (pop body) after-copy))))
     `(let* ((vc-backend          ,vc-backend)
-            (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores)))
+            (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores
+                                                             ,(when after-copy `(lambda () ,@(reverse after-copy))))))
        (unless eldev--test-project
          (ert-skip (eldev-format-message "%s couldn't be found" vc-backend)))
        (prog1 (progn ,@body)
          ;; Delete the copy if there are no errors.
          (ignore-errors (delete-directory eldev--test-project t))))))
 
-(defun eldev--test-make-temp-copy (test-project vc-backend ignores)
+(defun eldev--test-make-temp-copy (test-project vc-backend ignores after-copy)
   (unless (memq vc-backend '(nil Git Hg SVN))
     (error "Cannot create temporary VC copy for backend `%s'" vc-backend))
   (let* ((svnadmin   (when (eq vc-backend 'SVN) (eldev-svnadmin-executable t)))
@@ -186,6 +189,11 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                                     ;; extra root node at the front
                                     (if (eq system-type 'windows-nt) "/" "")
                                     repository-dir)))
+      ;; Since the result of `package-dir-info' depends on the directory name (oh lol, the
+      ;; robustness) when reading `*-pkg.el' file, create a subdirectory with "the proper"
+      ;; name here.
+      (setf copy-dir (file-name-as-directory (expand-file-name test-project copy-dir)))
+      (make-directory copy-dir)
       ;; To avoid copying generated files.
       (eldev--test-run test-project ("clean" "everything")
         (should (= exit-code 0)))
@@ -194,8 +202,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (eldev-call-process executable `("mkdir" ,(format "%s/trunk" repository-url) ,(format "%s/branches" repository-url) "--message" "Init") :die-on-error t)
         (eldev-call-process executable `("checkout" ,(format "%s/trunk" repository-url) ,copy-dir) :die-on-error t))
       (copy-directory project-dir copy-dir t nil t)
-      (when vc-backend
-        (let ((default-directory copy-dir))
+      (let ((default-directory copy-dir))
+        (when after-copy
+          (funcall after-copy))
+        (when vc-backend
           (unless svnadmin
             (eldev-call-process executable `("init") :die-on-error t))
           (when (eq ignores :std)
@@ -221,6 +231,19 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
           (eldev--test-shell-command (expand-file-name "bin/eldev" temp-script-dir)))
      (copy-directory (expand-file-name "bin" eldev-project-dir) (file-name-as-directory temp-script-dir))
      ,@body))
+
+(defun eldev--test-switch-vc-branch (vc-backend branch-name)
+  (unless (eldev-external-filename (file-relative-name (eldev--test-project-dir) eldev-project-dir))
+    (error "Refusing to switch branches in non-external project"))
+  (let ((default-directory (eldev--test-project-dir)))
+    (dolist (command (eldev-pcase-exhaustive vc-backend
+                       (`Git `(("branch"   ,branch-name)
+                               ("checkout" ,branch-name)))
+                       (`Hg  `(("branch"   ,branch-name)))
+                       (`SVN `(("copy"     "^/trunk" ,(format "^/branches/%s" branch-name) "--message" "Branching")
+                               ("switch"   ,(format "^/branches/%s" branch-name))))))
+      (eldev-call-process (eldev-vc-executable vc-backend) command
+        :die-on-error t))))
 
 
 (defmacro eldev--test-with-external-dir (test-project packages &rest body)
@@ -265,13 +288,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                   (signal (car error) (cdr error))))))
 
 (defmacro eldev--test-with-file-buffer (test-project file &rest body)
-  "Execute in a buffer with a FILE from TEST-PROJECT and write results back."
+  "Execute in a buffer with FILE from TEST-PROJECT and write results back."
   (declare (indent 2) (debug (stringp sexp body)))
-  `(with-temp-buffer
-     (ignore-errors (insert-file-contents (expand-file-name ,file (eldev--test-project-dir ,test-project)) t))
-     ,@body
-     (let ((backup-inhibited t))
-       (save-buffer))))
+  `(eldev-with-file-buffer (expand-file-name ,file (eldev--test-project-dir ,test-project))
+     ,@body))
 
 (defmacro eldev--test-capture-output (&rest body)
   `(with-temp-buffer
