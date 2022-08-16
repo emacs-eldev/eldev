@@ -5630,11 +5630,6 @@ version as the only argument.  It may return a new version to be
 set in the post-release commit.  Any other return value is
 handled as described above.")
 
-(defvar eldev-release-post-release-version-incrementor 'eldev-release-next-snapshot-version-unless-already-snapshot
-  "How to increment project's version after a release.
-The incrementor can return the version (its argument) unmodified
-to skip version incrementing.")
-
 (defvar eldev-release-post-release-commit-message nil
   "Message (comment) given to the post-release commit.
 See function `eldev-substitute' for the explanation of
