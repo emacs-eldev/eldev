@@ -1203,12 +1203,12 @@ Loading mode is not included.  Since 1.2."
 (defvar eldev--loading-roots nil)
 
 (eval-and-compile
-  (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")     300)
-                                          (gnu-devel      ("gnu-devel"      . "https://elpa.gnu.org/devel/")        190)
-                                          (nongnu         ("nongnu"         . "https://elpa.nongnu.org/nongnu/")    250)
-                                          (nongnu-devel   ("nongnu-devel"   . "https://elpa.nongnu.org/devel/")     150)
-                                          (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/") 200)
-                                          (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")        100)
+  (defvar eldev--known-package-archives '((gnu            ("gnu"            . "https://elpa.gnu.org/packages/")        300)
+                                          (gnu-devel      ("gnu-devel"      . "https://elpa.gnu.org/devel/")           190)
+                                          (nongnu         ("nongnu"         . "https://elpa.nongnu.org/nongnu/")       250)
+                                          (nongnu-devel   ("nongnu-devel"   . "https://elpa.nongnu.org/nongnu-devel/") 150)
+                                          (melpa-stable   ("melpa-stable"   . "https://stable.melpa.org/packages/")    200)
+                                          (melpa-unstable ("melpa-unstable" . "https://melpa.org/packages/")           100)
                                           (gnu-elpa       (:stable gnu          :unstable gnu-devel))
                                           (nongnu-elpa    (:stable nongnu       :unstable nongnu-devel))
                                           (melpa          (:stable melpa-stable :unstable melpa-unstable)))))
