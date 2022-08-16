@@ -79,8 +79,10 @@ to Eldev itself."
     (when (re-search-forward (rx bol (| "refs/heads/future-doc" "refs/remotes/origin/future-doc") eol) nil t)
       (eldev-release-maybe-fail (eldev-format-message "branch `future-doc' is not merged into `origin/master'")))))
 
-;; Insert after after `eldev-release-validate-vcs'.
-(push 'eldev--require-future-doc-merged (cdr (memq 'eldev-release-validate-vcs eldev-release-validators )))
+;; Don't die on older Eldev versions.  FIXME: Delete once 1.2 makes it to MELPA Stable.
+(when (boundp 'eldev-release-validators)
+  ;; Insert after after `eldev-release-validate-vcs'.
+  (push 'eldev--require-future-doc-merged (cdr (memq 'eldev-release-validate-vcs eldev-release-validators))))
 
 
 (defmacro eldev--install-self-error (error directory format-string &rest arguments)
