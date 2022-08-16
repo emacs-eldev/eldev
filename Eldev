@@ -65,6 +65,24 @@ to Eldev itself."
     directories))
 
 
+(setf eldev-formatted-project-name "Eldev")
+(setf eldev-release-post-release-commit-message "Post-release version bump."
+      eldev-release-post-release-commit (lambda (version)
+                                          (let ((eldev-release-min-version-size 3))
+                                            (eldev-release-next-snapshot-version-unless-already-snapshot version))))
+
+(defun eldev--require-future-doc-merged (_version)
+  (eldev-call-process (eldev-git-executable)
+      `("for-each-ref" "--no-merged=origin/master" "--format" "%(refname)")
+    :die-on-error t
+    ;; Catch both local and remote branches.  Need to push before releasing.
+    (when (re-search-forward (rx bol (| "refs/heads/future-doc" "refs/remotes/origin/future-doc") eol) nil t)
+      (eldev-release-maybe-fail (eldev-format-message "branch `future-doc' is not merged into `origin/master'")))))
+
+;; Insert after after `eldev-release-validate-vcs'.
+(push 'eldev--require-future-doc-merged (cdr (memq 'eldev-release-validate-vcs eldev-release-validators )))
+
+
 (defmacro eldev--install-self-error (error directory format-string &rest arguments)
   `(signal 'eldev-error (append (unless (file-writable-p ,directory) '(:hint "You probably need to log in as root"))
                                 (list ,format-string ,@arguments (error-message-string ,error)))))
