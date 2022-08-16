@@ -9,8 +9,10 @@ ifdef::env-github[]
 :note-caption: :paperclip:
 :tip-caption: :bulb:
 endif::[]
+:empty:
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
+:uri-git-hooks: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks#_git_hooks
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
@@ -41,6 +43,8 @@ endif::[]
 :uri-logview: https://github.com/doublep/logview
 :uri-datetime: https://github.com/doublep/datetime
 :uri-docker-emacs: https://github.com/Silex/docker-emacs
+:uri-release-it: https://github.com/release-it/release-it
+:uri-emacs-forwarding: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
@@ -55,6 +59,7 @@ endif::[]
 :since-0-10: image:https://img.shields.io/badge/since-0.10-8be[Since 0.10,float=right]
 :since-0-11: image:https://img.shields.io/badge/since-0.11-8be[Since 0.11,float=right]
 :since-1-1: image:https://img.shields.io/badge/since-1.1-8be[Since 1.1,float=right]
+:since-1-2: image:https://img.shields.io/badge/since-1.2-8be[Since 1.2,float=right]
 
 = Eldev
 
@@ -78,15 +83,36 @@ toc::[]
 
 Eldev features:
 
-* Eldev configuration is Elisp.  It can change many defaults or even
-  define additional commands and options.
-* Built-in support for regression/unit testing.
-* There are _four_ levels of configuration — you can customize most
-  aspects of Eldev for your project needs and personal preferences.
-* You can use local dependencies, even those that don’t use Eldev
-  (though some restrictions do apply, of course).  This is similar to
-  Cask linking, but with more flexibility.
-* Runs on all major operating systems: Linux, macOS, Windows.
+* Eldev configuration is Elisp.  It can change many defaults, add
+  special cases for Emacs versions and much more — even define
+  additional Eldev commands and options.
+* Built-in <<testing,support for regression/unit testing>>.
+* Blends nicely into <<continuous-integration,continuous
+  integration>> setups.
+* Can run on <<different-emacs-versions,different Emacs version>> even
+  on the same machine; can also use <<docker,Docker>> for that.
+* There are <<setup-procedure,_four_ levels of configuration>> — you
+  can customize most aspects of Eldev for your project needs and
+  personal preferences.
+* <<dependencies,Project dependency>> downloading, installation etc.
+  is fully automated, you only need to specify which Elisp package
+  archive(s) to use.
+* You can also use <<local-dependencies,local dependencies>>, even
+  those that don’t use Eldev (some restrictions still apply).  This
+  is similar to Cask linking, but with more flexibility.
+* Full support for <<autoloads,autoloads>> during development.
+* Miscellaneous operations useful during development:
+  <<running-emacs,running Emacs>> with only your project,
+  <<linting,linting>> source code, <<evaluating,evaluating
+  expressions>> in project’s context, <<profiling,profiling>>.
+* Can <<maintainer-plugin,automate release process>> for your project.
+* Eldev by default <<project-isolation,isolates>> your project for
+  development, helping you to distinguish between problems with setup
+  or configuration and inherent bugs in the project.
+* Full-featured <<build-system,build system>> for complex projects.
+* Can <<debugging-features,help you debug your code>>.
+* <<requirements,Runs on all major operating systems>>: Linux, macOS,
+  Windows.
 * Eldev is fast.
 
 Drawbacks:
@@ -98,8 +124,8 @@ Drawbacks:
 * Eldev depends much more on Emacs internals.  It is more likely to
   break with future Emacs versions than Cask.
 
-Eldev is not widely used, but as of April 2021 there are
-{uri-search-github}[around 50 projects on GitHub] that include file
+Eldev is not widely used, but as of August 2022 there are
+{uri-search-github}[around 120 projects on GitHub] that include file
 `Eldev`, so it is already quite well tested in the wild.
 Additionally, Eldev contains a fairly large regression test
 collection.
@@ -153,6 +179,7 @@ Various elements of files `Eldev` in these projects are documented
 below.
 
 
+[#requirements]
 == Requirements
 
 Eldev runs on Emacs 24.4 and up.  On earlier Emacs versions it will be
@@ -369,6 +396,24 @@ dependencies.
 
 After this step, Eldev is ready to work with your project.
 
+[#githooks]
+=== Initializing a checkout
+
+If your project uses {uri-git-hooks}[Git hooks], you can take
+advantage of Eldev’s command `githooks` to install them:
+
+    $ eldev githooks
+    Installed as symbolic link: ‘.git/hooks/pre-commit’ -> ‘githooks/pre-commit’
+
+Eldev doesn’t try to enforce any hooks on you, instead, it only
+symlinks the files the project has in directory `githooks` to the
+place Git expects them.  For security reasons, Git doesn’t activate
+any hooks by default upon repository cloning, this has to be an
+explicit decision — be that copying by hands or an Eldev invocation.
+
+If you don’t have such a subdirectory, command will not do anything
+and will also not be shown in the output of `eldev help`.
+
 [#setup-procedure]
 == Setup procedure in details
 
@@ -475,6 +520,7 @@ usual in Eldev, you can make it the default in file
 `~/.config/eldev/config` if you want.
 
 
+[#dependencies]
 == Project dependencies
 
 Eldev picks up project dependencies from package declaration,
@@ -862,6 +908,7 @@ You can always ask Eldev for a full list:
 
     $ eldev --list-modes
 
+[#autoloads]
 === Autoloads
 
 {since-0-6} Autoloaded functions of installed Elisp packages can be
@@ -881,6 +928,7 @@ loading mode.  If the autoloads file is kept up-to-date using
 needed in local dependencies too.
 
 
+[#build-system]
 == Build system
 
 Eldev comes with quite a sofisticated build system.  While by default
@@ -1043,8 +1091,9 @@ Previously, the recommended way was
 
 However, this is wrong because it assumes that
 `eldev-files-to-package` is a <<simple-filesets,simple fileset>> which
-will change in Eldev 1.2.  Replace this with code similar to the new
-recommendation above; it works with any Eldev version.
+is no longer true since Eldev 1.2.  Replace this with code similar to
+the new recommendation above; it works with any Eldev version.  See
+also section <<modifying-filesets,on modifying filesets>>.
 ====
 
 Normally, packages are generated in subdirectory `dist` (more
@@ -1623,6 +1672,7 @@ linting in <<continuous-integration,continuous integration>> should
 you want to do that.
 
 
+[#evaluating]
 == Quickly evaluating expressions
 
 It is often useful to evaluate Elisp expressions in context of the
@@ -1716,6 +1766,7 @@ Or:
 at code profiling.  See <<profiling-eval,relevant section below>>.
 
 
+[#running-emacs]
 == Running Emacs
 
 Sometimes you want to run Emacs with _just_ your project installed and
@@ -1857,6 +1908,7 @@ ____
 Therefore, if you use byte-compilation and switch Emacs versions,
 don’t forget to clean the directory.
 
+[#docker]
 === Using Docker
 
 Alternatively, if you are on a Linux or macOS system and have
@@ -1883,10 +1935,12 @@ or evaluate something using project’s functions:
 
     $ eldev docker 26.3 eval "(my-project-read-data \"foo.bin\")"
 
-Because of Elisp limitations, however, output generated by such
-commands will be available only all at once, after they have finished.
-So, it is possible to have a long delay without any output.  In a
-future version, Eldev might try to improve on this.
+Docker’s output is forwarded to normal Eldev output, however, because
+of {uri-emacs-forwarding}[Elisp limitations], it all ends up on
+Eldev’s stdout!  There might also be unwieldy delays, so that output
+doesn’t come smoothly as generated by the process inside Docker, but
+instead in larger chunks.  Before Eldev 1.2 the output would instead
+only appear when Docker has exited.
 
 It is also possible to use a custom image.  For this, replace Emacs
 version argument (26.3 in the last example above) with the full image
@@ -2110,7 +2164,7 @@ Eldev scripts.
 
 * Global option `-d` (`--debug`) makes Eldev print backtrace if it
   dies with a Elisp signal (except certain well-defined and explained
-  errors like missing dependency).
+  errors like a missing dependency).
 
 * {since-0-3} Global option `-Q` (`--backtrace-on-abort`) makes Eldev
   print backtrace if it is aborted with `^C`.  This is useful if your
@@ -2176,7 +2230,7 @@ As for other configuration, you can also do it in `Eldev-local` or
 
 In future, plugins may become externally-managed and “detached” from
 Eldev itself (create an issue if you are interested).  For now,
-however, Eldev provides two built-in plugins.
+however, Eldev provides three built-in plugins.
 
 You can check if a project has any plugins activated — and
 documentation for those plugins:
@@ -2192,7 +2246,7 @@ Remember that if a project activates a plugin in a non-standard way,
 for example from <<hooks,a hook>>, command `plugins` will not see it.
 
 There is currently no way to list all available plugins.  However, as
-of yet there are only two plugins anyway.
+of yet there are only three plugins anyway.
 
 [#autoloads-plugin]
 === autoloads
@@ -2227,6 +2281,190 @@ This plugin can also be activated in projects you use as
 <<local-dependencies,local dependencies>> for other projects.  Eldev
 knows how to keep the autoloads file up-to-date in all local
 dependencies, regardless of their loading mode.
+
+[#maintainer-plugin]
+=== maintainer
+
+{since-1-2} This is a special plugin that adds commands for project’s
+maintainer use, in fact, currently just one: `release`.  Because not
+every developer is a maintainer, this command is not enabled by
+default and is instead available only when the plugin is active, to
+avoid potential confusion.  The recommended way to activate it,
+therefore, is by adding code:
+
+[source]
+----
+(eldev-use-plugin 'maintainer)
+----
+
+to your (as maintainer’s) personal file `Eldev-local`.  You can also
+do this in `~/.config/eldev/config` to have the commands available
+everywhere.  If you are the only developer of your project (or simply
+don’t care), you can of course do this right in file `Eldev`.
+
+The plugin defines a lot of variables that control its behavior.  They
+are available even if the plugin itself is not active, and it is
+actually recommended to set them in file `Eldev`, so that if the
+plugin _is_ activated, project-specific configuration is already
+present.
+
+==== Command `release`
+
+The main plugin’s command is called `release`:
+
+    $ eldev release VERSION
+
+By default it runs interactively.  As always in Eldev, this can be
+changed from command line (option `-N` makes the command
+non-interactive) or customized in `~/.config/eldev/config`.  The
+command refuses to release the project if any _validation_ step fails
+(when running interactively, you can override this in some cases).  It
+won’t push any resulting commits: this is left for you to do
+explicitly.
+
+This command is relatively simplistic.  If you need really advanced
+functionality, try looking for an external tool, e.g.
+{uri-release-it}[Release-It].  Some external tools may be blendable
+into Eldev’s plugin via `eldev-release-validators` etc., see
+<<maintainer-settings,below>>.
+
+There are four standard validation steps:
+
+. Check the version.  It must be valid from Elisp point of view and
+  larger than the current project’s version.  You can also specify one
+  of _incrementors_ by name: “major”, “minor”, “patch” or “snapshot”
+  to have a suitable version number automatically generated for you
+  based on the current version.  Normally you need to specify this on
+  the command line, but when running the command interactively, you
+  can also type it in at runtime.
+
+. Check the project’s working directory.  It must be a Git or
+  Mercurial checkout; the command won’t work in non-VCS directories or
+  those belonging to a different VCS at all.  The directory must not
+  contain any modifications or unknown files (the latter can be
+  “allowed” using option `--ignore-unknown`, `-u`).  Finally, Eldev
+  can refuse releasing from certain branches, by default from anywhere
+  but Git’s “master” or Mercurial’s “default”.
+
+. Check the project’s files.  Eldev will refuse to release if any file
+  contains a run-together word “DONOT{empty}RELEASE” (configurable).
+  This can be left as a reminder to self, for example, as a comment in
+  any file in a place that must be fixed before making a release.
+  This precaution can be skipped with option `--no-file-checks` or
+  manually when running interactively.
+
+. Optionally test the project by running its tests and byte-compiling.
+  This step requires configuration and by default won’t do anything.
+  This is actually not a problem if you have
+  <<continuous-integration,continuous integration>> properly set up.
+  However, the plugin is currently unable to check results on
+  CI-servers automatically and instead relies on you “knowing what you
+  are doing”.
++
+Testing can be skipped with option `--no-testing` in case you know it
+passes on a CI-server or really need to make a release immediately,
+even with known failures.  In the interactive mode you can also choose
+to proceed even if some tests fail.
+
+If the validation passes or if you have interactively chosen to ignore
+the errors, Eldev proceeds to create the release commit and tag the
+release.  Depending on the project configuration, it may additionally
+create a post-release commit (not by default).
+
+Command `release` is written to be as generic as possible.  Eldev
+defines a lot of variables that control its behavior.  However, they
+are not available from the command line.  Instead, they should be
+customized in file `Eldev` on a per-project basis; see the next
+section.
+
+[#maintainer-settings]
+==== Maintainer project-specific settings
+
+You can and most often should adapt the plugin to your project’s
+needs.  There are really lots of variables that control command
+`release` behavior.  They have sensible defaults, but your project,
+especially if it is complicated, still might need to tweak some of
+them.
+
+Not every variable is listed here.  You can always check Eldev source
+code and in-Emacs documentation to find all `eldev-release-…`
+variables if you need yet more customization.
+
+[discrete]
+===== Project name and commit messages
+
+First variable you might need to set is called
+`eldev-formatted-project-name`.  By default it has no value and
+Elisp-level _package_ name is used in its place.  This is often not a
+bad default, but package names are typically all-lowercase.  By
+default the name also makes it into commit messages.
+
+It might also be necessary to modify `eldev-release-commit-message`
+and `eldev-release-post-release-commit-message`.  These variables
+_are_ accessible from command line, but if you always use standard
+messages when releasing, you can save yourself some typing by entering
+them once in file `Eldev`.  Messages set here may contain
+placeholders, see function `eldev-substitute` for details.
+
+[discrete]
+===== Validators
+
+Three variables `eldev-release-test-local`,
+`eldev-release-test-other-emacses` and
+`eldev-release-test-docker-images` let you configure local
+<<testing,testing>> before releasing.  Standard configuration includes
+no testing and Eldev simply relies on you knowing that the code is
+bug-free, e.g. from <<continuous-integration,continuous integration>>
+results.
+
+In addition to the four standard validation steps, you can define
+additional _validators_ by modifying hook `eldev-release-validators`.
+This lets you perform additional checks when releasing your project,
+e.g. checking if the documentation is up-to-date.  Macro
+`eldev-call-process` is particularly useful for implementing those in
+case you need to invoke external (i.e. non-Elisp) tools.
+
+[discrete]
+===== Preparing the release
+
+Once validation is complete, Eldev _prepares_ the release commit.
+Actually, the only standard step for this is updating package version.
+This Eldev can do automatically whether you use package headers, or
+have a prewritten `…-pkg.el` file.
+
+If you need to perform any other steps, you can use hook
+`eldev-release-preparators`.  Functions hooked here may do whatever is
+needed for your project.  Any changes in the registered VCS files will
+be included into the commit.  However, if you create another file, you
+need to register it by VCS first.
+
+[discrete]
+===== Post-release commit
+
+Many projects include a _post-release commit_ in their release flow
+that e.g. bumps project version to a “snapshot” one, so that it is
+always obvious if checked out source code corresponds to an official
+release or not.  To enable this for your project, set variable
+`eldev-release-post-release-commit` to t or a function; for example:
+
+[source]
+----
+(setf eldev-release-post-release-commit
+      (lambda (version)
+        (let ((eldev-release-min-version-size 3))
+          (eldev-release-next-snapshot-version-unless-already-snapshot version))))
+----
+
+Here we say that we do want to bump a version, but only if it is not a
+snapshot already (command `release` lets you create snapshot releases
+too).  We also temporarily rebind `eldev-release-min-version-size` to
+ensure that `snapshot` is added only after the patch (i.e. the third
+component) number.  If `version` is returned unchanged, the
+post-release commit is created, but without bumping the version.  If
+nil is returned, however, post-release commit is canceled altogether.
+
+Like with the main commit, you can modify hook
+`eldev-release-post-release-preparators` to add special steps.
 
 [#undercover-plugin]
 === undercover
@@ -2403,6 +2641,40 @@ Example of an evaluated fileset can be seen from return value of
 
 As the result contains references to two variables, they will be
 evaluated in turn — and so on, until everything is resolved.
+
+[#modifying-filesets]
+=== Modifying filesets
+
+Eldev contains quite a few variables with filesets that may be
+modified by the projects, for example, `eldev-test-fileset`,
+`eldev-standard-excludes` or `eldev-files-to-package`.  To modify
+those, you should create a <<composite-filesets,composite fileset>>
+that refers to the previous value.  For example like this:
+
+[source]
+----
+;; Make sure included sample projects are not compiled etc.
+(setf eldev-standard-excludes
+      `(:or ,eldev-standard-excludes "./samples"))
+----
+
+Previously Eldev documentation and its own source code would use
+`append` or `push` to modify existing filesets.  This turned out to be
+a bad advice, because this implicitly assumes that the modified
+filesets are <<simple-filesets,simple>> and might lead to unexpected
+results (stacktraces or filesets that don’t do what is expected) for
+any other fileset type.
+
+{since-1-2} Starting with version 1.2 Eldev will print a warning
+whenever it detects a “suspicious” modification in any of its standard
+filesets, to avoid potential bugs: `eldev-files-to-package` is no
+longer a simple filesets starting with that version, some others may
+be changed in the future too.  If your project triggers this warning,
+please modify the erroneous code (in file `Eldev` or `Eldev-local`) to
+be similar to the example above.  If you still get warnings, but are
+certain that all fileset-modifying code is correct, you can set
+variable `eldev-warn-about-suspicious-fileset-var-modifications` to
+`nil` in file `Eldev`.
 
 
 [#extending-eldev]
