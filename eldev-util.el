@@ -1377,8 +1377,9 @@ Since 1.2:
                ,@(when die-on-error
                    `((when (/= exit-code 0)
                        (let ((description ,(if (eq die-on-error t) `(eldev-format-message "`%s' process" (file-name-nondirectory executable)) die-on-error)))
-                         (unless (or (= (point-min) (point-max)) (memq ,evaluated-forward-output '(t stdout)))
-                           (eldev-warn "Output of the %s:\n%s" description (buffer-string)))
+                         ,@(unless (memq evaluated-forward-output '(t stdout))
+                            '((unless (or (= (point-min) (point-max)) )
+                                (eldev-warn "Output of the %s:\n%s" description (buffer-string)))))
                          (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
                ,@(or body '(exit-code))))
          (when (buffer-live-p ,temp-buffer)
