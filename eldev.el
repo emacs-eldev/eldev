@@ -4130,7 +4130,7 @@ BODY can contain the following keywords:
 linters listed in variable `eldev-lint-default' and not specified
 in `eldev-lint-default-excluded' or `eldev-lint-disabled' are
 executed.  Default values of these variables mean that all
-supported linters will be run.
+supported linters with the exception of `elisp-lint' will be run.
 
 You can also request specific linters by name.  Use option
 `--list-linters' to find all supported by Eldev.  Special name
