@@ -546,6 +546,8 @@ possible to build arbitrary targets this way."
            (puthash target (if succeeded 'built 'failed) eldev--build-results)))))))
 
 
+(defconst eldev--have-byte-compile-warning-function (boundp 'byte-compile-log-warning-function))
+
 (defvar eldev--recursive-byte-compilation   nil)
 (defvar eldev--recursive-elevated-errors-in nil)
 (defvar eldev--feature-providers            (make-hash-table :test #'eq))
@@ -595,9 +597,8 @@ possible to build arbitrary targets this way."
                                    ;;
                                    ;; Changes will be done several times in case of a recursive compilation,
                                    ;; but this doesn't really matter.
-                                   (let* ((have-warning-function             (boundp 'byte-compile-log-warning-function))
-                                          (original-warning-function         (when have-warning-function byte-compile-log-warning-function))
-                                          (byte-compile-log-warning-function (when have-warning-function
+                                   (let* ((original-warning-function         (when eldev--have-byte-compile-warning-function byte-compile-log-warning-function))
+                                          (byte-compile-log-warning-function (when eldev--have-byte-compile-warning-function
                                                                                (lambda (string &optional position fill level &rest etc)
                                                                                  (when (and eldev-build-treat-warnings-as-errors (eq level :warning))
                                                                                    (push source (car eldev--recursive-elevated-errors-in))
@@ -607,7 +608,7 @@ possible to build arbitrary targets this way."
                                      (eldev-advised (#'byte-compile-log-warning :around
                                                                                 ;; Not available on old Emacs versions.  Basically
                                                                                 ;; just duplicating the function above.
-                                                                                (unless have-warning-function
+                                                                                (unless eldev--have-byte-compile-warning-function
                                                                                   (lambda (original string &optional fill level &rest etc)
                                                                                     (when (and eldev-build-treat-warnings-as-errors (eq level :warning))
                                                                                       (push source (car eldev--recursive-elevated-errors-in))
