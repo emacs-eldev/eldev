@@ -546,14 +546,16 @@ possible to build arbitrary targets this way."
            (puthash target (if succeeded 'built 'failed) eldev--build-results)))))))
 
 
-(defvar eldev--recursive-byte-compilation nil)
-(defvar eldev--feature-providers (make-hash-table :test #'eq))
+(defvar eldev--recursive-byte-compilation   nil)
+(defvar eldev--recursive-elevated-errors-in nil)
+(defvar eldev--feature-providers            (make-hash-table :test #'eq))
 
 (defun eldev--byte-compile-.el (source target)
   (eval-and-compile (require 'bytecomp))
-  (let* ((recursive                         eldev--recursive-byte-compilation)
-         (eldev--recursive-byte-compilation t)
-         (load-prefer-newer                 t)
+  (let* ((recursive                           eldev--recursive-byte-compilation)
+         (eldev--recursive-byte-compilation   t)
+         (eldev--recursive-elevated-errors-in (if recursive eldev--recursive-elevated-errors-in (list nil)))
+         (load-prefer-newer                   t)
          ;; When called recursively, let `byte-compile-file' determine this.
          (skip-byte-compilation             (unless recursive
                                               (with-temp-buffer
@@ -590,32 +592,34 @@ possible to build arbitrary targets this way."
                                    ;; aborts compilation after the very first warning (since forever and at
                                    ;; least till June 2022 Emacs snapshots).  Makes it tedious to hunt them
                                    ;; down if you have twenty.
-                                   (let* (resulted-in-elevated-warnings
-                                          ;; Not available on old Emacs versions.
-                                          (have-warning-function             (boundp 'byte-compile-log-warning-function))
+                                   ;;
+                                   ;; Changes will be done several times in case of a recursive compilation,
+                                   ;; but this doesn't really matter.
+                                   (let* ((have-warning-function             (boundp 'byte-compile-log-warning-function))
                                           (original-warning-function         (when have-warning-function byte-compile-log-warning-function))
                                           (byte-compile-log-warning-function (when have-warning-function
-                                                                               (cond (recursive
-                                                                                      original-warning-function)
-                                                                                     (eldev-build-treat-warnings-as-errors
-                                                                                      (lambda (string &optional position fill _level &rest etc)
-                                                                                        (setf resulted-in-elevated-warnings t)
-                                                                                        (apply original-warning-function string position fill :error etc)))
-                                                                                     (eldev-build-suppress-warnings
-                                                                                      #'ignore)
-                                                                                     (t
-                                                                                      original-warning-function)))))
+                                                                               (lambda (string &optional position fill level &rest etc)
+                                                                                 (when (and eldev-build-treat-warnings-as-errors (eq level :warning))
+                                                                                   (push source (car eldev--recursive-elevated-errors-in))
+                                                                                   (setf level :error))
+                                                                                 (unless (and eldev-build-suppress-warnings (eq level :warning))
+                                                                                   (apply original-warning-function string position fill level etc))))))
                                      (eldev-advised (#'byte-compile-log-warning :around
+                                                                                ;; Not available on old Emacs versions.  Basically
+                                                                                ;; just duplicating the function above.
                                                                                 (unless have-warning-function
                                                                                   (lambda (original string &optional fill level &rest etc)
-                                                                                    (when eldev-build-treat-warnings-as-errors
-                                                                                      (setf resulted-in-elevated-warnings t)
+                                                                                    (when (and eldev-build-treat-warnings-as-errors (eq level :warning))
+                                                                                      (push source (car eldev--recursive-elevated-errors-in))
                                                                                       (setf level :error))
                                                                                     (unless (and eldev-build-suppress-warnings (eq level :warning))
                                                                                       (apply original string fill level etc)))))
                                        (eldev--silence-file-writing-message (expand-file-name target)
                                          (eldev-profile-body
-                                           (and (byte-compile-file source) (not resulted-in-elevated-warnings))))))))
+                                           (and (byte-compile-file source)
+                                                (if (memq source (car eldev--recursive-elevated-errors-in))
+                                                    (progn (delete-file target) nil)
+                                                  t))))))))
                     (cond ((eq result 'no-byte-compile)
                            (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
                            nil)

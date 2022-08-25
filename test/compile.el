@@ -173,11 +173,44 @@
 (ert-deftest eldev-compile-warnings-as-errors-2 ()
   (eldev--test-without-files "project-b" "project-b.elc"
     (eldev--test-run nil ("compile" "--warnings-as-errors")
-      ;; Compilation must produce two warnings, which are elevated and cause build to
+      ;; Compilation must produce two warnings, which are elevated and cause the build to
       ;; fail.  Previously Eldev would use built-in `byte-compile-error-on-warn' and thus
       ;; stop after the first warning.  Now we require that both are printed.
       (should (string-match-p "project-b-never-declared-this-variable" stderr))
       (should (string-match-p "noprefixforthisvar"                     stderr))
+      (should (= exit-code 1)))))
+
+(eldev-ert-defargtest eldev-compile-warnings-as-errors-recursive-1 (with-main-file)
+                      (nil t)
+  (eldev--test-without-files "project-k" ("project-k.elc" "project-k-util.elc")
+    ;; Make sure to delete everything first, so that the building doesn't know that
+    ;; `project-k.el' depends on `project-k-util.el'.
+    (eldev--test-run nil ("clean" "all")
+      (should (= exit-code 0)))
+    (eldev--test-run nil (:eval `("compile" "--warnings-as-errors" ,@(when with-main-file '("project-k.el")) "project-k-util.el"))
+      ;; Compilation must produce a warnings in `project-k-util.el', which is elevated and
+      ;; causes the build to fail.  It shouldn't therefore even get to warnings in
+      ;; `project-k.el' (but must start with it, if `with-main-file' is set).
+      (should (eldev-xor (not with-main-file) (string-match-p "ELC +project-k\\.el" stdout)))
+      (should (string-match-p "ELC +project-k-util\\.el" stdout))
+      (should (string-match-p "project-k-util-never-declared-this-variable" stderr))
+      ;; No `.elc' files must be produced.
+      (eldev--test-assert-files project-dir preexisting-files)
+      (should (= exit-code 1)))))
+
+(ert-deftest eldev-compile-suppress-warnings-1 ()
+  (eldev--test-without-files "project-k" ("project-k.elc" "project-k-util.elc")
+    (eldev--test-run nil ("compile" "--suppress-warnings" "project-k.el" "project-k-util.el")
+      (should-not (string-match-p "warning" stderr))
+      (eldev--test-assert-files project-dir preexisting-files "project-k.elc" "project-k-util.elc")
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-compile-suppress-warnings-2 ()
+  (eldev--test-without-files "project-k" ("project-k-erroneous.elc")
+    (eldev--test-run nil ("compile" "--suppress-warnings" "project-k-erroneous.el")
+      ;; Make sure it doesn't suppress the _error_.
+      (should (string-match-p "end of file" stderr))
+      (eldev--test-assert-files project-dir preexisting-files)
       (should (= exit-code 1)))))
 
 
