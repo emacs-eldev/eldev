@@ -6,6 +6,12 @@
     (should (string= stdout "1\n"))
     (should (= exit-code 0))))
 
+;; Test against a real failure in 1.2.1 (and likely long before that).
+(ert-deftest eldev-eval-2 ()
+  (eldev--test-run "trivial-project" ("eval" `(format "%2$s" 'foo 'bar))
+    (should (string= stdout "\"bar\"\n"))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-multieval-1 ()
   (eldev--test-run "trivial-project" ("eval" `1 `(+ 2 3) `(cons 1 2))
     (should (string= stdout "1\n5\n(1 . 2)\n"))

@@ -3816,7 +3816,7 @@ considered allowed)."
 This function is meant for use in framework support
 implementations."
   (mapcar (lambda (selector)
-            (let ((as-elisp (eldev-read-wholly selector "selector `%s'")))
+            (let ((as-elisp (eldev-read-wholly selector (eldev-format-message "selector `%s'" selector))))
               (if cons-with-string `(,as-elisp . ,selector) as-elisp)))
           selectors))
 

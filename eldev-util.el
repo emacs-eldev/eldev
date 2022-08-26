@@ -822,7 +822,7 @@ expressions, and this function returns a list of them."
   (with-temp-buffer
     (insert string)
     (goto-char 1)
-    (let ((expressions (eldev-read-current-buffer-forms (eldev-format-message (or description (format "Lisp object%s from `%%s'" (if list-of-expressions "(s)" ""))) string) (not list-of-expressions))))
+    (let ((expressions (eldev-read-current-buffer-forms (or description (eldev-format-message "Lisp object%s from `%%s'" (if list-of-expressions "(s)" "") string)) (not list-of-expressions))))
       (unless (or list-of-expressions (eobp))
         (let ((tail (buffer-substring (point) (point-max))))
           (signal 'eldev-error (if (string-suffix-p "expression" description)
