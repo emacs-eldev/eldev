@@ -8,8 +8,8 @@
 
 ;; Test against a real failure in 1.2.1 (and likely long before that).
 (ert-deftest eldev-eval-2 ()
-  (eldev--test-run "trivial-project" ("eval" `(format "%2$s" 'foo 'bar))
-    (should (string= stdout "\"bar\"\n"))
+  (eldev--test-run "trivial-project" ("eval" `(format "%s %s" 'foo 'bar))
+    (should (string= stdout "\"foo bar\"\n"))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-multieval-1 ()
