@@ -29,6 +29,19 @@
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-bootstrapping-2 ()
+  (eldev--test-create-eldev-archive "eldev-archive-1")
+  (let ((eldev--test-project     "trivial-project")
+        (eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
+        (eldev--test-eldev-dir   (eldev--test-tmp-subdir "bootstrap-root")))
+    (ignore-errors (delete-directory eldev--test-eldev-dir t))
+    ;; Ensure that bootstrapped Eldev is immediately operational and is byte-compiled.
+    ;; The first test `...-1' above wouldn't catch it since it issues `version' first.
+    ;; However, let's keep the first test anyway.  This test is targeted at issue #76.
+    (eldev--test-run nil ("eval" `(byte-code-function-p (symbol-function 'eldev-cli)) `(eldev-xor nil t))
+      (should (string= stdout (eldev--test-lines "t" "t")))
+      (should (= exit-code 0)))))
+
 (ert-deftest eldev-command-hook-1 ()
   ;; Just make sure that the hook is executed.
   (eldev--test-run "empty-project" ("--setup" `(add-hook 'eldev-help-hook (lambda () (error "fail!"))) "help")
