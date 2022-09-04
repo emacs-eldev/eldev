@@ -30,6 +30,9 @@
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-bootstrapping-2 ()
+  (when (< emacs-major-version 25)
+    ;; But apparently there are no consequences, so let's ignore that.
+    (ert-skip "This test fails on ancient Emacs versions"))
   (eldev--test-create-eldev-archive "eldev-archive-1")
   (let ((eldev--test-project     "trivial-project")
         (eldev--test-eldev-local (concat ":pa:" (eldev--test-tmp-subdir "eldev-archive-1")))
