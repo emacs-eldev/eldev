@@ -1429,9 +1429,7 @@ Since 1.2:
               ;; kill the process if Eldev itself gets killed with C-c; currently, this
               ;; should be the only difference compared to just using `call-process'.
               (let* (process
-                     stderr-pipe
-                     (still-running t)
-                     (common-sentinel (lambda (&rest _ignored) (setf still-running (or (process-live-p process) (process-live-p stderr-pipe))))))
+                     stderr-pipe)
                 (eldev-with-kill-handler (lambda ()
                                            (when (process-live-p process)
                                              (interrupt-process process)))
@@ -1448,7 +1446,7 @@ Since 1.2:
                                                                            (lambda (process string)
                                                                              (message "%s" string)
                                                                              (internal-default-process-filter process string)))
-                                                               :sentinel common-sentinel
+                                                               :sentinel #'ignore
                                                                :noquery  t))
                               process     (make-process :name     executable
                                                         :command  `(,executable ,@command-line)
@@ -1458,18 +1456,26 @@ Since 1.2:
                                                                       (princ string)
                                                                       (internal-default-process-filter process string)))
                                                         :stderr   stderr-pipe
-                                                        :sentinel common-sentinel
+                                                        ;; Default would write some useless message.
+                                                        :sentinel #'ignore
                                                         :noquery  t))
                         (when infile
                           (with-temp-buffer
                             (insert-file-contents-literally infile)
                             (process-send-string process (buffer-string))))
                         (unless dont-wait
-                          (while still-running
-                            ;; In principle, I'd replace the timeout with a very large
-                            ;; number, but I don't particularly trust Emacs not to get
-                            ;; stuck here.
-                            (accept-process-output process 1.0))
+                          (while (let ((wait-on (cond ((process-live-p process)     process)
+                                                      ((process-live-p stderr-pipe) stderr-pipe))))
+                                   (when wait-on
+                                     ;; Having nil for the timeout would make the function
+                                     ;; return right away rather than wait "forever".  In
+                                     ;; principle, I'd replace the timeout with a very
+                                     ;; large number, but don't particularly trust Emacs
+                                     ;; not to get stuck here.  Also, having some
+                                     ;; `wait-on' process rather than nil is important for
+                                     ;; making it return quickly if the process dies.
+                                     (accept-process-output wait-on 1.0)
+                                     t)))
                           (process-exit-status process)))
                     (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer
