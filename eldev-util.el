@@ -1466,7 +1466,10 @@ Since 1.2:
                             (process-send-string process (buffer-string))))
                         (unless dont-wait
                           (while still-running
-                            (accept-process-output))
+                            ;; In principle, I'd replace the timeout with a very large
+                            ;; number, but I don't particularly trust Emacs not to get
+                            ;; stuck here.
+                            (accept-process-output process 1.0))
                           (process-exit-status process)))
                     (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer
