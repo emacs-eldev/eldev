@@ -5715,8 +5715,12 @@ will fail if the project already has file named `Eldev'."
   :for-command    init)
 
 
+(defvar eldev-githooks-uninstall nil
+  "Uninstall the hooks instead of installing.")
+
 (defvar eldev-githooks-force nil
-  "Overwrite existing hooks if needed.")
+  "Overwrite existing hooks if needed.
+When uninstalling, also delete copied hooks.")
 
 (defvar eldev-githooks-command-active #'eldev--githooks-command-active)
 
@@ -5726,7 +5730,9 @@ will fail if the project already has file named `Eldev'."
 (eldev-defcommand eldev-githooks (&rest parameters)
   "Install project-recommended Git hooks.  All files from
 subdirectory `githooks' in the project root get symlinked to
-`.git/hooks'."
+`.git/hooks'.
+
+The command can also uninstall the hooks, see option `-u'."
   :aliases        install-githooks
   :hidden-if      (not (funcall eldev-githooks-command-active))
   (when parameters
@@ -5734,10 +5740,18 @@ subdirectory `githooks' in the project root get symlinked to
   (require 'eldev-vc)
   (eldev--do-githooks))
 
+(eldev-defbooloptions eldev-githooks-uninstall eldev-githooks-install eldev-githooks-uninstall
+  ("Uninstall the hooks instead"
+   :options       (-u --uninstall))
+  ("Do install the hooks"
+   :options       (-i --do-install)
+   :hidden-if     :default)
+  :for-command    githooks)
+
 (eldev-defbooloptions eldev-githooks-force-mode eldev-githooks-keep-existing-mode eldev-githooks-force
-  ("Overwrite existing installed Git hooks"
+  ("Overwrite existing installed Git hooks; when uninstalling, also delete copied hooks, not only those symlinked"
    :options       (-f --force))
-  ("Keep existing installed Git hooks"
+  ("Keep existing installed Git hooks; when uninstalling, only delete symlinks"
    :options       --keep-installed
    :hidden-if     :default)
   :for-command    githooks)
