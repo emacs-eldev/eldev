@@ -1,30 +1,79 @@
 (require 'eldev)
 (require 'ert)
 
-(defvar eldev--test-all-files       '("README"
-                                      "bar/README"
-                                      "files/README"
-                                      "files/xyz/README"))
-(defvar eldev--test-root-files      '("README"))
-(defvar eldev--test-bar-files       '("bar/README"))
-(defvar eldev--test-files-files     '("files/README" "files/xyz/README"))
-(defvar eldev--test-files-xyz-files '("files/xyz/README"))
 
+(defvar eldev--test-pretend-files   '("AA.fake"
+                                      "bb.fake"
+                                      "bar/Abc.fake"
+                                      "bar/z.fake"
+                                      "files/A.fake"
+                                      "files/B.fake"
+                                      "files/Z.fake"
+                                      "files/xyz/a-fake"))
+
+(defvar eldev--test-all-files       '("AA.fake"
+                                      "README"
+                                      "bb.fake"
+                                      "bar/Abc.fake"
+                                      "bar/README"
+                                      "bar/z.fake"
+                                      "files/A.fake"
+                                      "files/B.fake"
+                                      "files/README"
+                                      "files/Z.fake"
+                                      ;; Added `zzz' to test ordering: must come before
+                                      ;; subdirectories despite the name.
+                                      "files/zzz"
+                                      "files/xyz/README"
+                                      "files/xyz/a-fake"))
+(defvar eldev--test-root-files      '("AA.fake"
+                                      "README"
+                                      "bb.fake"))
+(defvar eldev--test-bar-files       '("bar/Abc.fake"
+                                      "bar/README"
+                                      "bar/z.fake"))
+(defvar eldev--test-files-files     '("files/A.fake"
+                                      "files/B.fake"
+                                      "files/README"
+                                      "files/Z.fake"
+                                      "files/zzz"
+                                      "files/xyz/README"
+                                      "files/xyz/a-fake"))
+(defvar eldev--test-files-xyz-files '("files/xyz/README"
+                                      "files/xyz/a-fake"))
+
+
+(defmacro eldev--do-test-fileset (fileset all-files expected-files)
+  `(let* ((all-files      ,all-files)
+          (excluded-files (eldev-filter (not (member it (eldev-listify ,expected-files))) all-files))
+          (file-types     (if eldev-pretend-files
+                              (if eldev-consider-only-pretend-files "pretend files only" "real and pretend files")
+                            "real files")))
+     (condition-case error
+         (progn (should (equal (eldev-find-files ,fileset nil "test/files") ,expected-files))
+                (should (equal (eldev-filter-files all-files ,fileset nil "test/files") ,expected-files)))
+       (error (eldev-error "Failed for fileset `%S' for %s" ,fileset file-types)
+              (signal (car error) (cdr error))))
+     (condition-case error
+         (progn (should (equal (eldev-find-files '(:not ,fileset) nil "test/files") excluded-files))
+                (should (equal (eldev-filter-files all-files '(:not ,fileset) nil "test/files") excluded-files)))
+       (error (eldev-error "Failed for fileset `(:not %S)' for %s" ,fileset file-types)
+              (signal (car error) (cdr error))))))
 
 (defmacro eldev--test-fileset (fileset expected-files)
   ;; Test `eldev-find-files' and `eldev-filter-files' on FILESET and
   ;; its negation.
-  `(let ((other-files (eldev-filter (not (member it (eldev-listify ,expected-files))) eldev--test-all-files)))
-     (condition-case error
-         (progn (should (equal (eldev-find-files ,fileset nil "test/files") ,expected-files))
-                (should (equal (eldev-filter-files eldev--test-all-files ,fileset nil "test/files") ,expected-files)))
-       (error (eldev-error "Failed for fileset %S" ,fileset)
-              (signal (car error) (cdr error))))
-     (condition-case error
-         (progn (should (equal (eldev-find-files '(:not ,fileset) nil "test/files") other-files))
-                (should (equal (eldev-filter-files eldev--test-all-files '(:not ,fileset) nil "test/files") other-files)))
-       (error (eldev-error "Failed for fileset (:not %S)" ,fileset)
-              (signal (car error) (cdr error))))))
+  `(progn
+     (eldev--do-test-fileset ,fileset
+                             (eldev-filter (not (string-match-p "fake" it)) eldev--test-all-files)
+                             (eldev-filter (not (string-match-p "fake" it)) ,expected-files))
+     (let ((eldev-pretend-files eldev--test-pretend-files))
+       (let ((eldev-consider-only-pretend-files t))
+         (eldev--do-test-fileset ,fileset
+                                 (eldev-filter (string-match-p "fake" it) eldev--test-all-files)
+                                 (eldev-filter (string-match-p "fake" it) ,expected-files)))
+       (let ((eldev-consider-only-pretend-files nil))
+         (eldev--do-test-fileset ,fileset eldev--test-all-files ,expected-files)))))
 
 
 (ert-deftest eldev-empty-fileset-nil-1 ()
@@ -146,6 +195,12 @@
 (ert-deftest eldev-single-file-2 ()
   (dolist (file eldev--test-all-files)
     (eldev--test-fileset (format "/%s" file) (list file))))
+
+
+(ert-deftest eldev-pretend-file-matching-real-file ()
+  (let ((eldev-pretend-files               '("README"))
+        (eldev-consider-only-pretend-files nil))
+    (eldev--do-test-fileset '("/README") (eldev-filter (not (string-match-p "fake" it)) eldev--test-all-files) '("README"))))
 
 
 (provide 'test/fileset)

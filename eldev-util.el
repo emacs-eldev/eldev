@@ -211,6 +211,12 @@ Needed for compatibility."
 
 (eval-and-compile
   (defmacro eldev--assq-set (key value place &optional comparator)
+    "Add or replace VALUE for given KEY in associated list at PLACE.
+For Emacs 25+ this is the same as
+
+    (setf (alist-get key place nil nil comparator) value)
+
+Only `eq' (also default) and `equal' are supported for COMPARATOR."
     `(let* ((key      ,key)
             (value    ,value)
             ;; Emacs 24 doesn't support arbitrary comparators.
@@ -1860,9 +1866,29 @@ Both lists and strings are accepted.  Since 1.2."
 
 ;; Fileset basics.
 
+(defvar eldev-pretend-files nil
+  "A list of “pretend”-files for fileset operations.
+Any file listed here will be a candidate for `eldev-find-files'
+as if it existed.  If a filename ends in a slash, it specifies a
+“pretend”-directory.
+
+This variable should never be set directly, only let-bound.
+
+Since 1.3.")
+
+(defvar eldev-consider-only-pretend-files nil
+  "Whether `eldev-find-files' should consider real files or not.
+If set to non-nil, real files are ignored.
+
+This variable should never be set directly, only let-bound.
+
+Since 1.3.")
+
+(defvar eldev--preprocessed-pretend-files)
+
 (defvar eldev-warn-about-suspicious-fileset-var-modifications t
   "Whether to warn about potentially wrong fileset modifications.
-Since 1.2")
+Since 1.2.")
 
 (defvar eldev-fileset-max-iterations 10
   "Fail if computed fileset elements cannot be resolved in this many iterations.")
@@ -1887,9 +1913,12 @@ For example, result list could be something like this:
     baz/foo"
   (setf root (file-name-as-directory (if root (expand-file-name root eldev-project-dir) eldev-project-dir)))
   (save-match-data
-    (let* ((case-fold-search     nil)
-           (preprocessed-fileset (eldev--preprocess-fileset fileset))
-           (files                (list nil)))
+    ;; `let*' to make `case-fold-search' have effect for preprocessing filesets.
+    (let* ((case-fold-search                  nil)
+           (preprocessed-fileset              (eldev--preprocess-fileset fileset))
+           (eldev--preprocessed-pretend-files (when eldev-pretend-files
+                                                (eldev--preprocess-pretend-files eldev-pretend-files root)))
+           (files                             (list nil)))
       (unless (equal preprocessed-fileset '(nil))
         (let ((default-directory root))
           (eldev--do-find-files root (if absolute root "") preprocessed-fileset files))
@@ -2014,6 +2043,33 @@ absolute paths, but are traced without them.  See
     (cons (eldev-xor (if (eq matches-initially 'undecided) (eldev-all-p (not (eldev-xor (car it) negated)) preprocessed-patterns) matches-initially) negated)
           (nreverse preprocessed-patterns))))
 
+(defun eldev--preprocess-pretend-files (files root)
+  ;; Hardly-readable code to build a hash-table based on `files' in the following format:
+  ;;
+  ;;     DIR -> (FILES-HERE . SUBDIRS-HERE)
+  ;;
+  ;; Here DIR is an absolute path.  Lists are not sorted yet; they don't contain
+  ;; duplicates.
+  (let ((lookup (make-hash-table :test #'equal)))
+    (dolist (file files)
+      (let ((path-scan (file-relative-name (expand-file-name file root) root))
+            entry)
+        (unless (or (eldev-external-or-absolute-filename path-scan) (string= path-scan "."))
+          (unless (string-suffix-p "/" path-scan)
+            (let ((filename (file-name-nondirectory path-scan))
+                  (key      (concat root (setf path-scan (file-name-directory path-scan)))))
+              (if (setf entry (gethash key lookup))
+                  (push filename (car entry))
+                (puthash key (cons (list filename) nil) lookup))))
+          (while (and (null entry) path-scan)
+            (setf path-scan (directory-file-name path-scan))
+            (let ((subdirectory (file-name-nondirectory path-scan))
+                  (key          (concat root (or (setf path-scan (file-name-directory path-scan)) ""))))
+              (if (setf entry (gethash key lookup))
+                  (push subdirectory (cdr entry))
+                (puthash key (cons nil (list subdirectory)) lookup)))))))
+    lookup))
+
 ;; The following complications are mostly needed to avoid even
 ;; scanning subdirectories where no matches can be found.  A simpler
 ;; way would be to find everything under `root' and just filter it.
@@ -2022,14 +2078,29 @@ absolute paths, but are traced without them.  See
   ;; Shouldn't be even traced; re-enable for testing if needed.
   (when nil
     (eldev-trace "  Scanning `%s' for %S" (if (equal directory "") (if (equal full-directory "") default-directory full-directory) directory) preprocessed-fileset))
-  (let (subdirectories)
-    (dolist (file (directory-files full-directory))
-      (unless (member file '("." ".."))
-        (if (file-directory-p (concat full-directory file))
-            (push file subdirectories)
+  (let* ((real-files             (unless eldev-consider-only-pretend-files (directory-files full-directory)))
+         (pretend-file-entry     (when eldev--preprocessed-pretend-files (gethash full-directory eldev--preprocessed-pretend-files)))
+         (pretend-files          (when pretend-file-entry (sort (car pretend-file-entry) #'string<)))
+         (pretend-subdirectories (cdr pretend-file-entry))
+         real-subdirectories)
+    (while (or real-files pretend-files)
+      (if (or (null pretend-files) (and real-files (not (string> (car real-files) (car pretend-files)))))
+          (let ((file (pop real-files)))
+            (unless (member file '("." ".."))
+              (if (file-directory-p (concat full-directory file))
+                  (push file real-subdirectories)
+                (when (eldev--file-matches file preprocessed-fileset)
+                  (push (concat directory file) (car result))))))
+        (let ((file (pop pretend-files)))
           (when (eldev--file-matches file preprocessed-fileset)
-            (push (concat directory file) (car result))))))
-    (dolist (subdirectory (nreverse subdirectories))
+            (setf file (concat directory file))
+            ;; Pretend-files can be real too, don't list those twice.
+            (unless (and (car result) (string= file (caar result)))
+              (push file (car result)))))))
+    (dolist (subdirectory (if pretend-subdirectories
+                              ;; Pretend-directories can be real too, don't recurse twice in such cases.
+                              (delete-consecutive-dups (sort (nconc real-subdirectories pretend-subdirectories) #'string<))
+                            (nreverse real-subdirectories)))
       (let ((recurse-fileset (eldev--build-recurse-fileset subdirectory preprocessed-fileset)))
         (unless (equal recurse-fileset '(nil))
           (eldev--do-find-files (concat full-directory subdirectory "/") (concat directory subdirectory "/")
