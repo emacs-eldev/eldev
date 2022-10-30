@@ -4531,8 +4531,9 @@ change `elisp-lint's configuration."
 
 
 (defun eldev-lint-fileset ()
-  ;; Target set is hardcoded for now.
-  (eldev-standard-fileset 'main))
+  ;; Target set is hardcoded for now.  It makes little sense to lint generated files, so
+  ;; those are excluded (important only if someone procedurally generates a `.el').
+  (eldev-standard-fileset 'main nil t))
 
 (defun eldev-lint-find-files (filter &optional fileset filter-description)
   "Find files to lint matching given FILTER in the FILESET."

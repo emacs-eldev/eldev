@@ -497,7 +497,9 @@ in the VERSION as unknown back then."
       (eldev-verbose "Skipping file contents checks as requested")
     (eldev-named-step "releasing" "checking project's files as configured"
       (eldev-verbose "%s..." (eldev-current-step-name t))
-      (dolist (file (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'all) (:not ,eldev-release-file-check-ignored-files)) "file%s to check"))
+      ;; Not checking generated files here.
+      (dolist (file (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'all nil t) (:not ,eldev-release-file-check-ignored-files))
+                                                "file%s to check"))
         (eldev-trace "Checking file `%s'..." file)
         (with-temp-buffer
           (insert-file-contents file)
