@@ -1,5 +1,4 @@
-(require 'eldev)
-(require 'ert)
+(require 'test/common)
 
 
 (defvar eldev--test-pretend-files   '("AA.fake"
@@ -197,8 +196,9 @@
     (eldev--test-fileset (format "/%s" file) (list file))))
 
 
-(ert-deftest eldev-pretend-file-matching-real-file ()
-  (let ((eldev-pretend-files               '("README"))
+(eldev-ert-defargtest eldev-pretend-file-matching-real-file (with-duplicate-pretend-file)
+                      (nil t)
+  (let ((eldev-pretend-files               (if with-duplicate-pretend-file '("README" "README") '("README")))
         (eldev-consider-only-pretend-files nil))
     (eldev--do-test-fileset '("/README") (eldev-filter (not (string-match-p "fake" it)) eldev--test-all-files) '("README"))))
 

@@ -2084,7 +2084,7 @@ absolute paths, but are traced without them.  See
          (pretend-subdirectories (cdr pretend-file-entry))
          real-subdirectories)
     (while (or real-files pretend-files)
-      (if (or (null pretend-files) (and real-files (not (string> (car real-files) (car pretend-files)))))
+      (if (or (null pretend-files) (and real-files (not (string< (car pretend-files) (car real-files)))))
           (let ((file (pop real-files)))
             (unless (member file '("." ".."))
               (if (file-directory-p (concat full-directory file))
