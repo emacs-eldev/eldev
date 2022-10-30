@@ -21,14 +21,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', '27.2', '28.1', 'snapshot']
+        emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', '27.2', '28.1', '28.2', 'snapshot']
         include:
           - os: macos-latest
-            emacs_version: '28.1'
+            emacs_version: '28.2'
           - os: macos-latest
             emacs_version: 'snapshot'
           - os: windows-latest
-            emacs_version: '28.1'
+            emacs_version: '28.2'
 
     steps:
     - name: Set up Emacs
@@ -55,12 +55,12 @@ jobs:
 
     - name: Test the project
       run: |
-        ./bin/eldev -p -dtTC test --omit-backtraces --expect 200
+        ./bin/eldev -p -dtTC test --omit-backtraces --expect 400
       env:
         ELDEV_LOCAL: "."
 
     - name: Test integration
-      run: ./bin/eldev -p -dtTC test --test-type integration --omit-backtraces --expect 5
+      run: ./bin/eldev -p -dtTC test --test-type integration --omit-backtraces --expect 30
       env:
         ELDEV_LOCAL: "."
 
