@@ -655,11 +655,14 @@ truncate backtrace lines"
 
 ;; Filesets.
 
-(defun eldev-standard-fileset (name &optional no-excludes)
+(defun eldev-standard-fileset (name &optional no-excludes without-generated)
   "Return a computed fileset for target set with given NAME.
 Unless NO-EXCLUDES is specified, all targets from
-`eldev-standard-excludes' are ignored."
-  (eldev-standard-filesets (if no-excludes :no-excludes :std-excludes) name))
+`eldev-standard-excludes' are ignored.
+
+Since 1.3: when NO-GENERATED is specified, generated files are
+ignored too."
+  (eldev-standard-filesets (if no-excludes :no-excludes :std-excludes) (if without-generated :without-generated :with-generated) name))
 
 (defun eldev-standard-filesets (&rest arguments)
   "Build a fileset from standard pieces.
@@ -678,10 +681,16 @@ of the following keywords:
 
     :std-excludes or :no-excludes
 
-        Whether to use `eldev-standard-excludes' (default) or not."
+        Whether to use `eldev-standard-excludes' (default) or not.
+
+    :with-generated or :without-generated (since 1.3)
+
+        Whether to include generated files (default) or not; see
+        function `eldev-generated-files'."
   (let ((combination-mode :or)
         except
         no-excludes
+        without-generated
         names
         result)
     (dolist (argument arguments)
@@ -692,6 +701,8 @@ of the following keywords:
          (setf except (eq argument :except)))
         ((or :no-excludes :std-excludes)
          (setf no-excludes (eq argument :no-excludes)))
+        ((or :with-generated :without-generated)
+         (setf without-generated (eq argument :without-generated)))
         ((pred keywordp)
          (error "Unhandled keyword `%s'" argument))
         (_
@@ -714,6 +725,11 @@ of the following keywords:
                    (car result)))
     (unless no-excludes
       (setf result `(:and ,result (:not eldev-standard-excludes))))
+    (when without-generated
+      (let (generated)
+        (dolist (file (eldev-generated-files))
+          (push (format "/%s" file) generated))
+        (setf result `(:and ,result (:not ,generated)))))
     result))
 
 (defun eldev-validate-standard-fileset (name)
@@ -1629,6 +1645,112 @@ If COMMAND is nil, list global options instead."
           (while (re-search-forward "\n" nil t)
             (replace-match indentation t t))))
       (buffer-string))))
+
+
+
+;; eldev files
+
+(defvar eldev-files-filesets nil
+  "Named filesets to list files in (`main', `test', etc.).
+If left nil, all filesets are listed.")
+
+(defvar eldev-files-type 'normal
+  "Which files to list.
+Can be `normal', `generated' and `all'.")
+
+(defvar eldev-files-generated-also-potential nil
+  "Whether to include potentially creatable generated files.
+Otherwise only existing generated files would be listed.")
+
+(defvar eldev-files-ignore-std-excludes nil
+  "Whether to ignore `eldev-standard-excludes'.")
+
+(defvar eldev-files-absolute-paths nil
+  "Whether to list files by their absolute paths.")
+
+(eldev-defcommand eldev-files (&rest parameters)
+  "List files in the project.
+
+By default, list all project files.  However, you can restrict
+listed files using command line parameters; remember that you
+will likely need to quote those if they contain wildcards, else
+the wildcards will get expanded by the shell.
+
+Option `--set' can be used to restrict only to files in that set.
+By default all filesets are included.
+
+Generated files, for example `.elc' files are not listed by
+default.  However, you can request lists of those with options
+`--generated' (instead of normal files) or `--all' (in addition
+to normal files).  It is possible to list only already existing
+generated files or those that could be created in principle."
+  :aliases        list-files
+  :parameters     "[FILESET...]"
+  :works-on-old-eldev t
+  (let* ((generated-files                   (unless (eq eldev-files-type 'normal) (eldev-generated-files)))
+         (eldev-pretend-files               (if eldev-files-generated-also-potential
+                                                generated-files
+                                              (eldev-filter (file-exists-p it) generated-files)))
+         (eldev-consider-only-pretend-files (eq eldev-files-type 'generated))
+         (fileset                           (apply #'eldev-standard-filesets
+                                                   (if eldev-files-ignore-std-excludes :no-excludes :std-excludes)
+                                                   (if (eq eldev-files-type 'normal) :without-generated :with-generated)
+                                                   :or (or eldev-files-filesets '(all)))))
+    (when parameters
+      (setf fileset `(:and ,fileset ,parameters)))
+    (dolist (file (eldev-find-files fileset eldev-files-absolute-paths))
+      (eldev-output "%s" file))))
+
+(eldev-defoption eldev-files-fileset (name)
+  "List files in this fileset"
+  :options        (-s --set --fileset)
+  :for-command    files
+  :value          NAME
+  :default-value  (eldev-message-enumerate nil (or eldev-files-filesets '(all)) nil t)
+  (setf eldev-files-filesets (append eldev-files-filesets (list (eldev-validate-standard-fileset name)))))
+
+(eldev-defoption eldev-files-only-normal ()
+  "List normal project files"
+  :options        (-n --normal)
+  :for-command    files
+  :if-default     (eq eldev-files-type 'normal)
+  (setf eldev-files-type 'normal))
+
+(eldev-defoption eldev-files-only-generated ()
+  "List generated files"
+  :options        (-g --generated)
+  :for-command    files
+  :if-default     (eq eldev-files-type 'generated)
+  (setf eldev-files-type 'generated))
+
+(eldev-defoption eldev-files-all ()
+  "List both normal and generated files"
+  :options        (-a --all --normal-and-generated)
+  :for-command    files
+  :if-default     (eq eldev-files-type 'all)
+  (setf eldev-files-type 'all))
+
+(eldev-defbooloptions eldev-files-generated-also-potential eldev-files-generated-only-existing eldev-files-generated-also-potential
+  ("Also show potential generatable files"
+   :options       (-c --creatable))
+  ("Only show those generated files that already exist"
+   :options       (-x --only-existing))
+  :for-command    files)
+
+(eldev-defbooloptions eldev-files-ignore-std-excludes eldev-files-use-std-excludes eldev-files-ignore-std-excludes
+  ("Ignore standard excludes"
+   :options       (-i --ignore-excludes))
+  ("Honour excluded file settings"
+   :options       (-X --std-excludes)
+   :hidden-if     :default)
+  :for-command    files)
+
+(eldev-defbooloptions eldev-files-absolute-paths eldev-files-relative-paths eldev-files-absolute-paths
+  ("Print absolute file paths"
+   :options       (-A --absolute))
+  ("Print file paths relative to project's root"
+   :options       (-r --relative))
+  :for-command    files)
 
 
 
@@ -2975,7 +3097,7 @@ it is also possible to use any other."
 
 
 (eldev-defcommand eldev-dependencies (&rest parameters)
-  "List dependencies of the current project.
+  "List dependencies of the project.
 
 If any additional sets are specified, dependencies from the sets
 are listed too.  Sets typically have the same name as commands.
@@ -3007,7 +3129,7 @@ or evaluating (`eval') registered in the project's `Eldev' file."
       (eldev-print "Project `%s' has no dependencies" (eldev-colorize (package-desc-name (eldev-package-descriptor)) 'name)))))
 
 (eldev-defcommand eldev-dependency-tree (&rest parameters)
-  "Show dependencies of the current project recursively.
+  "Show dependencies of the project recursively.
 
 If any additional sets are specified, dependencies from the sets
 are listed too.  Sets typically have the same name as commands.
@@ -3861,7 +3983,8 @@ See `eldev-test-expect-at-least'."
   "Forget all test results for this Emacs version.  All tests
 will count as new for frameworks that have appropriate
 selectors (e.g. ERT's `:new')."
-  :aliases        (tests)
+  :aliases       tests
+  :superseded-by (ecache dot-eldev)
   (eldev-find-files (format "./%s/test-results.*" (file-relative-name (eldev-cache-dir t) eldev-project-dir))))
 
 
@@ -5433,8 +5556,8 @@ as two last lines of output"
   :collect        ":compile"
   :define-cleaner (eldev-cleaner-.elc
                    "Delete `.elc' files, i.e. results of byte-compilation."
-                   :aliases (elc dot-elc)
-                   :default t)
+                   :aliases    (elc dot-elc)
+                   :default    t)
   :profiling-self t
   (require 'eldev-build)
   (eldev--byte-compile-.el source target))
@@ -5489,6 +5612,23 @@ as two last lines of output"
 (defun eldev--package-name-version ()
   (let ((package (eldev-package-descriptor)))
     (format "%s-%s" (package-desc-name package) (eldev-message-version (or eldev-package-forced-version package)))))
+
+(defun eldev-generated-files ()
+  "Return a list of all files that are or could be generated.
+Such files should be excluded from some operations.  See also
+NO-GENERATED parameter to `eldev-standard-fileset' and
+`:without-generated' for function `eldev-standard-filesets'.
+
+Since 1.3."
+  (let (all-generated)
+    ;; This list cannot really be created without build targets.  E.g. we want to include
+    ;; non-existing (but would be created) targets here too.  Also, what if someone has
+    ;; `.elc' or something like that for whatever reason in the project?
+    (maphash (lambda (target _)
+               (unless (eldev-virtual-target-p target)
+                 (push target all-generated)))
+             (eldev-build-find-targets))
+    all-generated))
 
 
 
