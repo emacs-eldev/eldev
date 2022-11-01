@@ -9,9 +9,14 @@
       (should (string= stdout "nil\n"))
       (should (= exit-code 0)))))
 
-(eldev-ert-defargtest eldev-optional-dependencies-2 (optional-dependency)
-                      ('uninstallable-a 'uninstallable-b)
-  (let ((eldev--test-project "project-a"))
+(eldev-ert-defargtest eldev-optional-dependencies-2 (main-project optional-dependency)
+                      ;; The difference is that `project-a' specifies a (sane) required
+                      ;; Emacs version, while `project-b' doesn't specify any.
+                      (("project-a" 'uninstallable-a)
+                       ("project-a" 'uninstallable-b)
+                       ("project-b" 'uninstallable-a)
+                       ("project-b" 'uninstallable-b))
+  (let ((eldev--test-project main-project))
     (eldev--test-delete-cache)
     ;; Dependency package itself is available, but cannot be installed because its
     ;; dependencies are not.  Still it must not be an error, as it is optional.

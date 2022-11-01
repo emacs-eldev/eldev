@@ -2427,6 +2427,14 @@ Since 0.2."
          (considered-version  (gethash package-name considered)))
     (when (stringp required-version)
       (setf required-version (version-to-list required-version)))
+    ;; See test `eldev-optional-dependencies-2' with parameters `project-a' and
+    ;; `uninstallable-a'.  When a built-in in a version that is not available is requested
+    ;; by an optional dependency, deem that dependency uninstallable.
+    ;;
+    ;; FIXME: Might need to do that not only for built-ins; however, for non-built-ins it
+    ;;        is not clear how to determine if those are available in that version.
+    (when (and optional considered-version (package-built-in-p package-name) (not (package-built-in-p package-name required-version)))
+      (throw 'skip-uninstallable-optionals nil))
     ;; Elevate requirement if needed.
     (when (version-list-< required-version (car highest-requirement))
       (setf required-version (car highest-requirement)
