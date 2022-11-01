@@ -177,6 +177,8 @@ Otherwise, certain tools (e.g. Projectile or `flycheck-eldev') won't consider
 your project to be Eldev-based.  It is even fine to have a completely empty
 file if you don't have anything to configure or customize." eldev-file))))
 
+(defvar no-byte-compile)
+
 (eldev-defdoctest eldev-doctest-eldev-byte-compilable (results)
   :caption    (eldev-format-message "Is file `%s' byte-compilable?" eldev-file)
   :categories eldev
@@ -185,7 +187,9 @@ file if you don't have anything to configure or customize." eldev-file))))
     (if (with-temp-buffer
           (insert-file-contents "Eldev")
           (hack-local-variables)
-          no-byte-compile)
+          ;; Can apparently fail (on 24.4?) otherwise.
+          (when (boundp 'no-byte-compile)
+            no-byte-compile))
         `(result   nil
           warnings ,(eldev-format-message "\
 It is recommended to make file `%s' byte-compilable.  This would make it

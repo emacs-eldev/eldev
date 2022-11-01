@@ -10,5 +10,6 @@
                  (byte-compile-file "eldev-ecukes.el")
                  (byte-compile-file "eldev-build.el")
                  (byte-compile-file "eldev-vc.el")
+                 (byte-compile-file "eldev-doctor.el")
                  (byte-compile-file "eldev-plugins.el"))
       (kill-emacs 1))))
