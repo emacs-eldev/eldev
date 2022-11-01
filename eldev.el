@@ -83,7 +83,8 @@
   (dolist (autoloads '(("eldev-build"   eldev-build-find-targets eldev-get-target-dependencies eldev-set-target-dependencies eldev-build-target-status eldev-build-target)
                        ("eldev-plugins" eldev-active-plugins eldev-use-plugin)
                        ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev--vc-set-up-buffer eldev-vc-synchronize-dir
-                                        eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name)))
+                                        eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name)
+                       ("eldev-doctor"  eldev-defdoctest)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))
 
@@ -4151,7 +4152,7 @@ global option `-b'"
 
 
 
-;; eldev lint
+;; eldev lint, eldev doctor
 
 (defvar eldev-lint-default :default
   "Linters to run by default.
@@ -4556,6 +4557,47 @@ change `elisp-lint's configuration."
             (setf files (eldev-filter (not (member it ignored)) files))
             (eldev-trace "%s" (eldev-message-enumerate-files "Ignored potential file%s to lint: %s (%d)" ignored))))))
     files))
+
+
+(defvar eldev-doctor-disabled-tests nil
+  "List of tests disabled in current project.
+This variable is not accessible from the command line.  Instead,
+a project may disable those tests whose warnings it won't fix.")
+
+(defvar eldev-doctor-print-successful nil
+  "Whether to print result of successful tests.
+By default, only failed doctests are printed.")
+
+(declare-function eldev--do-doctor 'eldev-doctor)
+(declare-function eldev--doctor-list-tests 'eldev-doctor)
+
+(eldev-defcommand eldev-doctor (&rest parameters)
+  "Check your project for potential problems.  Unlike linters, this
+these tests are not targeted at Elisp code, but rather at project
+infrastructure, including the way it uses Eldev.  Things reported
+should be seen as suggestions, not as warnings.  Depending on
+your project needs and other circumstances, it may be perfectly
+valid to implement something against doctor's recommendations.
+
+Projects may also disable certain tests by modifying variable
+`eldev-doctor-disabled-tests' in their file `Eldev'."
+  :parameters     "[SELECTOR...]"
+  (require 'eldev-doctor)
+  (eldev--do-doctor parameters))
+
+(eldev-defbooloptions eldev-doctor-print-successful eldev-doctor-print-only-failed eldev-doctor-print-successful
+  ("Also print results of successful tests"
+   :options       (-s --successful --all-tests))
+  ("Print result only of failed tests"
+   :options       (-f --failed))
+  :for-command    doctor)
+
+(eldev-defoption eldev-doctor-list-tests ()
+  "List doctests and exit"
+  :options        (-L --list-tests)
+  :for-command    doctor
+  (require 'eldev-doctor)
+  (eldev--doctor-list-tests))
 
 
 
@@ -5296,7 +5338,6 @@ In addition to t or nil, can also be symbol `concise'.")
                                                                        ',builder ',name))
                    (setf targets (append targets (cdr entry))))
                  targets))))))
-
 
 (defmacro eldev-defbuilder (name arguments &rest body)
   "Define a target builder."

@@ -1,1 +1,2 @@
+;; -*- mode: emacs-lisp; lexical-binding: t; no-byte-compile: t -*-  <-- This is to make our `doctor' upset, don't remove!
 (eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
