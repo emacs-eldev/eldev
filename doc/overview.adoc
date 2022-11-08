@@ -54,6 +54,7 @@ TIP: If you are using {uri-flycheck}[Flycheck], check out
 between Flycheck and Eldev, allowing the former to automatically use
 proper dependencies in Eldev projects.
 
+[#example-projects]
 === Example projects
 
 Here is a non-exhaustive list of projects that use Eldev and can serve

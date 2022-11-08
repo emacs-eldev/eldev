@@ -2199,7 +2199,7 @@ Since 1.2."
                                              ;; likely an error.
                                              (and current-value new-value
                                                   (or (eldev--smaller-list-prefix-p current-value new-value) (eldev--smaller-list-suffix-p current-value new-value)))))
-                                  (eldev-warn "Suspicious %s `%s' detected; please see https://github.com/doublep/eldev#modifying-filesets"
+                                  (eldev-warn "Suspicious %s `%s' detected; please see https://doublep.github.io/eldev/#modifying-filesets"
                                               (if (eq operation 'set) "assignment to" "let-binding of")
                                               var new-value)
                                   (eldev-warn "This might result in misbehavior of code using this variable"))))))
