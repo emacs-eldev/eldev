@@ -1,0 +1,190 @@
+[#continuous-integration]
+== Continuous integration
+
+Because of Eldev’s trivial installation and built-in support for
+testing, it is a suitable tool for use on continuous integration
+servers.  But of course this only applies if the test framework your
+project uses is already supported (currently <<ert,ERT>>,
+<<buttercup,Buttercup>> and <<ecukes,Ecukes>>).
+
+[#github-workflows]
+=== GitHub workflows
+
+The easiest option for continuous integration for GitHub-hosted
+projects are {uri-github-wflows}[GitHub workflows], as this doesn’t
+involve using a 3rd-party service.  Probably most of Elisp projects
+can take advantage of this, since GitHub appears to be the most
+popular hosting for Elisp projects.
+
+Workflow definition files for GitHub are somewhat more verbose than
+for <<travis-ci,Travis CI>>, but ultimately not really more
+complicated.  The easiest way to install Emacs binary of appropriate
+version is to use {uri-setup-emacs}[`purcell/setup-emacs`] action
+(which internally uses {uri-nix-emacs}[nix-emacs-ci]).  Since
+{uri-evm}[EVM] seems tuned to Ubuntu Trusty (i.e. what Travis CI
+provides), it is likely unsuitable for GitHub workflows.
+
+There is a short shell script that installs Eldev itself for use on
+GitHub runners.  Modifying `PATH` there is a bit tricky, so you
+probably should just go with the script, as demonstrated below.
+
+A basic workflow file (you can e.g. name it
+`.github/workflows/test.yml`) would look something like this:
+
+....
+name: CI
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs_version:
+          # Add more lines like this if you want to test on different Emacs versions.
+          - 26.3
+
+    steps:
+    - name: Set up Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
+
+    - name: Install Eldev
+      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+
+    - name: Check out the source code
+      uses: actions/checkout@v2
+
+    - name: Test the project
+      run: |
+        eldev -p -dtT test
+....
+
+Eldev’s terminal autorecognition doesn’t work on GitHub machines
+(unlike e.g. on Travis CI).  If you want colored output from Eldev,
+you need to explicitly enable it using `-C` (`--color`) global option.
+
+[#travis-ci]
+=== Travis CI
+
+{uri-travis}[Travis CI] is perhaps the most used continuous
+integration service for Elisp code, at least until the addition of
+<<github-workflows,GitHub workflows>>.  The largest problem on Travis
+CI is to install Emacs binary of the desired version.  Luckily, there
+are tools that can be used for this: at least {uri-evm}[EVM] and
+{uri-nix-emacs}[nix-emacs-ci].
+
+[#evm]
+==== EVM
+
+One of the tools to install Emacs is {uri-evm}[EVM].  Steve Purcell
+(the author of `nix-emacs-ci`) mentions “various issues” he has had
+with it, however many projects use it.  Apparently, you need to fix
+Ubuntu distribution used at Travis CI to Trusty for EVM-provided
+binaries.  Also note that EVM provides binaries only for Linux, so if
+you want test on macOS too, `nix-emacs-ci` is a better choice.
+
+If you also want to try it, Eldev provides a simple script
+specifically for use on Travis CI that installs Eldev and EVM in one
+go.  Here is a simple project-agnostic `.travis.yml` file that you can
+use as a basis:
+
+....
+language: emacs-lisp
+dist: trusty
+
+env:
+  # Add more lines like this if you want to test on different Emacs versions.
+  - EVM_EMACS=emacs-26.3-travis
+
+install:
+  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
+  - evm install $EVM_EMACS --use
+
+script:
+  - eldev -p -dtT test
+....
+
+==== nix-emacs-ci
+
+A newer tool to install Emacs is {uri-nix-emacs}[nix-emacs-ci].  Using
+it is easy: define environment variable `EMACS_CI` with the desired
+Emacs version and `curl` a single shell script — whether on Linux or
+macOS.  With one more line you can also install Eldev.  It appears to
+be slower than EVM, but for continuous integration that’s not terribly
+important.
+
+A basic `.travis.yml` would look like this:
+
+....
+language: nix
+
+env:
+  # Add more lines like this if you want to test on different Emacs versions.
+  - EMACS_CI=emacs-26-3
+
+install:
+  - bash <(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
+  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev > x.sh && source ./x.sh
+
+script:
+  - eldev -p -dtT test
+....
+
+[#circle-ci]
+=== CircleCI
+
+Another frequently used service is {uri-circle}[CircleCI].  I don’t
+know that much about it, presumably {uri-nix-emacs}[nix-emacs-ci] can
+be used to install Emacs on it.  Some projects successfully use
+{uri-docker}[Docker] images.
+
+Regardless of how you install Emacs, adding Eldev is yet another
+one-liner.  It is handy to use, because propagating `PATH`
+modifications between different commands on CircleCI is somewhat
+non-obvious.  To use it, add the following lines in the relevant place
+in file `.circleci/config.yml`:
+
+....
+    ...
+    - run:
+        name: Install Eldev
+        command: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/circle-eldev > x.sh && source ./x.sh
+....
+
+=== Script commands
+
+Once you have Emacs with Eldev set up on the continuous integration
+server of your choice, it is time to actually test your project.  The
+most basic command is, naturally, `eldev test`.  You might want to add
+a few options to both make project loading more similar to that
+typical for your users and Eldev’s output more informative:
+
+    $ eldev -p -dtT test
+
+To make sure that your project byte-compiles cleanly, use the
+following command:
+
+    $ eldev -dtT compile --warnings-as-errors
+
+Or maybe even this, if you want to make sure that test `.el` files
+also can be byte-compiled without warnings (this can sometimes catch
+more problems):
+
+    $ eldev -dtT compile --set all --warnings-as-errors
+
+You can also enforce conformance to certain coding standards by adding
+an invocation of `lint` to the `script` part.  Remember, however, that
+most linters are continuously being developed.  Even if a linter finds
+your source warning-free today, it might detect problems tomorrow.
+`relint` is probably one of the “safer” linters in this regard:
+
+    $ eldev -dtT lint re

@@ -1,0 +1,356 @@
+[#build-system]
+== Build system
+
+Eldev comes with quite a sofisticated build system.  While by default
+it only knows how to build packages, byte-compile `.el` files and make
+`.info` from `.texi`, you can extend it with custom _builders_ that
+can do anything you want.  For example, generate resource files that
+should be included in the final package.
+
+The main command is predictably called `build`.  There are also
+several related commands which will be discussed in the next sections.
+
+=== Targets
+
+Build system is based on _targets_.  Targets come in two kinds: _real_
+and _virtual_.  First type of targets corresponds to files — not
+necessarily already existing.  When needed, such targets get rebuilt
+and the files are (re)generated in process.  Targets of the second
+type always have names that begin with “:” (like keywords in Elisp).
+Most import virtual target is called `:default` — this is what Eldev
+will build if you don’t request anything explicitly.
+
+To find all targets in a project (more precisely, its `main`
+<<target-sets,target set>>):
+
+    $ eldev targets
+
+Project’s targets form a tree.  Before a higher-level target can be
+built, all its children must be up-to-date, i.e. built first if
+necessary.  In the tree you can also see _sources_ for some targets.
+Those can be distinguished by lack of builder name in brackets.
+Additionally, if output is colored, targets have special color, while
+sources use default text color.
+
+Here is how target tree looks for Eldev project itself (version may be
+different and more targets may be added in future):
+
+    :default
+        bin/eldev  [SUBST]
+            bin/eldev.in
+    :package
+        dist/eldev-0.1.tar  [PACK]
+            bin/eldev  [repeated, see above]
+            eldev-ert.el
+            eldev-util.el
+            eldev.el
+    :compile
+        eldev-ert.elc  [ELC]
+            eldev-ert.el
+        eldev-util.elc  [ELC]
+            eldev-util.el
+        eldev.elc  [ELC]
+            eldev.el
+    :package-archive-entry
+        dist/eldev-0.1.entry  [repeated, see ‘dist/eldev-0.1.tar’ above]
+
+And a short explanation of various elements:
+
+`:default`, `:package`, `:compile` etc.::
+
+    Virtual targets.  The ones you see above are typical, but there
+    could be more.
+
+`bin/eldev`, `dist/eldev-0.1.tar`, `eldev-ert.elc` etc.::
+
+    Real targets.
+
+`SUBST`, `PACK`, `ELC`::
+
+    Builders used to generate target.  Note that virtual targets never
+    have builders.  `SUBST` is not a standard builder, it is defined
+    in file `Eldev` of the project.
+
+`bin/eldev.in`, `eldev-ert.el` etc.::
+
+    Sources for generating targets.  Certain targets have more than
+    one source file.  Also note how targets can have other targets as
+    their sources (`bin/eldev` is both a target on its own and a
+    source for `dist/eldev-0.1.tar`).
+
+`[repeated \...]`::
+
+    To avoid exponential increase in tree size, Eldev doesn’t repeat
+    target subtrees.  Instead, only root target of a subtree is
+    printed.
+
+==== Target cross-dependencies
+
+FIXME
+
+[#target-sets]
+==== Target sets
+
+Eldev groups all targets into _sets_.  Normally, there are only two
+sets called `main` and `test`, but you can define more if you need
+(see variable `eldev-filesets`).  For example, if your project
+includes a development tool that certainly shouldn’t be included in
+project’s package, it makes sense to break it out into a separate
+target set.
+
+Target sets should be seen only as ways of grouping targets together
+for the purpose of quickly enumerating them.  Two targets in the same
+set can be completely independent from each other.  Similarly, targets
+from different sets can depend on each other (provided this doesn’t
+create a circular dependency, of course).  For example, targets in set
+`test` will often depend on those in set `main`, because test `.el`
+files usually `require` some features from `main`.
+
+By default, command `build` operates only on `main` target set.  You
+can use option `--set` (`-s`) to process a different target set.  If
+you want to build several sets at once, repeat the option as many
+times as needed.  Finally, you can use special name `all` to order
+Eldev to operate on all defined sets at once.
+
+Command `targets` instead of the option expects set names as its
+arguments.  For example:
+
+    $ eldev targets test
+
+[#packaging]
+=== Building packages
+
+To build an Elisp package out of your project, use command `package`:
+
+    $ eldev package
+
+This command is basically a wrapper over the build system, it tells
+the system to generate virtual target `:package`.  However, there are
+a few options that can only be passed to this special command, not to
+underlying `build`.
+
+Files that are copied to the package `.tar` default to Elisp files
+plus standard documentation: `\*.info`, `doc/*.info` and files `dir`
+along those.  However, if you need to package additional files, just
+modify variable `eldev-files-to-package`.  Its value must be a
+<<filesets,fileset>>.  In particular, you can extend the default
+value, making a <<composite-filesets,composite fileset>>, instead of
+replacing it.  Here is an example from Eldev’s own file `Eldev`:
+
+[source]
+----
+(setf eldev-files-to-package
+      `(:or ,eldev-files-to-package
+            '("./bin" "!./bin/**/*.in" "!./bin/**/*.part")))
+----
+
+Here we instruct package builder to copy all files from subdirectory
+`bin`, except those with names ending in `.in` or `.part`,
+additionally to the standard files.  If you distribute your package
+through MELPA, you will unfortunately need to repeat these
+instructions in MELPA recipe.
+
+[IMPORTANT]
+====
+Previously, the recommended way was
+
+[source]
+----
+(setf eldev-files-to-package (append eldev-files-to-package ...))
+----
+
+However, this is wrong because it assumes that
+`eldev-files-to-package` is a <<simple-filesets,simple fileset>> which
+is no longer true since Eldev 1.2.  Replace this with code similar to
+the new recommendation above; it works with any Eldev version.  See
+also section <<modifying-filesets,on modifying filesets>>.
+====
+
+Normally, packages are generated in subdirectory `dist` (more
+precisely, in directory specified by `eldev-dist-dir` variable).  If
+needed, you can override this using `--output-dir` option.
+
+By default, Eldev will use package’s self-reported version, i.e. value
+of “Version” header in its main `.el` file.  If you need to give the
+package a different version, use option `--force-version`.  E.g. MELPA
+would do this if it used Eldev.
+
+Finally, if you are invoking Eldev from a different tool, you might be
+interested in option `--print-filename`.  When it is specified, Eldev
+will print absolute filename of the generated package and word
+“generated” or “up-to-date” as the two last lines of its (stdout)
+output.  Otherwise it is a bit tricky to find the package, especially
+if you don’t use `--force-version` option.  As an optimisation, you
+can also reuse previous package file if Eldev says “up-to-date”.
+
+=== Byte-compiling
+
+You can use Eldev to byte-compile your project.  Indirectly, this can
+be done by <<loading-modes,selecting appropriate loading mode>> for
+the project or its local dependencies.  However, sometimes you might
+want to do this explicitly.  For this, use command `compile`:
+
+    $ eldev compile
+
+You can also byte-compile specific files:
+
+    $ eldev compile foo-util.el foo-misc.el
+
+Eldev will not recompile `.el` that have up-to-date `.elc` versions.
+So, if you issue command `compile` twice in a row, it will say:
+“Nothing to do” the second time.
+
+However, simple comparison of modification time of `.el` and its
+`.elc` file is not always enough.  Suppose file `foo-misc.el` has form
+`(require 'foo-util)`.  If you edit `foo-util.el`, byte-compiled file
+`foo-misc.elc` might no longer be correct, because it has been
+compiled against old definitions from `foo-util.el`.  Luckily, Eldev
+knows how to detect when a file ``require``s another.  You can see
+this in the target tree:
+
+    $ eldev targets --dependencies
+    [...]
+    :compile
+        foo-misc.elc  [ELC]
+            foo-misc.el
+            [inh] foo-util.elc
+    [...]
+
+As a result, if you now edit `foo-util.el` and issue `compile` again,
+both `foo-util.elc` and `foo-misc.elc` will be rebuilt.
+
+Eldev treats warnings from Emacs’ byte-compiler just as that —
+warnings, i.e. they will be shown, but will not prevent compilation
+from generally succeeding.  However, during
+<<continuous-integration,automated testing>> you might want to check
+that there are no warnings.  The easiest way to do it is to use
+`--warnings-as-errors` option (`-W`):
+
+    $ eldev compile --warnings-as-errors
+
+Command `compile` is actually only a wrapper over the generic building
+system.  You can rewrite all the examples above using command `build`.
+If you don’t specify files to compile, virtual target `:compile` is
+built.  This target depends on all `.elc` files in the project.
+
+However, there is a subtle difference: for `compile` you specify
+_source_ files, while `build` expects _targets_.  Therefore, example
+
+    $ eldev compile foo-util.el foo-misc.el
+
+above is equivalent to this command:
+
+    $ eldev build foo-util.elc foo-misc.elc
+
+with `.el` in filenames substituted with `.elc`.
+
+==== Byte-compiling complicated macros ====
+
+Certain files with macros in Elisp cannot be byte-compiled without
+evaluating them first _or_ carefully applying `eval-and-compile` to
+functions used in macroexpansions.  Because Emacs packaging system
+always loads (evaluates) package files before byte-compiling them
+during installation, this is often overlooked.
+
+Unlike the packaging system, Eldev by default expects that `.el` files
+can be compiled _without_ loading them first, i.e. it expects that
+`eval-and-compile` is applied where needed.  This is the default
+because it is much faster on certain files.
+
+However, if your project cannot be byte-compiled without loading first
+and you don’t want to “fix” this, you can ask Eldev to behave like the
+packaging system using `--load-before-compiling` (`-l`) option:
+
+    $ eldev compile -l
+
+Projects that can only be compiled with this setting should specify it
+as the default in their file `Eldev`:
+
+[source]
+----
+(setf eldev-build-load-before-byte-compiling t)
+----
+
+You can find more information in section
+https://www.gnu.org/software/emacs/manual/html_node/elisp/Eval-During-Compile.html[“Evaluation
+During Compilation” of Elisp manual].
+
+==== Speed of byte-compilation ====
+
+While not particularly important in most cases, speed of
+byte-compilation can become an issue in large projects, especially if
+they use lots of macros.  Eldev tries to speed up byte-compilation by
+compiling the files in “correct” order.
+
+This means that if, as above, `foo-misc.el` ``require``s feature
+`foo-util`, then `foo-util.el` will always be byte-compiled first, so
+that compilation of `foo-misc.el` can use faster, byte-compiled
+versions of definitions from that file.  This works even if Eldev
+doesn’t yet know which files `require` which.
+
+When Eldev has to change the planned order of byte-compilation because
+of a `require` form, it writes an appropriate message (you need to run
+with option `-v` or `-t` to see it):
+
+    $ eldev -v compile
+    [...]
+    ELC      foo-misc.el
+    Byte-compiling file ‘foo-misc.el’...
+    ELC      foo-util.el
+    Byte-compiling file ‘foo-util.el’ early as ‘require’d from another file...
+    Done building “sources” for virtual target ‘:compile’
+
+[#cleaning]
+=== Cleaning
+
+While cleaning is not really part of the build system, it is closely
+related.  Cleaning allows you to remove various generated files that
+are the result of other commands (not only `build`).  Command can be
+executed without any arguments:
+
+    $ eldev clean
+
+In this case, it removes byte-compiled Elisp files and any `.info`
+files generated from `.texi`/`.texinfo` if you have those in your
+project.
+
+In general case, you can specify name one or more _cleaners_ as
+command arguments.  All supported cleaners can be found using option
+`--list-cleaners` (`-L`).  Here is a short list of some of the more
+useful ones:
+
+`.eldev`::
+
+    Delete Eldev’s cache, i.e. subdirectory `.eldev` for this project.
+
+`distribution` (or `dist`)::
+
+    Delete `dist` subdirectory; useful after <<packaging,building
+    project’s package>>.
+
+`test-results` (or `tests`)::
+
+    Forget <<test-results,previous test results>>, for ERT.
+
+`global-cache`::
+
+    Remove contents of the <<global-cache,global package archive
+    cache>>.  This can be executed from any directory.
+
+`all` (or `everything`)::
+
+    Run all available cleaners.  Some cross-project data may still be
+    retained (currently, only the global package archive cache), that
+    can be cleaned only by explicitly mentioning it.
+
+Cleaners executed by default are called `.elc`, `.info` and
+`info-dir`.  Normally, they delete their targets in all
+<<target-sets,target sets>> at once.  However, you can limit them to
+`main`, `test` and so on set with option `-s` (`--set`), e.g. command:
+
+    $ eldev clean -s test
+
+would delete all byte-compiled test files.
+
+You can also specify option `-n` (`--dry-run`) to see what would be
+deleted, without actually deleting it.

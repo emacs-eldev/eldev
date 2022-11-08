@@ -1,0 +1,392 @@
+[#extending-eldev]
+== Extending Eldev
+
+Eldev is written to be not just configurable, but also extensible.  It
+makes perfect sense to have additional code in file `Eldev` — if your
+project has uncommon building steps.  And also in
+`~/.config/eldev/config` — if you want a special command for your own
+needs, for example.  Or maybe in `Eldev-local` — if you need something
+extra only for one specific project that you maintain.
+
+[#hooks]
+=== Hooks
+
+Eldev defines several hooks executed at different times (more might be
+added later).  Due to historical reasons, Eldev doesn’t follow Emacs
+naming convention on using `-hook` only for standard hooks (i.e. those
+not accepting any arguments) and `-functions` in other cases.
+Functions for many of the hooks listed below do receive arguments.
+
+`eldev-executing-command-hook (COMMAND)`::
+
+    Run before executing any command.  Command name (as a symbol) is
+    passed to the hook’s functions as the only argument.  This is
+    always the “canonical” command name, even if it is executed using
+    an alias.
+
+`eldev-COMMAND-hook`::
+
+    Run before executing specific command, functions have no
+    arguments.  Eldev itself uses it (i.e. in its file `Eldev`) to
+    print a disclaimer about its fairly slow tests.
+
+{since-0-2} `eldev-load-dependencies-hook (TYPE ADDITIONAL-SETS)`::
+
+    Executed after successfully loading dependencies.  Functions are
+    called with arguments `TYPE` and `ADDITIONAL-SETS`.  `TYPE` is
+    either `t` if the project is being loaded for actual use, symbol
+    `load-only` if it is loaded only for side effect (e.g. to build a
+    tree of its dependencies), and `nil` if invoked from
+    `eldev-load-extra-dependencies` (i.e. if the project is not being
+    loaded at all: only some additional sets).  The second is a list
+    of <<additional-dependencies,additional dependency sets>>.
+
+{since-0-6} `eldev-before-loading-dependencies-hook (TYPE ADDITIONAL-SETS)`::
+
+    Similar to the previous hook, but called _before_ dependencies are
+    loaded.  Function arguments are the same.
+
+{since-0-1-1} `eldev-build-system-hook`::
+
+    Hook executed whenever build system is used.  This is useful since
+    at least commands `build`, `compile` and `package` invoke the
+    build system: it would be impractical to add the same function to
+    all three hooks.
+
+{since-0-2} `eldev-test-FRAMEWORK-hook (SELECTORS)`::
+
+    Called immediately before executing tests with given framework
+    (<<ert,ERT>>, <<buttercup,Buttercup>>, <<ecukes,Ecukes>>).
+    Functions on the hook get passed `SELECTORS` as the only argument.
+    At this point project dependencies and additional set `test` will
+    have been loaded already, so functions can `require` features from
+    the project.
+
+=== Writing builders
+
+Eldev build system provides standard builders that cover all basic
+needs of Elisp packages.  However, some projects have uncommon build
+steps.  Instead of writing custom shell scripts, you can integrate
+them into the overall build process — which also simplifies further
+development.
+
+An example of a project with additional build steps is Eldev itself.
+Its executable(s) are combined from executable template that is
+OS-specific and a common Elisp bootstrapping script.  For example,
+`bin/eldev` is generated from files `bin/eldev.in` and
+`bin/bootstrap.el.part`.  However, only the first file counts as the
+source; see how function `eldev-substitute` works.
+
+There is a simple builder for this in file `Eldev` of the project:
+
+[source]
+----
+(eldev-defbuilder eldev-builder-preprocess-.in (source target)
+  :short-name     "SUBST"
+  :message        source-and-target
+  :source-files   "*.in"
+  :targets        (".in" -> "")
+  :collect        ":default"
+  :define-cleaner (eldev-cleaner-preprocessed
+                   "Delete results of preprocessing `.in' files.  This is specific
+to Eldev itself."
+                   :aliases prep)
+  (let ((modes (file-modes target)))
+    (eldev-substitute source target)
+    (when (or modes (string-prefix-p "bin/" target))
+      (set-file-modes target (or modes #o755)))))
+----
+
+Here `eldev-defbuilder` is a macro much like `defun`.  It defines an
+Elisp function named `eldev-builder-preprocess-.in` and registers it
+with parameters (the keyword lines before the body) as an Eldev
+builder.  Predictably, list `(source target)` specifies function
+arguments.
+
+Let’s skip the keywords for a bit and have a look at the body.  It
+works exactly like in a normal Elisp function.  Its job is to generate
+`target` from `source` using builder-specific means.  This particular
+builder calls function `eldev-substite` that does the actual work
+(this function is available also to your project, should you need it).
+But your builders could do whatever you want, including launching
+external processes (C/C++ compiler, a Python script, etc.) and using
+anything from Elisp repertoire.  Note that return value of the body is
+ignored.  If building the target fails, builder should signal an
+error.
+
+Now back to the keyword parameters.  As you can see, they all have a
+name and exactly one value after it.  First comes parameter
+`:short-name`.  It specifies what you see in the target tree of the
+project, i.e. builder’s name for the user.  It is not required;
+without it Eldev would have used `preprocess-.in` as user-visible
+name.
+
+Next parameter is `:message`.  It determines what Eldev prints when
+the builder is actually invoked.  For example, when byte-compiling,
+you’d see messages like this:
+
+    ELC      some-file.el
+
+That’s because byte-compiling builder has its `:message` set to
+`source` (the default).  Other valid values are `target` and
+`source-and-target` (as in the example).  Both `source` and `target`
+can be pluralized (i.e. `sources-and-target` is also a valid value),
+but singular/plural is not important in this case as both work
+identically.  Finally, value of `:message` can be a function, in which
+case it is called with the same arguments as the builder itself and
+should return a string.
+
+Value of `:source-files` parameter must be a <<filesets,fileset>>.  In
+the above example, fileset consists of only one simple rule — which is
+actually enough in most cases, — but it could also be much more
+complicated.  All files that match the fileset and do not match
+`eldev-standard-excludes` will be processed using this builder.
+
+Parameter `:targets` defines the rule used to construct target names
+out of sources matched by `:source-files`.  There are several ways to
+define this rule, we’ll consider them in <<target-rules,their own
+subsection>>.
+
+Keyword `:collect` determines how targets generated by this builder
+are “collected” into virtual targets.  In the example all such targets
+are simply added to the virtual target `:default`.  However, here too
+we have several other possibilities, which will be described
+<<collecting-virtual-targets,later>>.
+
+Finally, keyword `:define-cleaner` provides a simple way of linking
+builders with the <<cleaning,cleaning system>>.
+
+Another important keyword is `:type`.  It is not used here only
+because the example builder is of the default and most common type
+that generates one target for each source file.  All possible types
+are: `one-to-one` (the default), `one-to-many` (several targets from
+one source file), `many-to-one` and `many-to-many`.  If you write a
+builder of a non-default type, be aware that it will be called with a
+list of strings instead of a single string as one or both of its
+arguments, as appropriate.  You should probably also name them in
+plural in the definition in this case, to avoid confusion.
+
+[#target-rules]
+==== Target rules
+
+Target rules define which target(s) will be built from given
+source(s).  There are several ways to define a target rule.  Yet more
+can be added in the future as real-world needs accumulate.
+
+`TARGET`::
+
+    All the sources will be passed together as a list to the builder
+    to generate one `TARGET`.  This is suitable for `many-to-one`
+    builders.
+
+`(TARGET-1 [TARGET-2 [\...]])`::
+
+    Build several `TARGETS` out of all the sources.  This is for
+    `many-to-many` and `one-to-many` builders.
+
+`(SOURCE-SUFFIX \-> TARGET-SUFFIX)`::
+
+    Build target name from source name by replacing filename suffixes.
+    `SOURCE-SUFFIX` can also be a list of strings, in which case any
+    suffix from the list will be replaced.  This is the type of target
+    rule you can see in the example and is suitable for `one-to-one`
+    builders.  Another use of this rule type could be seen in
+    byte-compiling builder:
++
+        :targets        (".el" -> ".elc")
+
+And the most powerful of all target rules: a function (can be a lambda
+form or a function name).  It is called with a list of sources (even
+if the builder is of `one-to-one` or `one-to-many` type) and must
+return one of the types enumerated above.
+
+[#collecting-virtual-targets]
+==== Collecting into virtual targets
+
+Real targets generated by the builders can optionally be combined into
+virtual targets.  The latter are used to easily build all real targets
+of the same type; some (`:default`, `:compile` etc.)  also have
+special meaning to certain commands.
+
+Like with the target rules, there are several ways to collect the
+targets.
+
+`VIRTUAL-TARGET`::
+
+    All real targets generated by the builder are combined into given
+    `VIRTUAL-TARGET`.  This is what you can see in the example.
+
+`(VIRTUAL-TARGET-1 [VIRTUAL-TARGET-2 [\... VIRTUAL-TARGET-N]])`::
+
+    Combine the real targets into `VIRTUAL-TARGET-N`, then put it to
+    the preceding virtual target and so on.  This format is currently
+    unused in standard Eldev builders.  It can generate target trees
+    of this form:
++
+--
+    :gen-files
+        :gen-sources
+            :gen-el
+                foo.el.in
+                bar.el.in
+
+It is expected (even if not required) that a different builder adds
+another branch to the tree, actually making it useful.
+--
+
+`(ENTRY...)`, each `ENTRY` being `(REAL-TARGETS VIRTUAL-TARGETS)`::
+
+    Both of `REAL-TARGETS` and `VIRTUAL-TARGETS` must be either a list
+    or a single target string.  For each `ENTRY` this repeats the
+    logic of one of the two formats above, but instead of all targets
+    for the builder uses only those listed in `REAL-TARGETS` for the
+    `ENTRY`.  This is not often needed, but can be useful if builder’s
+    targets come in two or more substantially different kinds.
+
+Like with <<target-rules,target rules>>, you can specify a function
+here.  Such a function gets called with a list of real targets and
+must return a collection rule in one of the formats listed above.
+
+==== Summary
+
+To define a builder you need to write an Elisp function that generates
+target(s) from source(s).  If it processes multiple sources at once or
+generates multiple targets, give it the appropriate `:type`.  Write a
+fileset that matches its `:source-files` and a rule to determine
+target names from those — parameter `:targets`.  If you want the
+targets grouped together into virtual target(s), add `:collect`
+keyword.  You should probably also add a `:define-cleaner` that
+removes generated targets.
+
+Parameters `:name`, `:short-name`, `:message` and `:briefdoc` are all
+fully presentational and thus not very important.  But if you want to
+write a nice and polished builder, investigate them too.
+
+=== Adding commands and options
+
+Eldev has lots of standard commands, but sometimes you need to define
+yet more.  Commands should generally be defined for things that cannot
+be reformulated in terms of building targets.  If a command would just
+create a file, e.g. extract documentation from source code, an
+additional builder would be more suitable.
+
+Defining a command is not much more complicated than defining a normal
+Elisp function:
+
+[source]
+----
+(eldev-defcommand mypackage-parrot (&rest parameters)
+  "Repeat parameters from the command line."
+  :parameters     "TEXT-TO-PARROT"
+  :aliases        (copycat ape)
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Nothing to say")))
+  (eldev-output "%s" (mapconcat #'identity parameters " ")))
+----
+
+Macro `eldev-defcommand` works much like `defun`, but additionally it
+adds the new function to the list of Eldev command handlers.  New
+command receives name built from the function name by removing package
+prefix.  If that doesn’t produce the needed result in your case
+(e.g. if package prefix is two words in your project), you can always
+specify name explicitly by using `:command` parameter.  You can also
+give your command any number of aliases, as shown above.
+
+Keyword `:parameter` describes what the command expects to see on the
+command line.  It is used when invoking `eldev help COMMAND` to
+improve documentation: all commands are automatically documented.  The
+short one-liner for `eldev help` is derived from the function’s
+documentation by taking the first sentence.  If this is not good
+enough in your case, use keyword `:briefdoc` to set it explicitly.
+
+When command is invoked from command line, Eldev calls the
+corresponding function, passing all remaining parameters to it as
+strings.  The example command above just parrots the parameters back
+at user, in accordance to its name.
+
+==== Defining options
+
+You have probably noticed that the command function we’ve defined
+doesn’t accept any options.  In fact, this is true for all commands in
+Eldev: options are not _passed_ to them.  Eldev takes a different
+approach: whenever a (recognized) option is encountered on the command
+line, appropriate function is called, which is supposed to alter
+global state.  This way it is easy to share options between multiple
+commands when needed.
+
+So, with that in mind, let’s expand our example command with an
+option:
+
+[source]
+----
+(defvar mypackage-parrot-colorize-as nil)
+
+(eldev-defcommand mypackage-parrot (&rest parameters)
+  "Repeat parameters from the command line.  If you want, I can even
+colorize them!"
+  :parameters     "TEXT-TO-PARROT"
+  :aliases        (copycat ape)
+  (unless parameters
+    (signal 'eldev-wrong-command-usage `(t "Nothing to say")))
+  (let ((text (mapconcat #'identity parameters " ")))
+     (when mypackage-parrot-colorize-as
+       (setf text (eldev-colorize text mypackage-parrot-colorize-as)))
+     (eldev-output "%s" text)))
+
+(eldev-defoption mypackage-parrot-colorize (&optional style)
+  "Apply given STYLE to the parroted text (`section' if not specified)"
+  :options        (-c --colorize)
+  :optional-value STYLE
+  :for-command    parrot
+  (setf mypackage-parrot-colorize-as (intern (or style "section"))))
+----
+
+Definition of `mypackage-parrot` is updated, but there is nothing
+Eldev-specific here.  Let’s rather have a look at the option
+definition.
+
+Unlike for command function, name of option function is not important.
+Instead, how the option looks like on the command line is determined
+by `:options` keyword.  It can specify any number of alternatives, but
+they all must be either short-style (single `-` followed by one
+letter) or long-style (`--` followed by a longer name) options.  Some
+options take a value; it is determined by parameter `:optional-value`
+or `:value` (if the value is mandatory) and must match arguments in
+function definition.
+
+Options can be either global or command-specific.  In the latter case
+— the one you’ll typically need — you define to which command(s) the
+option applies using `:for-command` parameter.  In our case its value
+is a single command, but it can also be a list of commands.
+
+To test how the new option works, run:
+
+    $ eldev parrot -c Repeat this
+
+It should print text “Repeat this” in bold, unless you’ve disabled
+output colorizing.
+
+Note that the command doesn’t repeat “-c”, even though it appears on
+the command line.  That’s because Eldev doesn’t pass the options as
+parameters to commands: only non-option arguments remain.
+
+Documentation (i.e. output of `eldev help parrot`) for the command we
+defined above now automatically lists the accepted option:
+
+....
+Usage: eldev [OPTION...] parrot TEXT-TO-PARROT
+
+Command aliases: copycat, ape
+
+Options:
+  -c, --colorize[=STYLE]
+                        Apply given STYLE to the parroted text (‘section’ if
+                        not specified)
+
+Repeat parameters from the command line.  If you want, I can even
+colorize them!
+....
+
+=== Custom test runners
+
+FIXME

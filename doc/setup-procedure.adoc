@@ -1,0 +1,104 @@
+[#setup-procedure]
+== Setup procedure in details
+
+Now that we have created file `Eldev`, it makes sense to go over the
+full startup process:
+
+* Load file `~/.config/eldev/config`
+* Load file `Eldev` in the current directory
+* Load file `Eldev-local` in the current directory
+* Execute setup forms specified on the command line
+
+None of these Elisp files and forms are required.  They are also not
+restricted in what they do.  However, their _intended_ usage is
+different.
+
+File `~/.config/eldev/config` is _user-specific_.  It is meant mostly
+for customizing Eldev to your personal preferences.  For example, if
+you hate coloring of Eldev output, add form `(setf eldev-coloring-mode
+nil)` to it.  Then every Eldev process started for any project will
+default to using uncolored output.
+
+NOTE: {since-0-11} More precisely, if directory `~/.eldev` exists (for
+pre-0.11 Eldev installations), file `~/.eldev/config` is used.
+Otherwise, if {uri-xdg}[environment variable `XDG_CONFIG_HOME`] is
+set, file `$XDG_CONFIG_HOME/eldev/config` is used.  And finally,
+`~/.config/eldev/config` is the default fallback.
+
+File `Eldev` is _project-specific_.  It is the only configuration file
+that should be added to project’s VCS (Git, Mercurial, etc.).  Typical
+usage of this file is to define in which package archives to look up
+dependencies.  It is also the place to define project-specific
+builders and commands, for example to build project documentation from
+source.
+
+File `Eldev-local` is _working directory_ or _user/project-specific_.
+Unlike `Eldev`, it _should not_ be added to VCS: it is meant to be
+created by each developer (should he want to do so) to customize how
+Eldev behaves in this specific directory.  The most common use is to
+define local dependencies.  A good practice is to instruct your VSC to
+ignore this file, e.g. list it in `.gitignore` for Git.
+
+Finally, it is possible to specify some (short) setup forms on the
+command line using `--setup` (`-S`) option.  This is not supposed to
+be used often, mostly in cases where you run Eldev on a use-once
+project checkout, e.g. on a <<continuous-integration,continuous
+integration>> server.
+
+[#project-isolation]
+=== Project isolation
+
+Eldev tries to create a self-contained environment for building and
+testing your project.  It will isolate your project as much as
+possible from your “normal” Emacs, i.e. the one that you use for
+editing.  This is done to avoid interference from your other installed
+packages or configuration, to prevent broken and misbehaving projects
+from affecting your Emacs and, finally, to simplify testing of certain
+“permanent effect” features, like customizing variables.
+
+* Packages installed in your Emacs (usually in `~/.emacs.d/elpa/`) are
+  not visible for projects built with Eldev.  Likewise, dependencies
+  installed for such projects will not appear in your normal Emacs.
+
+* {since-0-2-1} Variable `user-emacs-directory` will point somewhere
+  inside `.eldev` in the project’s directory rather than to
+  `~/.emacs.d`.  This also means that `locate-user-emacs-file` will
+  not find files in your normal configuration directory.  If you want
+  to undo this change (e.g. in file `Eldev` or `Eldev-local`), use
+  original value of the variable stored as
+  `eldev-real-user-emacs-directory`.
+
+* Eldev supports <<different-emacs-versions,executing on different
+  Emacs version>> for the same project without any additional steps.
+
+=== Using preinstalled dependencies
+
+{since-0-8} Starting with version 0.8 you can opt out of some of the
+default project isolation features and use preinstalled dependencies,
+e.g. those from your normal Emacs.  To activate this mode, use global
+option `--external` (`-X`), e.g.:
+
+    $ eldev -X test
+
+In this mode Eldev will expect dependencies to be installed in given
+directory (standard Emacs location — `~/.emacs.d/elpa` — is only the
+default: you can use another directory).  If a dependency is not
+installed, Eldev _will not_ install it on its own: it doesn’t know
+which package archives should be used.  Likewise, it will not upgrade
+anything.  In all such cases, i.e. when required dependencies are not
+correctly preinstalled in the specified external directory, Eldev will
+simply fail.
+
+<<local-dependencies,Local dependencies>> discussed later take
+precedence even in this mode: anything declared as local will override
+dependencies available from an external directory, just like it will
+in usual full isolation mode.
+
+This mode can be useful to load exactly the same dependency versions
+as those installed in your normal Emacs.  However, it is not suitable
+for continuous integration or for working on packages that you do not
+have — for whatever reason — installed normally.  It is also difficult
+to test on <<different-emacs-versions,different Emacs versions>> in
+external directory mode.  Therefore, it is not the default.  But, as
+usual in Eldev, you can make it the default in file
+`~/.config/eldev/config` if you want.

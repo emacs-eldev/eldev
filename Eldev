@@ -8,7 +8,8 @@
                                                             (`main        "./test/*/")
                                                             (`integration '("./test/"   "!./test/integration"))
                                                             (`all         '("./test/*/" "!./test/integration")))
-                                    "./webinstall"))
+                                    "./webinstall"
+                                    "./htmldoc"))
 
 ;; I don't want to "fix" docstrings, especially since they are mostly meant to be printed
 ;; to console in this project.
@@ -131,3 +132,26 @@ be executed via `install.sh'."
                  (if (eldev-directory-in-exec-path directory)
                      "; you can execute `eldev' now"
                    (format "\nDon't forget to add `%s' to `PATH' environment variable" directory)))))
+
+;; Might want to convert this to a builder later.
+(eldev-defcommand eldev-build-documentation (&rest parameters)
+  "Generate documentation HTML from Asciidoctor source."
+  :command        documentation
+  :aliases        (doc html-doc)
+  (when parameters
+    (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
+  (eldev-call-process "asciidoctor" `("--backend" "html5"
+                                      "--destination-dir" "htmldoc"
+                                      "--out-file" "index.html"
+                                      ;; It seems to treat everything too lightly, so order it to fail on
+                                      ;; anything even remotely potentially problematic.
+                                      "--warnings" "--failure-level" "INFO"
+                                      ,@(pcase eldev-verbosity-level
+                                          (`quiet   '("--quiet"))
+                                          (`verbose '("--verbose"))
+                                          (`trace   '("--verbose")))
+                                      ,@(when debug-on-error '("--trace"))
+                                      "doc/README.adoc")
+    :trace-command-line t
+    :forward-output     t
+    :die-on-error       t))

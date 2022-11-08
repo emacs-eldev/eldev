@@ -1,0 +1,143 @@
+[#filesets]
+== Filesets
+
+Filesets are lists of rules that determine a collection of files
+inside given root directory, usually the project directory.  Similar
+concepts are present in most build tools, version control systems and
+some other programs.  Filesets in Eldev are inspired by Git.
+
+Important examples of filesets are variables `eldev-main-fileset`,
+`eldev-test-fileset` and `eldev-standard-excludes`.  Default values of
+all three are _simple filesets_, but are not actually restricted to
+those: when customizing for your project you can use any valid fileset
+as a value for any of these variables.  However, for most cases simple
+filesets are all that you really need.
+
+[#simple-filesets]
+=== Simple filesets
+
+From Lisp point of view, a simple fileset is a list of strings.  A
+single-string list can also be replaced with that string.  The most
+important filesets are `eldev-main-fileset` and `eldev-test-fileset`.
+Using them you can define which `.el` files are to be packaged and
+which contain tests.  Default values should be good enough for most
+projects, but you can always change them in file `Eldev` if needed.
+
+Each rule is a string that matches file path — or its part — relative
+to the root directory.  Path elements must be separated with a slash
+(`/`) regardless of your OS, to be machine-independent.  A rule may
+contain glob wildcards (`+*+` and `?`) with the usual meaning and also
+double-star wildcard (`+**+`) that must be its own path element.  It
+stands for any number (including zero) of nested subdirectories.
+Example:
+
+    foo/**/bar-*.el
+
+matches `foo/bar-1.el` and `foo/x/y/bar-baz.el`.
+
+If a rule starts with an exclamation mark (`!`), it is an _exclusion_
+rule.  Files that match it (after the mark is stripped) are excluded
+from the result.  Other (“normal”) rules are called _inclusion_ rules.
+
+Typically, a rule must match any part of a file path (below the root,
+of course).  However, if a rule starts with `/` or `./` it is called
+_anchored_ and must match beginning of a file path.  For example, rule
+`./README` matches file `README` in the root directory, but not in any
+of its subdirectories.
+
+If a rule matches a directory, it also matches all of the files the
+directory contains (with arbitrary nesting level).  For example, rule
+`test` also matches file `test/foo/bar.el`.
+
+A rule that ends in a slash directly matches only directories.  But,
+in accordance to the previous paragraph, also all files within such
+directories.  So, there is a subtle difference: a rule `test/` won’t
+match a file named `test`, but will match any file within a directory
+named `test`.
+
+Finally, note a difference with Git concerning inclusions/exclusions
+and subdirectories.  Git manual says: _“It is not possible to
+re-include a file if a parent directory of that file is excluded.”_
+Eldev filesets have no such exceptions.
+
+[#composite-filesets]
+=== Composite filesets
+
+Eldev also supports composite filesets.  They are built using common
+set/logic operations and can be nested, i.e. one composite fileset can
+include another.  There are currently three types:
+
+`(:and ELEMENT\...)`::
+
+  A file matches an `:and` fileset if and only if it matches _every_
+  of its `ELEMENT` filesets.
+
+`(:or ELEMENT\...)`::
+
+  A file matches an `:or` fileset if and only if it matches _at least
+  one_ of its `ELEMENT` filesets.
+
+`(:not NEGATED)`::
+
+  A file matches a `:not` fileset when it _doesn’t match_ its
+  `NEGATED` fileset and vice versa.
+
+=== Evaluated filesets
+
+Finally, some parts of filesets — but not elements of simple filesets!
+— can be evaluated.  An evaluated element can be a variable name (a
+symbol) or a form.  When matching, such element will be evaluated
+_once_, before `eldev-find-files` or `eldev-filter-files` start actual
+work.
+
+Result of evaluating such an expression can be an evaluated fileset in
+turn — Eldev will keep evaluating elements until results finally
+consist of only simple and composite filesets.  To prevent accidental
+infinite loops, there is a limit of `eldev-fileset-max-iterations` on
+how many times sequential evaluations can yield symbols or forms.
+
+Example of an evaluated fileset can be seen from return value of
+`eldev-standard-fileset` function.  E.g.:
+
+[source]
+----
+(eldev-standard-fileset 'main)
+=> (:and eldev-main-fileset (:not eldev-standard-excludes))
+----
+
+As the result contains references to two variables, they will be
+evaluated in turn — and so on, until everything is resolved.
+
+[#modifying-filesets]
+=== Modifying filesets
+
+Eldev contains quite a few variables with filesets that may be
+modified by the projects, for example, `eldev-test-fileset`,
+`eldev-standard-excludes` or `eldev-files-to-package`.  To modify
+those, you should create a <<composite-filesets,composite fileset>>
+that refers to the previous value.  For example like this:
+
+[source]
+----
+;; Make sure included sample projects are not compiled etc.
+(setf eldev-standard-excludes
+      `(:or ,eldev-standard-excludes "./samples"))
+----
+
+Previously Eldev documentation and its own source code would use
+`append` or `push` to modify existing filesets.  This turned out to be
+a bad advice, because this implicitly assumes that the modified
+filesets are <<simple-filesets,simple>> and might lead to unexpected
+results (stacktraces or filesets that don’t do what is expected) for
+any other fileset type.
+
+{since-1-2} Starting with version 1.2 Eldev will print a warning
+whenever it detects a “suspicious” modification in any of its standard
+filesets, to avoid potential bugs: `eldev-files-to-package` is no
+longer a simple filesets starting with that version, some others may
+be changed in the future too.  If your project triggers this warning,
+please modify the erroneous code (in file `Eldev` or `Eldev-local`) to
+be similar to the example above.  If you still get warnings, but are
+certain that all fileset-modifying code is correct, you can set
+variable `eldev-warn-about-suspicious-fileset-var-modifications` to
+`nil` in file `Eldev`.

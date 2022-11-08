@@ -1,0 +1,14 @@
+[#requirements]
+== Requirements
+
+Eldev runs on Emacs 24.4 and up.  On earlier Emacs versions it will be
+overly verbose, but this is rather an Emacs problem.
+
+Any “typical” OS — Linux, macOS, Windows or any POSIX-like system not
+listed earlier — will do.  Additionally, since there is only a small
+shell script (`.bat` file for Windows) that is really OS-dependent,
+porting to other systems should not be difficult, volunteers welcome.
+
+Eldev intentionally has no dependencies, at least currently: otherwise
+your project would also see them, which could in theory lead to some
+problems.

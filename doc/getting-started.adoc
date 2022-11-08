@@ -1,0 +1,28 @@
+== Getting started
+
+Eldev comes with built-in help.  Just run:
+
+    $ eldev help
+
+This will list all the commands Eldev supports.  To see detailed
+description of any of those, type:
+
+    $ eldev help COMMAND
+
+In the help you can also see lots of options — both global and
+specific to certain commands.  Many common things are possible just
+out of the box, but <<extending-eldev,later we will discuss>> how to
+define additional commands and options or change defaults for the
+existing.
+
+Two most important global options to remember are `--trace` (`-t`) and
+`--debug` (`-d`).  With the first one, Eldev prints lots of additional
+information about what it is doing to stdout.  With the second, Eldev
+prints stacktraces for most errors.  These options will often help you
+figure out what’s going wrong without requesting any external
+assistance.  Also check out section on <<debugging-features,various
+debugging features>> discussed later.
+
+Eldev mostly follows GNU conventions in its command line.  Perhaps the
+only exception is that global options must be specified before command
+name and command-specific options — after it.

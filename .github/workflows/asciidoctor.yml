@@ -1,0 +1,42 @@
+name: Deploy documentation
+
+on:
+  push:
+    branches: ['master']
+    paths: ['doc/**']
+
+jobs:
+  build_html:
+    runs-on: ${{matrix.os}}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        emacs_version: ['28.2']
+
+    steps:
+    # We want to call it via Eldev, to reuse command line etc.  Certainly an overkill, but
+    # hardly important, our regression testing action is magnitudes more costly anyway.
+    - name: Set up Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
+
+    - name: Set up Asciidoctor
+      run: sudo apt-get -y install asciidoctor
+
+    - name: Check out the source code
+      uses: actions/checkout@v3
+
+    - name: Build documentation HTML
+      run: |
+        ./bin/eldev -dtTC documentation
+      env:
+        ELDEV_LOCAL: "."
+
+    - name: Deploy resulting HTML to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        deploy_key: ${{secrets.ACTIONS_DEPLOY_KEY}}
+        publish_branch: github-pages
+        publish_dir: ./htmldoc

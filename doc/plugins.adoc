@@ -1,0 +1,324 @@
+== Plugins
+
+{since-0-3} Plugins are activatable extensions to Eldev functionality.
+They provide features that are not needed for most projects and
+are therefore not enabled by default.  However, enabling a plugin is
+trivial — just add line:
+
+[source]
+----
+(eldev-use-plugin 'PLUGIN-NAME)
+----
+
+to file `Eldev` of your project.  For example:
+
+[source]
+----
+(eldev-use-plugin 'autoloads)
+----
+
+As for other configuration, you can also do it in `Eldev-local` or
+<<setup-procedure,other places>>.
+
+In future, plugins may become externally-managed and “detached” from
+Eldev itself (create an issue if you are interested).  For now,
+however, Eldev provides three built-in plugins.
+
+You can check if a project has any plugins activated — and
+documentation for those plugins:
+
+    $ eldev plugins
+
+Run Eldev in quiet mode (`-q`) to get only the list, without the long
+documentation:
+
+    $ eldev -q plugins
+
+Remember that if a project activates a plugin in a non-standard way,
+for example from <<hooks,a hook>>, command `plugins` will not see it.
+
+There is currently no way to list all available plugins.  However, as
+of yet there are only three plugins anyway.
+
+[#autoloads-plugin]
+=== autoloads
+
+{since-0-6} A plugin that enables automatic collection of functions
+and other forms marked with `;;;###autoload` cookie in project’s `.el`
+files.  It tries to behave exactly the same as for installed Elisp
+packages, so that there are no differences between development and
+installed versions of the project.
+
+The plugin is not on by default because many projects don’t use
+autoloading functionality at all and having file
+`PACKAGE-autoloads.el` magically appear all the time in them would be
+annoying.
+
+To have autoloads automatically collected in your project, just
+activate the plugin: add form `(eldev-use-plugin 'autoloads)` to the
+project’s file `Eldev`.  You don’t need any additional steps to
+instruct Eldev how to use the generated file.  In fact, it is able to
+do this even without the plugin: the plugin only takes cares to build
+and update the file as necessary.
+
+If the plugin is activated, you can see new target `:autoloads` in the
+output of `targets` command.  In addition to being built by default,
+this file is also generated whenever Eldev needs to load the project:
+for commands `test`, `eval`, `exec` and `emacs`.  Finally, the file is
+also registered as a dependency to all `.elc` targets in the project;
+this way, byte-compiling always has access to up-to-date list of
+autoloaded functions.
+
+This plugin can also be activated in projects you use as
+<<local-dependencies,local dependencies>> for other projects.  Eldev
+knows how to keep the autoloads file up-to-date in all local
+dependencies, regardless of their loading mode.
+
+[#maintainer-plugin]
+=== maintainer
+
+{since-1-2} This is a special plugin that adds commands for project’s
+maintainer use, in fact, currently just one: `release`.  Because not
+every developer is a maintainer, this command is not enabled by
+default and is instead available only when the plugin is active, to
+avoid potential confusion.  The recommended way to activate it,
+therefore, is by adding code:
+
+[source]
+----
+(eldev-use-plugin 'maintainer)
+----
+
+to your (as maintainer’s) personal file `Eldev-local`.  You can also
+do this in `~/.config/eldev/config` to have the commands available
+everywhere.  If you are the only developer of your project (or simply
+don’t care), you can of course do this right in file `Eldev`.
+
+The plugin defines a lot of variables that control its behavior.  They
+are available even if the plugin itself is not active, and it is
+actually recommended to set them in file `Eldev`, so that if the
+plugin _is_ activated, project-specific configuration is already
+present.
+
+==== Command `release`
+
+The main plugin’s command is called `release`:
+
+    $ eldev release VERSION
+
+By default it runs interactively.  As always in Eldev, this can be
+changed from command line (option `-N` makes the command
+non-interactive) or customized in `~/.config/eldev/config`.  The
+command refuses to release the project if any _validation_ step fails
+(when running interactively, you can override this in some cases).  It
+won’t push any resulting commits: this is left for you to do
+explicitly.
+
+This command is relatively simplistic.  If you need really advanced
+functionality, try looking for an external tool, e.g.
+{uri-release-it}[Release-It].  Some external tools may be blendable
+into Eldev’s plugin via `eldev-release-validators` etc., see
+<<maintainer-settings,below>>.
+
+There are four standard validation steps:
+
+. Check the version.  It must be valid from Elisp point of view and
+  larger than the current project’s version.  You can also specify one
+  of _incrementors_ by name: “major”, “minor”, “patch” or “snapshot”
+  to have a suitable version number automatically generated for you
+  based on the current version.  Normally you need to specify this on
+  the command line, but when running the command interactively, you
+  can also type it in at runtime.
+
+. Check the project’s working directory.  It must be a Git or
+  Mercurial checkout; the command won’t work in non-VCS directories or
+  those belonging to a different VCS at all.  The directory must not
+  contain any modifications or unknown files (the latter can be
+  “allowed” using option `--ignore-unknown`, `-u`).  Finally, Eldev
+  can refuse releasing from certain branches, by default from anywhere
+  but Git’s “master” or Mercurial’s “default”.
+
+. Check the project’s files.  Eldev will refuse to release if any file
+  contains a run-together word “DONOT{empty}RELEASE” (configurable).
+  This can be left as a reminder to self, for example, as a comment in
+  any file in a place that must be fixed before making a release.
+  This precaution can be skipped with option `--no-file-checks` or
+  manually when running interactively.
+
+. Optionally test the project by running its tests and byte-compiling.
+  This step requires configuration and by default won’t do anything.
+  This is actually not a problem if you have
+  <<continuous-integration,continuous integration>> properly set up.
+  However, the plugin is currently unable to check results on
+  CI-servers automatically and instead relies on you “knowing what you
+  are doing”.
++
+Testing can be skipped with option `--no-testing` in case you know it
+passes on a CI-server or really need to make a release immediately,
+even with known failures.  In the interactive mode you can also choose
+to proceed even if some tests fail.
+
+If the validation passes or if you have interactively chosen to ignore
+the errors, Eldev proceeds to create the release commit and tag the
+release.  Depending on the project configuration, it may additionally
+create a post-release commit (not by default).
+
+Command `release` is written to be as generic as possible.  Eldev
+defines a lot of variables that control its behavior.  However, they
+are not available from the command line.  Instead, they should be
+customized in file `Eldev` on a per-project basis; see the next
+section.
+
+[#maintainer-settings]
+==== Maintainer project-specific settings
+
+You can and most often should adapt the plugin to your project’s
+needs.  There are really lots of variables that control command
+`release` behavior.  They have sensible defaults, but your project,
+especially if it is complicated, still might need to tweak some of
+them.
+
+Not every variable is listed here.  You can always check Eldev source
+code and in-Emacs documentation to find all `eldev-release-…`
+variables if you need yet more customization.
+
+[discrete]
+===== Project name and commit messages
+
+First variable you might need to set is called
+`eldev-formatted-project-name`.  By default it has no value and
+Elisp-level _package_ name is used in its place.  This is often not a
+bad default, but package names are typically all-lowercase.  By
+default the name also makes it into commit messages.
+
+It might also be necessary to modify `eldev-release-commit-message`
+and `eldev-release-post-release-commit-message`.  These variables
+_are_ accessible from command line, but if you always use standard
+messages when releasing, you can save yourself some typing by entering
+them once in file `Eldev`.  Messages set here may contain
+placeholders, see function `eldev-substitute` for details.
+
+[discrete]
+===== Validators
+
+Three variables `eldev-release-test-local`,
+`eldev-release-test-other-emacses` and
+`eldev-release-test-docker-images` let you configure local
+<<testing,testing>> before releasing.  Standard configuration includes
+no testing and Eldev simply relies on you knowing that the code is
+bug-free, e.g. from <<continuous-integration,continuous integration>>
+results.
+
+In addition to the four standard validation steps, you can define
+additional _validators_ by modifying hook `eldev-release-validators`.
+This lets you perform additional checks when releasing your project,
+e.g. checking if the documentation is up-to-date.  Macro
+`eldev-call-process` is particularly useful for implementing those in
+case you need to invoke external (i.e. non-Elisp) tools.
+
+[discrete]
+===== Preparing the release
+
+Once validation is complete, Eldev _prepares_ the release commit.
+Actually, the only standard step for this is updating package version.
+This Eldev can do automatically whether you use package headers, or
+have a prewritten `…-pkg.el` file.
+
+If you need to perform any other steps, you can use hook
+`eldev-release-preparators`.  Functions hooked here may do whatever is
+needed for your project.  Any changes in the registered VCS files will
+be included into the commit.  However, if you create another file, you
+need to register it by VCS first.
+
+[discrete]
+===== Post-release commit
+
+Many projects include a _post-release commit_ in their release flow
+that e.g. bumps project version to a “snapshot” one, so that it is
+always obvious if checked out source code corresponds to an official
+release or not.  To enable this for your project, set variable
+`eldev-release-post-release-commit` to t or a function; for example:
+
+[source]
+----
+(setf eldev-release-post-release-commit
+      (lambda (version)
+        (let ((eldev-release-min-version-size 3))
+          (eldev-release-next-snapshot-version-unless-already-snapshot version))))
+----
+
+Here we say that we do want to bump a version, but only if it is not a
+snapshot already (command `release` lets you create snapshot releases
+too).  We also temporarily rebind `eldev-release-min-version-size` to
+ensure that `snapshot` is added only after the patch (i.e. the third
+component) number.  If `version` is returned unchanged, the
+post-release commit is created, but without bumping the version.  If
+nil is returned, however, post-release commit is canceled altogether.
+
+Like with the main commit, you can modify hook
+`eldev-release-post-release-preparators` to add special steps.
+
+[#undercover-plugin]
+=== undercover
+
+{since-0-3} This built-in plugin provides integration with
+{uri-undercover}[undercover] tool that generates coverage reports for
+your tests.  It is active only for <<testing,command `test`>>.  By
+default, behavior of the tool is unaltered (with the exception that
+reports are not merged), so effectively it will do nothing unless run
+on a supported <<continuous-integration,continuous integration>>
+server.
+
+To have your project’s code coverage statistics automatically gathered
+during continuous integration, all you need to do is:
+
+. Activate the plugin: add `(eldev-use-plugin 'undercover)` to your
+  project’s file `Eldev`.
+
+. Make sure that command `test` is executed during automated testing
+  (e.g. in file `.travis.yml`) in `as-is`, `source` or `built-source`
+  <<loading-modes,loading mode>>.  If you want, you can run it
+  again additionally in `packaged` mode.
+
+The plugin adds two options for command `test`: `--undercover` (`-u`)
+and `--undercover-report` (`-U`).  First option can be used to
+configure the plugin and the tool, the second — to change report
+filename.  Value for the option `-u` should be a comma and/or
+space-separated list of any of the following flags:
+
+`auto`, `on` (`always`), `off` (`never`)::
+
+    whether to generate the report; default value is `auto`;
+
+`coveralls`, `simplecov`, `codecov`, `text`::
+
+    format of the report to generate; default is `coveralls`;
+
+`merge`, `restart`::
+
+    whether to merge with existing report; note that by default report
+    is _restarted_, i.e. existing report file is deleted;
+
+`send`, `dontsend`::
+
+    whether to send the generated report to
+    {uri-coveralls}[coveralls.io] (only for the suitable format);
+    default is to send.
+
+Additionally, when `eldev-dwim` is non-nil, certain flags can affect
+each other:
+
+* if report format is not set explicitly, it is derived from extension
+  of report filename if possible: `.json` for `simplecov` format,
+  `.txt` or `.text` for a text report; `codecov` format cannot be set
+  this way, currently;
+* when requested format is not `coveralls`, report is always generated
+  unless `auto` or `off` (`never`) is specified explicitly.
+
+Based on the above, easiest way to generate a local coverage report is
+something like this:
+
+    $ eldev test -U simplecov.json
+
+Full help for the plugin can always be checked by running `eldev
+plugins` in a project with the plugin activated.

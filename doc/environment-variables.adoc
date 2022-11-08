@@ -1,0 +1,24 @@
+== Influential environment variables
+
+A few environment variables can affect Eldev’s behavior.
+
+`EMACS` or `ELDEV_EMACS`::
+
+    Use given Emacs executable (also for any child processes).  If not
+    specified, this defaults to just `emacs`, which is expected
+    somewhere in `PATH`.
+
+`ELDEV_LOCAL`::
+
+    Load Eldev Elisp code from given directory (usually a Git clone of
+    source tree) instead of the normal bootstrapping from MELPA.
+    Should not be needed normally, only when developing Eldev itself.
+
+`ELDEV_DIR`::
+
+    Directory where user’s configuration file, Eldev’s bootstrapping
+    files etc. are located.  When not set, configuration files are
+    looked up either in `~/.eldev` if that exists, else in
+    `~/.config/eldev`; runtime files are placed either in `~/.eldev`
+    or `~/.cache/eldev`.  Used by Eldev’s own regression tests, should
+    be of no interest for typical use.

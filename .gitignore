@@ -4,6 +4,7 @@ Eldev-local
 *.elc
 
 /dist
+/htmldoc
 
 /test/*/*.info
 /test/*/dir

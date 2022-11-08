@@ -1,0 +1,56 @@
+[#profiling]
+== Profiling
+
+{since-0-11} Eldev has limited built-in support for profiling your
+project.  The largest limitation here is Emacs itself: it is difficult
+to receive a useful code profile, as provided functionality is really
+basic and crude.
+
+Profiling is implemented as a “prefix” command, which takes the “real”
+command as an argument.  This way, anything can be profiled, though of
+course it is really useful only with commands `eval`, `exec` and
+`test`, maybe occasionally with `compile` and similar.
+
+The basic usage is like this:
+
+    $ eldev profile --open eval "(my-project-function)"
+
+Option `--open` tells Eldev to send resulting profile(s) to your
+normal Emacs and open there.  It provides the quickest way to examine
+results of profiling.  For it to work, Emacs must run a server, see
+function `server-start`.  Another alternative is to store results into
+a file, using `--file` option, though opening this in Emacs is
+currently (28.1) fairly difficult.  At least one of `--open` and
+`--file` (can be abbreviated as `-o` and `-f`) is required.
+
+Eldev is smart enough to start profiling only immediately before
+running code from your project, i.e. to avoid profiling project
+dependency installation (if that is needed) and so on.  However, it is
+apparently not possible to exclude irrelevant stuff from backtraces,
+so those will, unfortunately, contain quite a lot of entries not
+related to your project.
+
+Like with Elisp function `profiler-start`, you can choose between CPU,
+memory and both together using options `--cpu`, `--mem` and `cpu-mem`
+(or `-c`, `-m` and `-M`).  Default profiling mode is CPU.
+
+[#profiling-eval]
+=== Useful evaluation options
+
+Profiling is most useful with commands `eval` and `exec`.
+Additionally, those have certain options targeted especially at
+profiling, though they could, of course, be used in other cases.
+
+Options `--macroexpand` and `--compile` (`-m` and `-c`) make the
+commands preprocess their expressions accordingly; by default
+expressions are simply evaluated using Elisp interpreter.
+
+Option `--repeat` (`-n`) lets you evaluate the same expression(s)
+multiple times.  This is useful if normal evaluation is too fast for a
+meaningful profile.  If the command `eval` is used, only the last
+result is printed.  However, any side effects (including printing)
+will be observable that many times, so keep that in mind!
+
+For example:
+
+    $ eldev profile -o eval -c -n 10000 "..."

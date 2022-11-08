@@ -1,0 +1,117 @@
+== Installation
+
+There are several ways to install Eldev.
+
+[discrete]
+==== Bootstrapping from MELPA: if you have a catch-all directory for executables
+
+* On Linux, macOS, etc.:
+. From this directory (e.g. `~/bin`) execute:
++
+--
+    $ curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
+
+You can even do this from `/usr/local/bin` provided you have the
+necessary permissions.
+--
+
+* On Windows:
+. From this directory (e.g. `%USERPROFILE%\bin`) execute:
++
+--
+    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev.bat > eldev.bat
+--
+
+No further steps necessary — Eldev will bootstrap itself as needed on
+first invocation.
+
+[discrete]
+==== Bootstrapping from MELPA: general case
+
+* On Linux, macOS, etc.:
+. Execute:
++
+--
+    $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
+
+This will install `eldev` script to `~/.local/bin`.
+--
+
+. Generally, {uri-xdg}[this directory should already be in your
+  `PATH`].  But if not, e.g. in `~/.profile` add this:
++
+    export PATH="$HOME/.local/bin:$PATH"
+
+* On Windows:
+. Execute:
++
+--
+    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
+
+This will install `eldev.bat` script to `%USERPROFILE%\.local\bin`.
+--
+
+. Add this directory to your `PATH`:
++
+    > reg add HKCU\Environment /v Path /d "%USERPROFILE%\.local\bin;%PATH%" /f
+
+Afterwards Eldev will bootstrap itself as needed on first invocation.
+
+TIP: `eldev` doesn’t _really_ need to be findable through `PATH` — it
+will work regardless.  This is rather for your convenience, so that
+you don’t need to type the full path again and again.
+
+[discrete]
+==== Installing from sources
+
+. Clone the source tree from GitHub.
+
+. In the cloned working directory execute,
+* on Linux, macOS, etc.:
++
+    $ ./install.sh DIRECTORY
++
+* on Windows:
++
+    > install.bat DIRECTORY
+
+Here `DIRECTORY` is the location of `eldev` executable should be put.
+It should be in `PATH` environment variable, or else you will need to
+specify full path each time you invoke Eldev.  You probably have
+sth. like `~/bin` in your `PATH` already, which would be a good value
+for `DIRECTORY`.  You could even install in e.g. `/usr/local/bin` —
+but make sure you have permissions first.
+
+[discrete]
+==== Mostly for developing Eldev itself
+
+. Clone the source tree from GitHub.
+
+. Set environment variable `ELDEV_LOCAL` to the full path of the
+  working directory.
+
+. Make sure executable `eldev` is available.  Either follow any of the
+  first way to install Eldev, or symlink/copy file `bin/eldev` from
+  the cloned directory to somewhere on your `PATH`.
+
+Now each time Eldev is executed, it will use the sources at
+`ELDEV_LOCAL`.  You can even modify it and see how that affects Eldev
+immediately.
+
+=== Upgrading Eldev
+
+Eldev bootstraps itself when needed, but won’t automatically fetch new
+versions.  To upgrade it later, explicitly run (from any directory):
+
+    $ eldev upgrade-self
+
+By default it uses MELPA Stable.  If you want to test or use some not
+yet officially released version, try:
+
+    $ eldev --unstable upgrade-self
+
+This will make it use MELPA Unstable for upgrading.  If you want to
+switch back to the latest stable version (as recommended), supply `-d`
+(`--downgrade`) option to the command:
+
+    $ eldev upgrade-self -d

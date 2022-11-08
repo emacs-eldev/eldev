@@ -1,0 +1,45 @@
+== Initializing a project
+
+When Eldev starts up, it configures itself for the project in the
+directory where it is run from.  This is done by loading Elisp file
+called `Eldev` (without extension!) in the current directory.  This
+file is similar to Make’s `Makefile` or Cask’s `Cask`.  But even more
+so to Gradle’s `build.gradle`: because it is a program.  File `Eldev`
+is not strictly required, but nearly all projects will have one.  It
+is also generally recommended to create it even if empty, because
+otherwise some tools (e.g. {uri-flycheck-eldev}[flycheck-eldev],
+{uri-projectile}[Projectile]) will not recognize the project as
+Eldev-based without it.
+
+You can create the file in your project manually, but it is easier to
+just let Eldev itself do it for you, especially the first time:
+
+    $ eldev init
+
+If you let the initializer do its work, it will create file `Eldev`
+already prepared to download project dependencies.  If you answer “no”
+to its question (or execute as `eldev init --non-interactive`), just
+edit the created file and uncomment some of the calls to
+`eldev-use-package-archive` there as appropriate.  These forms
+instruct Eldev to use specific package archives to download project
+dependencies.
+
+After this step, Eldev is ready to work with your project.
+
+[#githooks]
+=== Initializing a checkout
+
+If your project uses {uri-git-hooks}[Git hooks], you can take
+advantage of Eldev’s command `githooks` to install them:
+
+    $ eldev githooks
+    Installed as symbolic link: ‘.git/hooks/pre-commit’ -> ‘githooks/pre-commit’
+
+Eldev doesn’t try to enforce any hooks on you, instead, it only
+symlinks the files the project has in directory `githooks` to the
+place Git expects them.  For security reasons, Git doesn’t activate
+any hooks by default upon repository cloning, this has to be an
+explicit decision — be that copying by hands or an Eldev invocation.
+
+If you don’t have such a subdirectory, command will not do anything
+and will also not be shown in the output of `eldev help`.

@@ -1,0 +1,98 @@
+== Brief overview
+
+Eldev features:
+
+* Eldev configuration is Elisp.  It can change many defaults, add
+  special cases for Emacs versions and much more — even define
+  additional Eldev commands and options.
+* Built-in <<testing,support for regression/unit testing>>.
+* Blends nicely into <<continuous-integration,continuous
+  integration>> setups.
+* Can run on <<different-emacs-versions,different Emacs version>> even
+  on the same machine; can also use <<docker,Docker>> for that.
+* There are <<setup-procedure,_four_ levels of configuration>> — you
+  can customize most aspects of Eldev for your project needs and
+  personal preferences.
+* <<dependencies,Project dependency>> downloading, installation etc.
+  is fully automated, you only need to specify which Elisp package
+  archive(s) to use.
+* You can also use <<local-dependencies,local dependencies>>, even
+  those that don’t use Eldev (some restrictions still apply).  This
+  is similar to Cask linking, but with more flexibility.
+* Full support for <<autoloads,autoloads>> during development.
+* Miscellaneous operations useful during development:
+  <<running-emacs,running Emacs>> with only your project,
+  <<linting,linting>> source code, <<evaluating,evaluating
+  expressions>> in project’s context, <<profiling,profiling>>.
+* Can <<maintainer-plugin,automate release process>> for your project.
+* Eldev by default <<project-isolation,isolates>> your project for
+  development, helping you to distinguish between problems with setup
+  or configuration and inherent bugs in the project.
+* Full-featured <<build-system,build system>> for complex projects.
+* Can <<debugging-features,help you debug your code>>.
+* <<requirements,Runs on all major operating systems>>: Linux, macOS,
+  Windows.
+* Eldev is fast.
+
+Drawbacks:
+
+* Eldev doesn’t run the project being tested/built in a separate
+  process, so it is not as pure as Cask.  However, Emacs packages
+  won’t live in a sterile world anyway: typical user setup will
+  include dozens of other packages.
+* Eldev depends much more on Emacs internals.  It is more likely to
+  break with future Emacs versions than Cask.
+
+Eldev is not widely used, but as of August 2022 there are
+{uri-search-github}[around 120 projects on GitHub] that include file
+`Eldev`, so it is already quite well tested in the wild.
+Additionally, Eldev contains a fairly large regression test
+collection.
+
+TIP: If you are using {uri-flycheck}[Flycheck], check out
+{uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
+between Flycheck and Eldev, allowing the former to automatically use
+proper dependencies in Eldev projects.
+
+=== Example projects
+
+Here is a non-exhaustive list of projects that use Eldev and can serve
+as examples.  I intentionally list only my own projects, even if there
+are others, because this way it’s easier to ensure that the comments
+below stay valid.  Eldev source code itself comes with no examples: I
+think real-world usage provides better models.
+
+{uri-extmap}[`extmap`]; its file {uri-extmap}/blob/master/Eldev[`Eldev`]; its file {uri-extmap}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
+
+    A simple project with no dependencies.  As you can see, there is
+    nothing in its `Eldev`.  The file is actually not even needed, it
+    is only there to signify that Eldev can be used on the project and
+    for some tools ({uri-flycheck-eldev}[flycheck-eldev],
+    {uri-projectile}[Projectile]).
+
+{uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
+
+    Another simple project with no dependencies.  However, it uses its
+    file `Eldev` to define a custom option that activates
+    project-specific development assistance code.  Additionally, it
+    enables <<undercover-plugin,undercover>> plugin to collect test
+    code coverage statistics.
+
+{uri-logview}[Logview]; its file {uri-logview}/blob/master/Eldev[`Eldev`]; its file {uri-logview}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
+
+    This project has several dependencies, so it needs to instruct
+    Eldev how to find them.
+
+{uri-datetime}[`datetime`]; its file {uri-datetime}/blob/master/Eldev[`Eldev`]; its file {uri-datetime}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
+
+    A library with a fairly complicated file `Eldev`.  The main reason
+    for complexity are two included Java programs that are used for 1)
+    extracting information from Java core libraries; and 2) comparing
+    ``datetime``’s results against a Java implementation during
+    testing.  It also uses `extmap` to generate resource files that
+    are later included in its package.
+
+All these projects also use <<continuous-integration,continuous
+integration>> on <<github-workflows,GitHub>> for automated testing.
+Various elements of files `Eldev` in these projects are documented
+below.

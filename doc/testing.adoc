@@ -1,0 +1,321 @@
+[#testing]
+== Testing
+
+Eldev has built-in support for running regression/unit tests of your
+project.  Currently, Eldev supports {uri-ert}[ERT],
+{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
+frameworks.  Leave a feature request in the issue tracker if you are
+interested in a different library.
+
+Simply executing
+
+    $ eldev test
+
+will run all your tests.  By default, all tests are expected to be in
+files named `test.el`, `tests.el`, `+*-test.el+`, `+*-tests.el+` or in
+`test` or `tests` subdirectories of the project root.  But you can
+always change the value of `eldev-test-fileset` variable in the
+project’s `Eldev` as appropriate.
+
+By default, the command runs all available tests.  However, during
+development you often need to run one or a few tests only — when you
+hunt a specific bug, for example.  Eldev provides two ways to select
+which tests to run.
+
+First is by using a _selector_ (<<frameworks,framework-specific>>,
+this example is for <<ert,ERT>>):
+
+    $ eldev test foo-test-15
+
+will run only the test with that specific name.  It is of course
+possible to select more than one test by specifying multiple
+selectors: they are combined with ‘or’ operation.  You can use any
+selector supported by the testing framework here, see its
+documentation.
+
+The second way is to avoid loading (and executing) certain test files
+altogether.  This can be achieved with `--file` (`-f`) option:
+
+    $ eldev test -f foo.el
+
+will execute tests only in file `foo.el` and not in e.g. `bar.el`.
+You don’t need to specify directory (e.g. `test/foo.el`); for reasons
+why, see <<filesets,explanation of Eldev filesets below>>.
+
+Both ways of selecting tests can be used together.  In this case they
+are combined with ‘and’ operation: only tests that match selector and
+which are defined in a loaded file are run.
+
+When a test is failing, a backtrace of the failure is printed.  You
+can affect its readability and completeness using options `-b`
+(`--print-backtrace`, the default) and `-B` (`--omit-backtraces`).
+The first option accepts your screen width as an optional parameter;
+backtrace lines get cut to the specified width.  (Since 0.7 this can
+also be specified as a global option that additionally affects all
+other backtraces that are printed by Eldev.)  Special value of 0 (the
+default in Eldev) disables truncation of backtrace lines.  Second
+option, `-B`, is surprisingly useful.  In many cases backtraces don’t
+actually give any useful information, especially when the tests
+contain only a single assertion, and only clutter the output.  If you
+have different preferences compared to Eldev, you can customize
+variable `eldev-test-print-backtraces` in file
+`~/.config/eldev/config`.
+
+How exactly tests are executed depends on _test runner_.  If you
+dislike the default behavior of Eldev, you can choose a different test
+runner using `--runner` (`-r`) option of `test` command; see the list
+of available test runners with their descriptions using
+`--list-runners` option.  If you always use a different test runner,
+it is a good idea to set it as the default in file
+`~/.config/eldev/config`.  Finally, you can even write your own
+runner.
+
+[#frameworks]
+=== Frameworks
+
+As stated above, Eldev supports {uri-ert}[ERT] (Emacs built-in),
+{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
+frameworks.  Normally, you don’t need to specify which framework the
+project uses, as the tool can autodetect that.  But in rare cases you
+may need to set variable `eldev-test-framework` to either `'ert`,
+`'buttercup` or `'ecukes`, as appropriate.  It is also possible to use
+more than one framework in a project, <<multiple-frameworks,see
+below>>.  You don’t need to declare testing package(s) as
+<<additional-dependencies,extra dependencies>>: Eldev will install
+them itself when needed.
+
+Eldev tries to provide uniform command line interface to the supported
+frameworks, but of course there are many differences between them.
+
+[#ert]
+==== ERT
+
+{uri-ert}[ERT] is the “default” testing framework and also an Emacs
+built-in.  This means that no additional packages need to be installed
+and the framework is available on all non-ancient Emacs versions (at
+least all Eldev itself supports).
+
+All functionality of `test` command works with ERT.
+
+[#buttercup]
+==== Buttercup
+
+{since-0-2} {uri-buttercup}[Buttercup] is a behavior-driven
+development framework for testing Emacs Lisp code.  Its support in
+Eldev has some limitations.  On the other hand, certain functionality
+is not supported by the library itself, and e.g. its `bin/buttercup`
+script also doesn’t provide similar features.
+
+When using Buttercup, selectors are _patterns_ from
+{uri-buttercup-rt}[the library’s documentation].  I.e. they are
+regular expressions in Emacs syntax, and only tests with names
+matching at least one of the specified selectors/patterns are
+executed.
+
+Things that won’t work with Buttercup at the moment:
+
+* option `--stop-on-unexpected` (`-s`);
+* specifying screen width with option `--print-backtraces` (`-b`): it
+  will always work as if 80 was specified.
+
+Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
+on the previous run’s results.
+
+[#ecukes]
+==== Ecukes
+
+{since-0-10} {uri-ecukes}[Ecukes] is a framework for performing
+integrational testing.  Its support in Eldev is limited to “script”
+(a.k.a “batch”) mode: neither “no win” nor “win” mode is supported
+currently.
+
+Instead of adding more command-line options, Eldev reuses its standard
+selector concept for all of Ecukes patterns, anti-patterns, tags and
+“run only failing scenarios” option.  It depends on the contents of a
+selector:
+
+[cols="2, 5"]
+|===
+| `REGEXP`
+| Pattern: scenarios with names matching the `REGEXP` are executed
+
+| `~REGEXP`
+| Antipattern: scenarios matching the `REGEXP` are omitted
+
+| `@TAG`
+| Scenarios with given tag (i.e. `@TAG`) are executed
+
+| `~@TAG`
+| Scenarios with the tag are omitted
+
+| `:failed` _or_ `:failing`
+| Only scenarios that failed in the previous run are executed
+|===
+
+For example, command
+
+    $ eldev test @foo ~open
+
+runs all scenarios tagged as `@foo` with name that doesn’t contain
+word `open`.
+
+Unlike the standard (Cask-based) Ecukes test runner, Eldev prints
+backtraces of failures in scenario steps by default.  As for all other
+supported frameworks, however, this can be disabled using option `-B`
+(`--omit-backtraces`).  If your project uses only Ecukes tests and you
+don’t like the backtraces being printed by default, you can always add
+`(setf eldev-test-print-backtraces nil)` to file `Eldev`.
+
+Option `-X` (`--expect`) is currently not supported for this
+framework.
+
+[#multiple-frameworks]
+=== Multiple frameworks in one project
+
+{since-0-10} Eldev supports using test of different types in one
+project, in any combination of supported <<frameworks,frameworks>>.
+In fact, its autodetection will work even in such cases.  However,
+especially when using different test types, it might be useful to set
+variable `eldev-test-framework` to a _list_ of the frameworks the
+project uses.  E.g.:
+
+....
+(setf eldev-test-framework '(ert buttercup))
+....
+
+The order of elements in the list is important, as this will be the
+order in which `test` command calls the different frameworks.
+
+Command `test` will apply all its options and selectors to all
+frameworks (autodetected or specified explicitly as above) at once.
+Additionally, when tests of different types are invoked, the command
+will print a short summary over all types.
+
+Often, however, you don’t want to mix different test types and instead
+run them using separate commands.  This is especially useful when you
+specify selectors, because those are often different across
+frameworks.  In this case you can use commands `test-FRAMEWORK` or
+their shorter aliases `FRAMEWORK`.  The syntax and behavior of these
+commands is the same as that of `test`, with the only difference that
+only one, specified, framework is used.  These commands are available
+in all project.  However, they are not “advertised”, i.e. not shown in
+output of `eldev help`, unless you set variable `eldev-test-framework`
+to a list of at least two elements.
+
+Example usage:
+
+    $ eldev test-ert
+    $ eldev ecukes basics.feature
+
+It is also possible to specify filesets that limit test file selection
+for each framework, using variables `eldev-test-FRAMEWORK-fileset`.
+If you often use single-framework commands, these filesets can speed
+up testing by not loading unneeded files.  For example, if you have
+ERT tests in one file called `ert.el` and a lot of files with
+Buttercup tests, you could add this to file `Eldev`:
+
+....
+(setf eldev-test-ert-fileset "ert.el"
+      eldev-test-buttercup-fileset "!ert.el")
+....
+
+=== Loading test files
+
+{since-0-5} There appears to be two common ways of using tests: 1)
+they are loaded from project root; 2) subdirectory `test/` (or
+similar) in the project is added to `load-path`.  Eldev supports both.
+First one is the default, since it doesn’t require anything in
+addition.
+
+To better understand the second way, imagine your project structure is
+like this:
+
+....
+    tests/
+        test-helper.el
+        test-my-project.el
+....
+
+and file `test-my-project.el` includes a form `(require
+'test-helper)`.  Naturally, this setup will work only if subdirectory
+`tests/` is in `load-path` by the point tests are executed.  To
+instruct Eldev that your project needs this, add the following to file
+`Eldev`:
+
+[source]
+----
+(eldev-add-loading-roots 'test "tests")
+----
+
+where `'test` is the command name and `"tests"` is the name of the
+subdirectory that should serve as additional loading root.  In
+principle, loading roots can also be used for other commands too, just
+like <<additional-dependencies,extra dependencies>>.
+
+If you want to switch to the first way and avoid special forms in file
+`Eldev`, replace `(require 'test-helper)` with `(require
+'tests/test-helper)`.
+
+[#test-results]
+=== Reusing previous test results
+
+<<ert,ERT>> provides a few selectors that operate on tests’ last
+results.  Even though different Eldev executions will run in different
+Emacs processes, you can still use these selectors: Eldev stores and
+then loads last results of test execution as needed.
+
+For example, execute all tests until some fails (`-s` is a shortcut
+for `--stop-on-unexpected`):
+
+    $ eldev test -s
+
+If any fails, you might want to fix it and rerun again, to see if the
+fix helped.  The easiest way is:
+
+    $ eldev test :failed
+
+For more information, see {uri-ert-sel}[documentation on ERT
+selectors] — other “special” selectors (e.g. `:new` or `:unexpected`)
+also work.
+
+For <<ecukes,Ecukes>> there is a comparable feature, though only for
+failing scenarios.  Internally it is implemted differently, as it is
+built into the framework itself, but from the interface point of view
+it works almost exactly the same: specify selector `:failed` or
+`:failing` on the command line:
+
+    $ eldev test-ecukes :failed
+
+[#testing-simplifications]
+=== Testing command line simplifications
+
+When variable `eldev-dwim` (“do what I mean”) is non-nil, as by
+default, Eldev supports a few simplifications of the command line to
+make testing even more streamlined.
+
+* For all frameworks: any selector that ends in `.el` (`.feature` for
+  <<ecukes,Ecukes>>) is instead treated as a file pattern.  For
+  example:
++
+--
+    $ eldev test foo.el
+
+will work as if you specified `-f` before `foo.el`.
+--
+
+* For <<ert,ERT>>: any symbol selector that doesn’t match a test name
+  is instead treated as regular expression (i.e. as a string).  For
+  example:
++
+--
+    $ eldev test foo
+
+will run all tests with names that contain `foo`.  You can achieve the
+same result with ‘strict’ command line (see also ERT selector
+documentation) like this:
+
+    $ eldev test \"foo\"
+--
+
+If you dislike these simplifications, set `eldev-dwim` to `nil` in
+`~/.config/eldev/config`.

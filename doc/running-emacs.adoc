@@ -1,0 +1,43 @@
+[#running-emacs]
+== Running Emacs
+
+Sometimes you want to run Emacs with _just_ your project installed and
+see how it works without any customization.  You can achieve this in
+Eldev easily:
+
+    $ eldev emacs
+
+This will spawn a separate Emacs that doesn’t read any initialization
+scripts and doesn’t have access to your usual set of installed
+packages, but instead has access to the project being built with Eldev
+— and its dependencies, of course.  Similar as with `eval` and `exec`
+commands, features listed in variable `eldev-emacs-required-features`
+are required automatically.
+
+You can also pass any Emacs options through the command line.  For
+example, this will visit file `foo.bar`, which is useful if your
+project is a mode for `.bar` files:
+
+    $ eldev emacs foo.bar
+
+See `emacs --help` for what you can specify on the command line.
+
+When issued as shown above, command `emacs` will pass the rest of the
+command line to Emacs, but also add a few things on its own.  First,
+it adds everything from the list `eldev-emacs-default-command-line`,
+which disables `~/.emacs` loading and similar things.  Second, it
+transfers variables listed in `eldev-emacs-forward-variables` to the
+child process (this is done in order to keep
+<<project-isolation,project isolation>> promises).  Third, adds
+`--eval` arguments to require the features as described above.  And
+only after that comes the actual command line you specified.
+
+Occasionally you might not want this behavior.  In this case, prepend
+`--` to the command line — then Eldev will pass everything after it to
+the spawned Emacs as-is (with the exception of still transferring
+variables listed in `eldev-emacs-forward-variables`).  Remember that
+you will likely need to pass at least `-q` (`--no-init-file`) option
+to Emacs, otherwise it will probably fail on your `~/.emacs` since it
+will not see your usual packages.  To illustrate:
+
+    $ eldev emacs -- -q foo.bar

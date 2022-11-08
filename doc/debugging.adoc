@@ -1,0 +1,54 @@
+[#debugging-features]
+== Debugging features
+
+Eldev comes with lots of different options and other features that can
+help you debug problems both in your project, Eldev itself or your
+Eldev scripts.
+
+* Global options `-t` (`--trace`), `-v` (`--verbose`) and `-q`
+  (`--quiet`) control the amount of output Eldev generates.  The first
+  one makes Eldev extra verbose, helping you to understand what it is
+  doing and at which step something goes wrong.
+
+* Global option `-d` (`--debug`) makes Eldev print backtrace if it
+  dies with a Elisp signal (except certain well-defined and explained
+  errors like a missing dependency).
+
+* {since-0-3} Global option `-Q` (`--backtrace-on-abort`) makes Eldev
+  print backtrace if it is aborted with `^C`.  This is useful if your
+  project freezes or has very bad performance, and you want to figure
+  out where exactly this happens.
+
+* {since-0-8} Global option `-b` (`--backtrace`) lets you adapt
+  backtraces to your screen width and thus make them more readable at
+  the expense of completeness (by default, Eldev doesn’t truncate
+  backtrace lines).  It is a good idea to change the default in file
+  `~/.config/eldev/config`.  Starting with 0.10 this also affects
+  backtraces printed if Eldev or code from the project it executes
+  fails with a signal (see also option `--debug`).
+
+* Global option `-T` (`--time`) prepends timestamps to all lines of
+  Eldev output, making it easier to spot performance problems.
+
+* Command `prepare` can be used to install all project dependencies —
+  and thus check if they and package archives are specified correctly
+  — without doing anything else.
+
+* Commands `deps` (`dependencies`) and `dtree` (`dependency-tree`) can
+  be used to display list or tree of project dependencies, which is
+  especially useful for large projects unfamiliar to you.
+
+* For many errors, Eldev will print additional hints (unless you
+  specify option `--quiet`).  For example: if an error happens during
+  evaluating file `Eldev`, the tool will mention this; if a dependency
+  cannot be installed, Eldev will mention what required this
+  dependency (can be non-obvious in larger packages).
+
+* While not a direct feature of Eldev itself, file `Eldev-local`
+  provides a good place to install temporary advices, overwrite Emacs
+  functions etc. in the process of debugging certain problems.
+
+* You can temporarily add calls to `eldev-warn`, `eldev-backtrace` and
+  other Eldev functions to the tests in your project to provide
+  additional output.  But it is a good idea to do this only while
+  debugging and avoid committing such changes.

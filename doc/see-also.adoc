@@ -1,0 +1,35 @@
+== See also
+
+Other build tools you might want to use instead of Eldev:
+
+* {uri-cask}[Cask] — the most established Emacs project management
+  tool.
+* {uri-makem-sh}[makem.sh] — a shell script that performs many common
+  Elisp development tasks; must be copied to your project.
+* {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
+* {uri-keg}[Keg] — a build tool that can be seen as a successor to
+  Cask; uses a similar project description file.
+* {uri-makel}[makel] — a prebuilt `Makefile` with typical targets
+  useful to Elisp projects.
+
+Projects and services that can otherwise help you with developing your
+Elisp code:
+
+* {uri-evm}[EVM] — Emacs version manager; has special support for
+  Travis CI.
+* {uri-nix-emacs}[nix-emacs-ci] — installer of different Emacs
+  versions that uses Nix and Cachix; useful for continuous
+  integration.
+* {uri-github-wflows}[GitHub workflows] — a part of GitHub available
+  to any hosted project, which can be used for
+  <<github-workflows,continuous integration>> among other things.
+* {uri-travis}[Travis CI] — continuous integration service, the most
+  used one for Elisp projects; Eldev has <<travis-ci,additional
+  support>> for it.
+* {uri-circle}[CircleCI] — another continuous integration service;
+  Eldev provides <<circle-ci,a special installation script>> for it.
+* {uri-coveralls}[Coveralls] — web service to help you track your
+  code coverage over time; can be integrated with Eldev using
+  <<undercover-plugin,a plugin>>;
+* {uri-undercover}[undercover] — a tool for generating test coverage
+  reports for Elisp code; also see Coveralls above.

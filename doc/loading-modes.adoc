@@ -1,0 +1,84 @@
+[#loading-modes]
+== Loading modes
+
+In Eldev the project’s package and its local dependencies have
+_loading modes_.  This affects exactly how the package (that of the
+project or of its local dependency) becomes loadable by Emacs.
+
+Default loading mode is called `as-is`.  It means the directory where
+project (or local dependency) is located is simply added to Emacs
+varible `load-path` and normal Emacs loading should be able to find
+required features from there on.  This is the fastest mode, since it
+requires no preparation and in most cases is basically what you want
+during development.
+
+However, users won’t have your project loaded like that.  To emulate
+the way that most of the people will use it, you can use loading mode
+`packaged`.  In this mode, Eldev will first build a package out of
+your project (or local dependency), then install and activate it using
+Emacs’ packaging system.  This is quite a bit slower than `as-is`,
+because it involves several preparation steps.  However, this is
+almost exactly the way normal users will use your project after
+e.g. installing it from MELPA.  For this reason, this mode is
+recommended for <<continuous-integration,continuous integration>> and
+other forms of automated testing.
+
+Other modes include `byte-compiled` and `source`.  In these modes
+loading is performed just as in `as-is` mode, but before that Eldev
+either byte-compiles everything or, vice-versa, removes `.elc` files.
+
+So, after discussing the loading modes, let’s have a look at how
+exactly you tell Eldev which one to use.
+
+For the project itself, this is done from the command line using
+global option `--loading` (or `-m`) with its argument being the name
+of the mode.  Since this is supposed to be used quite frequently,
+there are also shortcut options to select specific modes: `--as-is`
+(or `-a`), `--packaged` (`-p`), `--source` (`-s`) or `--byte-compiled`
+(`-c`).  For example, the following command will run unit-tests in the
+project, having it loaded as an Emacs package:
+
+    $ eldev -p test
+
+Remember, that as everything in Eldev, this can be customized.
+E.g. if you want to run your project byte-compiled by default, add
+this to your `Eldev-local`:
+
+[source]
+----
+(setf eldev-project-loading-mode 'byte-compiled)
+----
+
+For local dependencies the mode can be chosen when calling
+`eldev-use-local-dependency`.  For example:
+
+[source]
+----
+(eldev-use-local-dependency "~/barlib" 'packaged)
+----
+
+As mentioned above, loading mode defaults to `as-is`.
+
+There are a few other loading modes useful only for certain projects.
+You can always ask Eldev for a full list:
+
+    $ eldev --list-modes
+
+[#autoloads]
+=== Autoloads
+
+{since-0-6} Autoloaded functions of installed Elisp packages can be
+accessed without a `require` form.  To simplify development, Eldev
+provides the same functionality for projects regardless of loading
+mode, as long as file `PACKAGE-autoloads.el` exists.  This might look
+like an unwieldy requirement, but luckily there is
+<<autoloads-plugin,a plugin>> for building the file and keeping it
+up-to-date as necessary.  The reason this is not enabled by default is
+that many projects — especially those not providing user-visible
+functionality, or those that consist of a single file — don’t have any
+autoloading functions or other forms.
+
+Local dependencies also have their autoloads activated regardless of
+loading mode.  If the autoloads file is kept up-to-date using
+<<autoloads-plugin,the plugin>>, Eldev will take care to do this as
+needed in local dependencies too.
