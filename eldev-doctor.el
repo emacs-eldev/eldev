@@ -16,6 +16,7 @@
 ;; along with this program.  If not, see https://www.gnu.org/licenses.
 
 (require 'eldev)
+(require 'eldev-vc)
 
 
 (defvar eldev--doctests nil)
@@ -126,7 +127,7 @@ or “NO”, depending on `ok'."
                         (eldev-message-plural num-user-requested "doctest")
                         (if (= num-visibly-failed num-user-requested)
                             (if (= num-user-requested 1) "it" "all of them")
-                          (format "%d of them" num-visibly-failed))
+                          (eldev-format-message "%d of them" num-visibly-failed))
                         (if (= num-visibly-failed 1) "a warning" "warnings"))
             (signal 'eldev-quit 1)))
       (eldev-print "Nothing to delete"))))
@@ -258,5 +259,90 @@ directly.  This way you can switch between the variants using global options
     `(result   ,(null warnings)
       warnings ,warnings)))
 
+(eldev-defdoctest eldev-doctest-recent-stable-releases (_results)
+  :caption    "Are stable releases up-to-date?"
+  :categories (version-control vc)
+  (pcase (eldev--doctor-last-stable-release-data)
+    (`nil
+     '(result unknown short-answer "no VC detected"))
+    (`none
+     '(result nil short-answer "NO (but no stable releases at all)"))
+    (`(,version ,commit-date ,commits-after)
+     (cond ((= commits-after 0)
+            `(result t short-answer ,(eldev-format-message "YES (no commits after %s)" version)))
+           ((<= commits-after 10)
+            `(result t short-answer ,(eldev-format-message "YES (only %s since %s)" (eldev-message-plural commits-after "commit") version)))
+           ((null commit-date)
+            `(result unknown short-answer ,(eldev-format-message "cannot determine %s release date" version)))
+           (t
+            (let* ((date        (float-time (date-to-time commit-date)))
+                   (now         (float-time))
+                   (days-passed (round (/ (- now date) 86400))))
+              (if (<= days-passed 90)
+                  `(result t short-answer ,(eldev-format-message "YES (only ~%s since %s)" (eldev-message-plural days-passed "day") version))
+                `(result nil short-answer ,(eldev-format-message "NO (~%s and %s since %s)"
+                                                                 (eldev-message-plural days-passed "day") (eldev-message-plural commits-after "commit") version)
+                         warnings "\
+If you have ever released a stable version (created a version-like tag in your
+VCS), you should keep it up-to-date with the latest features.  Otherwise,
+people using a stable package archive, e.g. MELPA Stable or GNU ELPA, will
+never notice that your project is still being developed, new features appear
+and bugs get fixed.
+
+It is up to you to decide *when* a version is stable enough.  But please don't
+release a stable version only to never do that again in future."))))))
+    (backend
+     `(result unknown short-answer ,(eldev-format-message "can't tell for %s" backend)))))
+
+(defun eldev--doctor-last-stable-release-data ()
+  (eldev-with-vc nil
+    (pcase backend
+      (`Git
+       (let (last-version
+             last-version-tag)
+         (eldev-call-process (eldev-git-executable) '("for-each-ref" "refs/tags" "--format" "%(refname)")
+           :destination  '(t nil)
+           :discard-ansi t
+           :die-on-error t
+           (while (not (eobp))
+             (let* ((tag     (string-remove-prefix "refs/tags/" (buffer-substring (point) (line-end-position))))
+                    (version (string-remove-prefix (rx (any "rRvV")) tag)))
+               (when (and (ignore-errors (version-to-list version)) (or (null last-version) (version< last-version version)))
+                 (setf last-version     version
+                       last-version-tag tag)))
+             (forward-line 1)))
+         (if last-version
+             `(,last-version
+               ;; `git show' doesn't print _only_ date for signed commits.
+               ,(eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch" ,last-version-tag)
+                  :destination  '(t nil)
+                  :discard-ansi t
+                  :die-on-error t
+                  (let ((date-string (string-trim (buffer-string))))
+                    ;; Don't match the whole, but just a bit of assertion here.
+                    (when (string-match-p (rx bos (= 4 num) "-" (= 2 num) "-" (= 2 num)) date-string)
+                      date-string)))
+               ,(eldev-call-process (eldev-git-executable) `("rev-list" ,(format "%s.." last-version-tag) "--count")
+                  :destination  '(t nil)
+                  :discard-ansi t
+                  :die-on-error t
+                  (string-to-number (buffer-string))))
+           'none)))
+      (_
+       backend))))
+
+(eldev-defdoctest eldev-doctest-githooks (_results)
+  :caption    "Are project-recommended Git hooks installed?"
+  :categories (version-control vc)
+  (when (and (eq (eldev-vc-detect) 'Git) (eldev-find-files "./githooks/*"))
+    (let ((not-installed (eldev--githooks-list-not-installed)))
+      (if not-installed
+          `(result nil warnings ,(eldev-format-message "\
+This projects comes with recommended Git hooks, but you don't use %s.
+Consider installing %s by running:
+
+    $ eldev githooks"
+                                                       (eldev-message-enumerate nil not-installed) (if (cddr not-installed) "them" "it")))
+        '(result t)))))
 
 (provide 'eldev-doctor)

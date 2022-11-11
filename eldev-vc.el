@@ -387,12 +387,7 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                              (setf num-processed (1+ num-processed))
                              (eldev-print "Uninstalled hook `%s' symlinked as `%s'" hook link-as))
                     (eldev-trace "Ignoring symlink `%s' as pointing to a wrong target `%s'" link-as link-target))
-                (if (ignore-errors (string= (with-temp-buffer
-                                              (insert-file-contents-literally link-as)
-                                              (buffer-string))
-                                            (with-temp-buffer
-                                              (insert-file-contents-literally hook)
-                                              (buffer-string))))
+                (if (eldev--githooks-is-copy link-as hook)
                     (if eldev-githooks-force
                         (progn (delete-file link-as)
                                (setf num-processed (1+ num-processed))
@@ -413,6 +408,26 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                                                         (t                        "replace existing hook files")))
       (when (= num-processed 0)
         (eldev-print "Nothing to do")))))
+
+;; FIXME: Rename and move somewhere?  Looks generally useful.
+(defun eldev--githooks-is-copy (file1 file2)
+  (ignore-errors (string= (with-temp-buffer
+                            (insert-file-contents-literally file1)
+                            (buffer-string))
+                          (with-temp-buffer
+                            (insert-file-contents-literally file2)
+                            (buffer-string)))))
+
+(defun eldev--githooks-list-not-installed ()
+  ;; Keep in sync with `eldev--do-githooks'.
+  (let (not-installed)
+    (dolist (hook (eldev-find-files "./githooks/*"))
+      (let* ((link-as     (replace-regexp-in-string (rx bos "githooks") ".git/hooks" hook t t))
+             (link-target (file-symlink-p link-as)))
+        (unless (or (and link-target (file-equal-p link-target hook))
+                    (eldev--githooks-is-copy link-as hook))
+          (push hook not-installed))))
+    (nreverse not-installed)))
 
 
 (provide 'eldev-vc)

@@ -1388,7 +1388,7 @@ Since 1.2:
                             '((unless (or (= (point-min) (point-max)) )
                                 (eldev-warn "Output of the %s:\n%s" description (buffer-string)))))
                          (signal 'eldev-error (list "%s exited with error code %d" (eldev-message-upcase-first description) exit-code))))))
-               ,@(or body '(exit-code))))
+               ,@(if body `((ignore exit-code) ,@body) '(exit-code))))
          (when (buffer-live-p ,temp-buffer)
            (kill-buffer ,temp-buffer))))))
 

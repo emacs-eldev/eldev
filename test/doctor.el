@@ -35,6 +35,18 @@
     (should (string-match-p "required Emacs version" stdout))
     (should (= exit-code 1))))
 
+(ert-deftest eldev-doctor-recent-stable-releases ()
+  ;; Too difficult to set up not-up-to-date pseudoprojects, so we test only a couple
+  ;; setups that the doctor doesn't complain about.
+  (eldev--test-with-temp-copy "project-a" 'Git
+    (eldev--test-run nil ("doctor" "recent-stable-releases" "--successful")
+      (should (string-match-p "no stable releases at all" stdout))
+      (should (= exit-code 0)))
+    (eldev-vc-create-tag "1.0" (eldev--test-project-dir))
+    (eldev--test-run nil ("doctor" "recent-stable-releases" "--successful")
+      (should (string-match-p "no commits after 1.0" stdout))
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-doctor-disabling-doctests ()
   ;; Pretend that the project has disabled it in its `Eldev'.
