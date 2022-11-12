@@ -114,8 +114,7 @@ or “NO”, depending on `ok'."
                               (with-temp-buffer
                                 (insert warning)
                                 (let ((fill-column 78))
-                                  (set-mark 1)
-                                  (fill-paragraph nil t)
+                                  (fill-region (point-min) (point-max))
                                   (setf warning (buffer-string)))))
                             (eldev-output "\n%s" warning)))
                         (setf last-with-warnings with-warnings
