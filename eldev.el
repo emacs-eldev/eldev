@@ -4314,7 +4314,7 @@ least one warning."
                   (throw 'eldev--lint-stop nil)))))
           (if (> eldev--lint-num-warnings 0)
               (signal 'eldev-error `("Linting produced warnings"))
-            (eldev-print (if (cdr linters) "Linters have no complaints" "Linter has no complaints"))))
+            (eldev-print (if (cdr linters) "Linters have %s" "Linter has %s") (eldev-colorize "no complaints" 'success))))
       (eldev-print "Nothing to do"))))
 
 (defun eldev-lint-default-p (linter)
@@ -4410,7 +4410,7 @@ least one warning."
      (eldev-verbose "Linting file `%s'" ,file)
      ,@body
      (if (= eldev--lint-num-warnings ,num-warnings)
-         (eldev-print "File `%s': no warnings" ,file)
+         (eldev-print "File `%s': %s" ,file ,(eldev-colorize "no warnings" 'success))
        (eldev-warn "Found %s in file `%s'" (eldev-message-plural (- eldev--lint-num-warnings ,num-warnings) "warning") ,file))
      (eldev-lint-note-file-finished))))
 

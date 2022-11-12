@@ -61,6 +61,7 @@
                                                                       (lambda (original &rest args)
                                                                         (eldev-profile-body
                                                                           (apply original args)))))
+                         ;; Not trying to highlight the summary, Buttercup already does that itself.
                          (buttercup-run t)))
            (num-failed (buttercup-suites-total-specs-failed buttercup-suites)))
       (setf eldev-test-num-passed  (+ eldev-test-num-passed  (buttercup-suites-total-specs-status buttercup-suites 'passed))

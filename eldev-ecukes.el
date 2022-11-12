@@ -120,6 +120,7 @@
                                                                              (when backtrace
                                                                                (eldev-output "%s" backtrace)))))
                         (ecukes-run feature-files))))
+                ;; Not trying to highlight the summary, Ecukes already does that itself.
                 (ecukes-run feature-files)))))
         (setf eldev-test-num-passed (+ eldev-test-num-passed ecukes-stats-scenarios-passed)
               eldev-test-num-failed (+ eldev-test-num-failed ecukes-stats-scenarios-failed))

@@ -149,6 +149,8 @@ use this for ERT framework, unless they can do better."
                                                            (lambda (original &rest args)
                                                              (eldev-profile-body
                                                                (apply original args))))))
+            ;; No easy way to highlight successful test summary with `success' color, so
+            ;; not doing this as low-importance and to avoid false positives.
             (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
                    (num-unexpected (ert-stats-completed-unexpected statistics)))
               ;; We map ERT's expected/unexpected to passed/failed here.
