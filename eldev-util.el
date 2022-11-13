@@ -532,19 +532,20 @@ printing to a real terminal, but not when printing to a file.")
 (defvar eldev--tty (equal (eldev-getenv "ELDEV_TTY") "t"))
 
 (defvar eldev-colorizing-schemes (eval-when-compile (let (schemes)
-                                                      (dolist (type '((error     ((light-bg "91;1") (dark-bg "91;1")))
-                                                                      (warn      ((light-bg 31)     (dark-bg 31)))
-                                                                      (verbose   ((light-bg 90)     (dark-bg 90)))
-                                                                      (trace     ((light-bg 90)     (dark-bg 90)))
-                                                                      (success   ((light-bg 32)     (dark-bg 92)))
-                                                                      (section   ((light-bg  1)     (dark-bg  1)))
-                                                                      (default   ((light-bg 34)     (dark-bg 94)))
-                                                                      (name      ((light-bg 33)     (dark-bg 93)))
-                                                                      (url       ((light-bg 34)     (dark-bg 96)))
-                                                                      (details   ((light-bg 90)     (dark-bg 90)))
-                                                                      (timestamp ((light-bg 90)     (dark-bg 90)))))
+                                                      (dolist (type '((error     ((light-bg "91;1") (dark-bg "91;1") (interactive error)))
+                                                                      (warn      ((light-bg 31)     (dark-bg 31)     (interactive warning)))
+                                                                      (verbose   ((light-bg 90)     (dark-bg 90)     (interactive shadow)))
+                                                                      (trace     ((light-bg 90)     (dark-bg 90)     (interactive shadow)))
+                                                                      (debug     ((light-bg 35)     (dark-bg 95)     (interactive font-lock-comment-face)))
+                                                                      (success   ((light-bg 32)     (dark-bg 92)     (interactive success)))
+                                                                      (section   ((light-bg  1)     (dark-bg  1)     (interactive bold)))
+                                                                      (default   ((light-bg 34)     (dark-bg 94)     (interactive font-lock-c)))
+                                                                      (name      ((light-bg 33)     (dark-bg 93)     (interactive font-lock-function-name-face)))
+                                                                      (url       ((light-bg 34)     (dark-bg 96)     (interactive font-lock-string-face)))
+                                                                      (details   ((light-bg 90)     (dark-bg 90)     (interactive shadow)))
+                                                                      (timestamp ((light-bg 90)     (dark-bg 90)     (interactive shadow)))))
                                                         (dolist (entry (cadr type))
-                                                          (puthash (car type) (format "%s" (cadr entry))
+                                                          (puthash (car type) (if (eq (car entry) 'interactive) (cadr entry) (format "%s" (cadr entry)))
                                                                    (or (cdr (assq (car entry) schemes))
                                                                        (eldev--assq-set (car entry) (make-hash-table :test #'eq) schemes)))))
                                                       schemes))
@@ -567,12 +568,29 @@ See `eldev-output-reroute-messages'.")
 
 (defvar eldev-message-rerouting-destination :stderr
   "Rerouted message destination.
-Should be either `:stderr' or `:stdout'.")
+Should be either `:stderr', `:stdout' or (since 1.3) `:debug' to
+reroute them to debugging output.")
 
 (defvar eldev-message-rerouting-wrapper nil
   "When set, send rerouted message through this function/macro.
 Typical values would be `eldev-warn', `eldev-trace' etc.  Note
 that this overrides `eldev-message-rerouting-destination'.")
+
+(defvar eldev-interactive-stderr-destination 'debugging-output
+  "Interactively, show output meant for stderr in given way.
+Normally, Eldev and its functions are meant for non-interactive
+use.  However, it is possible to use e.g. `eldev-backtrace' in
+a (preferably) temporary way as means of debugging output.  The
+output that normally comes to stderr (also from `eldev-warn', for
+example) can be redirected in interactive use as follows:
+
+    `message' or nil   -- show it with `message;
+    `debugging-output' -- send to _Emacs_ stderr, similar to output
+                          of `eldev-debug';
+    `display-warning'  -- show with `display-warning', trying to
+                          pick a suitable level.
+
+Since 1.3.")
 
 (defvar eldev--output-rerouted nil)
 (defvar eldev--real-stderr-output nil)
@@ -690,18 +708,25 @@ Since 0.2."
 
 (defun eldev-output (format-string &rest arguments)
   "Unconditionally format and print given message."
-  (let (stderr
+  (let (special-destination
         nolf
         nocolor
         colors)
     (while (keywordp format-string)
       (pcase format-string
-        (`:stdout  (setf stderr nil))
-        (`:stderr  (setf stderr t))
-        (`:nolf    (setf nolf t))
-        (`:nocolor (setf nocolor t))
-        (`:color   (push (pop arguments) colors))
-        (_         (error "Unknown option `%s'" format-string)))
+        (`:stdout                        (setf special-destination nil))
+        (`:stderr                        (setf special-destination
+                                               (if noninteractive
+                                                   'stderr
+                                                 (pcase eldev-interactive-stderr-destination
+                                                   (`debugging-output 'debugging-output)
+                                                   (`display-warning  'display-warning)
+                                                   (_                 'stderr)))))
+        ((or `:debug `:debugging-output) (setf special-destination 'debugging-output))
+        (`:nolf                          (setf nolf t))
+        (`:nocolor                       (setf nocolor t))
+        (`:color                         (push (pop arguments) colors))
+        (_                               (error "Unknown option `%s'" format-string)))
       (setf format-string (pop arguments)))
     (let ((message (if format-string (apply #'eldev-format-message format-string arguments) "")))
       (when colors
@@ -714,34 +739,62 @@ Since 0.2."
                (elapsed-millis  (floor (* (- elapsed-sec-raw elapsed-sec) 1000))))
           (setf message (concat (eldev-colorize (format "[%02d:%02d.%03d]" elapsed-min elapsed-sec elapsed-millis) 'timestamp)
                                 "  " (replace-regexp-in-string "\n" "\n             " message t t)))))
-      (when (and (not nocolor) (eldev-output-colorized-p))
-        (let ((colorizing-scheme (eldev--get-colorizing-scheme))
-              (from 0)
-              chunks)
-          (while (let ((to (next-property-change from message)))
-                   (let ((faces (get-text-property from 'face message)))
-                     (when (or to faces)
-                       (if faces
-                           (dolist (type (eldev-listify faces))
-                             (let ((ascii-mode (gethash type colorizing-scheme)))
-                               (when ascii-mode
-                                 (push (format "\033[%sm" ascii-mode) chunks))))
-                         (push "\033[0m" chunks))
-                       (push (substring-no-properties message from to) chunks)
-                       (if to
-                           (setf from to)
-                         (setf from (length message))
-                         nil)))))
-          (when chunks
-            (push "\033[0m" chunks))
-          (push (substring-no-properties message from) chunks)
-          (setf message (mapconcat #'identity (nreverse chunks) ""))))
-      (if stderr
-          (let ((inhibit-message           nil)
-                (eldev--real-stderr-output t))
-            ;; FIXME: Is there a way to support both `:stderr' and `:nolf' in one call?
-            (message "%s" message))
-        (princ (if nolf message (concat message "\n")))))))
+      (if (or noninteractive (eq special-destination 'debugging-output))
+          (when (and (not nocolor) (eldev-output-colorized-p))
+            (let ((colorizing-scheme (eldev--get-colorizing-scheme))
+                  (from 0)
+                  chunks)
+              (while (let ((to (next-property-change from message)))
+                       (let ((faces (get-text-property from 'face message)))
+                         (when (or to faces)
+                           (if faces
+                               (dolist (type (eldev-listify faces))
+                                 (let ((ascii-mode (gethash type colorizing-scheme)))
+                                   (when ascii-mode
+                                     (push (format "\033[%sm" ascii-mode) chunks))))
+                             (push "\033[0m" chunks))
+                           (push (substring-no-properties message from to) chunks)
+                           (if to
+                               (setf from to)
+                             (setf from (length message))
+                             nil)))))
+              (when chunks
+                (push "\033[0m" chunks))
+              (push (substring-no-properties message from) chunks)
+              (setf message (mapconcat #'identity (nreverse chunks) ""))))
+        ;; While Eldev is meant to be used non-interactively, make some effort to support
+        ;; interactive use too, especially for temporary debug output.  Otherwise Emacs
+        ;; would complain about unknown faces.
+        (let ((interactive-faces (cdr (assq 'interactive eldev-colorizing-schemes)))
+              (replaced-up-to    0))
+          (while replaced-up-to
+            (let ((faces       (get-text-property replaced-up-to 'face message))
+                  (next-change (next-single-property-change replaced-up-to 'face message))
+                  replaced-faces)
+              (when faces
+                (dolist (face faces)
+                  (let ((replacement (gethash face interactive-faces)))
+                    (when replacement
+                      (push replacement replaced-faces))))
+                (put-text-property replaced-up-to (or next-change (length message)) 'face (nreverse replaced-faces) message))
+              (setf replaced-up-to next-change)))))
+      (pcase special-destination
+        (`stderr
+         (let ((inhibit-message           nil)
+               (eldev--real-stderr-output t))
+           ;; FIXME: Is there a way to support both `:stderr' and `:nolf' in one call?
+           ;;        Mixing up `(princ ... t)' and `message' gives bad results.  Testcase:
+           ;;
+           ;;            $ eldev exec "(princ 1 t) (message \"2\")"
+           (message "%s" message)))
+        (`display-warning
+         (let ((scan 0)
+               probably-error)
+           (while (and scan (not (setf probably-error (memq 'error (eldev-listify (get-text-property scan 'face message))))))
+             (setf scan (next-single-property-change scan 'face message)))
+           (display-warning 'eldev message (if probably-error :error :warning))))
+        (_
+         (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output)))))))
 
 (defun eldev--get-colorizing-scheme ()
   ;; Main purpose of this function is to autoguess background, but I
@@ -792,6 +845,28 @@ Since 0.2."
 (defmacro eldev-trace (format-string &rest arguments)
   "Format and print given message if in trace mode."
   `(eldev-when-tracing ,(eldev--output-wrapper nil 'trace format-string arguments)))
+
+(defmacro eldev-debug (format-string &rest arguments)
+  "Format and print given debugging output message.
+The message is printed to stderr in standing-out color.
+
+Since 1.3."
+  (eldev--output-wrapper '(:debugging-output) 'debug format-string arguments))
+
+(defmacro eldev-dump (&rest variables)
+  "Dump given VARIABLES using `eldev-debug'.
+No specific guarantees about the way it looks other than that it
+should be useful to human eyes.
+
+Since 1.3."
+  (when variables
+    (let (forms)
+      (dolist (variable variables)
+        (push `(insert ,(format "%s%s = " (if forms "\n" "") variable)) forms)
+        (push `(eldev-prin1 ,variable (current-buffer)) forms))
+      `(with-temp-buffer
+         ,@(nreverse forms)
+         (eldev-debug "%s" (buffer-string))))))
 
 
 (defmacro eldev-with-verbosity-level-except (level functions-with-original-level &rest body)
