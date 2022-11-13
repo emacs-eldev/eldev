@@ -85,6 +85,7 @@ jobs:
         ./bin/eldev -p -dtTC lint re
       env:
         ELDEV_LOCAL: "."
+
     # Method 1: if you have a catch-all directory for executables.  We
     # don't test bootstrapping, as that is supposed to have been
     # tested by normal ERT tests.
@@ -94,7 +95,6 @@ jobs:
         script: |
           const exec = require('util').promisify(require('child_process').exec);
           const {downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
-
           const fakeBin = expandTilde('~/fake-bin');
           await io.mkdirP(fakeBin);
           const script = await downloadScript(github, context, "bin/eldev", fakeBin);
@@ -110,7 +110,6 @@ jobs:
           const fs = require('fs');
           const exec = require('util').promisify(require('child_process').exec);
           const {getRawUrl,downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
-
           if (fs.existsSync(expandTilde("~/.local/bin/eldev")))
               throw("~/.local/bin/eldev already exists");
           await io.mkdirP('tmp');
