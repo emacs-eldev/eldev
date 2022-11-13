@@ -325,7 +325,7 @@ Since 0.9.")
       (eldev-pcase-exhaustive (pop keywords)
         (:aliases
          (eldev-register-command-aliases command (pop keywords)))
-        ((and (or :command-hook :briefdoc :parameters :custom-parsing :hidden-if :works-on-old-eldev :profiling-self) keyword)
+        ((and (or :category :command-hook :briefdoc :parameters :custom-parsing :hidden-if :works-on-old-eldev :profiling-self) keyword)
          (eldev-put function keyword (pop keywords)))
         (:override
          (setf override (pop keywords)))))
@@ -347,6 +347,13 @@ BODY can contain the following keywords:
         Command name (a symbol) for the command line.  Default
         value is derived from function name by removing `eldev-'
         prefix (or a prefix for any other project).
+
+    :category CATEGORY
+
+        Generic category of the command.  Should be one of
+        `testing', `running', `dependencies', `building' or
+        `information'; all other commands are treated as
+        miscellaneous.  Since 1.3.
 
     :aliases ALIASES
 
@@ -1542,6 +1549,7 @@ depends on value of TRAILING-NEWLINES."
 show details about that command instead."
   :parameters     "[COMMAND]"
   :aliases        \?
+  :category       information
   :works-on-old-eldev t
   (if parameters
       ;; This is an exception: don't signal wrong command usage on excessive parameters.
@@ -1562,10 +1570,23 @@ show details about that command instead."
 Options before the command are global for Eldev.  Many commands have additional
 options specific to them; those must be specified after command name.  See each
 command's description for a list of such options.")
-    (eldev-options-help nil "\nGlobal options:")
-    (eldev-output "\nCommands:")
-    (dolist (command (sort (mapcar #'car eldev--commands) #'string<))
-      (eldev-command-or-option-help command (cdr (assq command eldev--commands))))
+    (eldev-options-help nil (format "\n%s" (eldev-colorize "Global options:" 'section)))
+    (let ((all-commands (sort (mapcar #'car eldev--commands) #'string<))
+          (categories   '((testing      "Testing commands")
+                          (running      "Running, executing commands")
+                          (dependencies "Dependency commands")
+                          (building     "Building commands")
+                          (information  "Information querying commands")
+                          (nil          "Miscellaneous commands"))))
+      (dolist (category categories)
+        (eldev-output (format "\n%s" (eldev-colorize (format "%s:" (cadr category)) 'section)))
+        (dolist (command all-commands)
+          (let* ((handler          (cdr (assq command eldev--commands)))
+                 (handler-category (eldev-get handler :category)))
+          (when (if (car category)
+                    (eq handler-category (car category))
+                  (not (and handler-category (assq handler-category categories))))
+            (eldev-command-or-option-help command handler))))))
     (eldev-output "
 Influential environment variables: `ELDEV_EMACS' (also just `EMACS'),
 `ELDEV_LOCAL' and `ELDEV_DIR'.  See documentation for their effects.")
@@ -1686,6 +1707,7 @@ default.  However, you can request lists of those with options
 to normal files).  It is possible to list only already existing
 generated files or those that could be created in principle."
   :aliases        list-files
+  :category       information
   :parameters     "[FILESET...]"
   :works-on-old-eldev t
   (let* ((generated-files                   (unless (eq eldev-files-type 'normal) (eldev-generated-files)))
@@ -1827,6 +1849,7 @@ dependencies.
 ADDITIONAL-SETs can be used to install extra dependencies added
 to those sets (see function `eldev-add-extra-dependencies')."
   :aliases        prep
+  :category       dependencies
   :parameters     "[ADDITIONAL-SET...]"
   (eldev-load-project-dependencies (mapcar #'intern parameters) nil t))
 
@@ -1846,6 +1869,7 @@ remote copy to be upgraded, make it non-local first (e.g. by
 commenting out `eldev-use-local-dependency' in `Eldev-local')
 before upgrading."
   :parameters     "[PACKAGE...]"
+  :category       dependencies
   (when (eldev-external-package-dir)
     (signal 'eldev-error `(:hint "Use global option `--isolated' (`-I')"
                                  "Cannot upgrade when using external package directory")))
@@ -2888,6 +2912,7 @@ cleaners are executed (not only the default).
 Use option `--list-cleaners' to find out which cleaner names can
 be used on the command line."
   :parameters     "[CLEANER...]"
+  :category       building
   (let (cleaners
         all
         to-delete
@@ -3060,6 +3085,7 @@ With the option `--list-known', instead list the “standard”
 archives Eldev knows about.  Most projects use some of those, but
 it is also possible to use any other."
   :aliases        arch
+  :category       dependencies
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (eldev--adjust-stable/unstable-archive-priorities)
@@ -3114,6 +3140,7 @@ E.g. there might be additional dependencies for testing (`test')
 or evaluating (`eval') registered in the project's `Eldev' file."
   :aliases        (deps requirements reqs)
   :parameters     "[ADDITIONAL-SET...]"
+  :category       dependencies
   :works-on-old-eldev t
   (let ((additional-sets (mapcar #'intern parameters))
         have-dependencies
@@ -3146,6 +3173,7 @@ E.g. there might be additional dependencies for testing (`test')
 or evaluating (`eval') registered in the project's `Eldev' file."
   :aliases        (dtree deptree requirement-tree rtree reqtree)
   :parameters     "[ADDITIONAL-SET...]"
+  :category       dependencies
   (let ((additional-sets (mapcar #'intern parameters)))
     (eldev-load-project-dependencies additional-sets t t)
     (let ((package (eldev-package-descriptor))
@@ -3219,6 +3247,7 @@ installed first if needed.
 Normally, package name and version is printed.  However, in quiet
 mode output is restricted to just the version."
   :parameters     "[PACKAGE...]"
+  :category       information
   :works-on-old-eldev t
   (let* ((packages          (if parameters
                                 (mapcar #'intern parameters)
@@ -3250,6 +3279,7 @@ mode output is restricted to just the version."
 
 (eldev-defcommand eldev-info (&rest parameters)
   "Display information about the project."
+  :category       information
   :works-on-old-eldev t
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
@@ -3326,6 +3356,7 @@ project-isolated one.
 At least one of options `--file' and `--open' is required."
   :parameters     "COMMAND [...]"
   :aliases        prof
+  :category       running
   :custom-parsing t
   (setf parameters (eldev-parse-options parameters 'profile t))
   (unless parameters
@@ -3687,6 +3718,7 @@ is not controllable from command line---change its value in
 This command exits with error code 1 if any test produces an
 unexpected result."
   :parameters     "[SELECTOR...]"
+  :category       testing
   :profiling-self t
   (eldev--do-test eldev-test-framework parameters))
 
@@ -3695,6 +3727,7 @@ unexpected result."
 for details."
   :parameters     "[SELECTOR...]"
   :aliases        ert
+  :category       testing
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'ert eldev-test-framework)))
   :profiling-self t
   (eldev--do-test 'ert parameters))
@@ -3704,6 +3737,7 @@ for details."
 `test' for details."
   :parameters     "[SELECTOR...]"
   :aliases        (buttercup test-bcup bcup)
+  :category       testing
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'buttercup eldev-test-framework)))
   :profiling-self t
   (eldev--do-test 'buttercup parameters))
@@ -3713,6 +3747,7 @@ for details."
 `test' for details."
   :parameters     "[SELECTOR...]"
   :aliases        ecukes
+  :category       testing
   :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'ecukes eldev-test-framework)))
   :profiling-self t
   (eldev--do-test 'ecukes parameters))
@@ -4277,6 +4312,7 @@ This command exits with error code 1 if any linter issues at
 least one warning."
   :parameters     "[LINTER...]"
   :aliases        linter
+  :category       testing
   (let ((eldev-lint-file-patterns eldev-lint-file-patterns)
         linters
         all)
@@ -4582,6 +4618,7 @@ valid to implement something against doctor's recommendations.
 Projects may also disable certain tests by modifying variable
 `eldev-doctor-disabled-tests' in their file `Eldev'."
   :parameters     "[SELECTOR...]"
+  :category       testing
   (require 'eldev-doctor)
   (eldev--do-doctor parameters))
 
@@ -4668,6 +4705,7 @@ treats any command line expression that ends in `.el' as a
 filename."
   :parameters     "EXPRESSION..."
   :aliases        evaluate
+  :category       running
   :profiling-self t
   (eldev--do-eval t parameters))
 
@@ -4688,6 +4726,7 @@ This is basically like `eval' command, with the only difference
 being that it doesn't print form results."
   :parameters     "FORM..."
   :aliases        execute
+  :category       running
   :profiling-self t
   (eldev--do-eval nil parameters))
 
@@ -4966,6 +5005,7 @@ with the exception of still forwarding variables enumerated in
 likely need to specify at least `-q' (`--no-init-file') option to
 be passed to Emacs, else it will most likely fail."
   :parameters     "[--] [COMMAND-LINE...]"
+  :category       running
   :custom-parsing t
   (eldev-load-project-dependencies 'emacs)
   (let (forwarding)
@@ -5164,6 +5204,7 @@ The contents of `eldev-docker-run-extra-args' will be added to the
 Currently only Linux and macOS systems are supported."
   :parameters     "{VERSION|IMG-NAME} [GLOBAL-OPTION..] COMMAND [...]"
   :aliases        emacs-docker
+  :category       running
   :custom-parsing t
   (unless (eldev--docker-on-supported-os)
     (signal 'eldev-error
@@ -5390,6 +5431,7 @@ will know changes in which `.el' files might require
 recompilation of seemingly unrelated `.elc'."
   :parameters     "[TARGET-SET...]"
   :aliases        target-tree
+  :category       building
   (require 'eldev-build)
   (eldev--do-targets parameters))
 
@@ -5445,6 +5487,7 @@ file.
 
 Also see commands `compile' and `package'."
   :parameters     "[TARGET...]"
+  :category       building
   :profiling-self t
   ;; When building, project loading mode is ignored.  The reason is that building itself
   ;; can involve compiling or packaging.
@@ -5461,6 +5504,7 @@ This is basically a different way of invoking `build' command.
 However, instead of targets, here you specify sources."
   :parameters     "[SOURCE...]"
   :aliases        byte-compile
+  :category       building
   :profiling-self t
   (if parameters
       (let (elc-files)
@@ -5478,6 +5522,7 @@ additional optional features.
 Option `--force-version' allows you to override the project's
 self-reported version."
   :aliases        pack
+  :category       building
   :profiling-self t
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
@@ -5695,6 +5740,7 @@ If run in quiet mode, only plugin names are printed, without
 documentation."
   :parameters     "[PLUGIN-NAME...]"
   :aliases        plugin
+  :category       information
   (require 'eldev-plugins)
   (let ((plugins (if parameters
                      (mapcar (lambda (name)

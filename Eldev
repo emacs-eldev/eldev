@@ -138,6 +138,7 @@ be executed via `install.sh'."
   "Generate documentation HTML from Asciidoctor source."
   :command        documentation
   :aliases        (doc html-doc)
+  :category       building
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (eldev-call-process "asciidoctor" `("--backend" "html5"

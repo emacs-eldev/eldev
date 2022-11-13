@@ -184,6 +184,7 @@ its behavior and are not settable from the command line.
 Instead, they should be customized in file `Eldev', on a
 per-project basis."
     :parameters   "VERSION"
+    :category     building
     (eldev--maintainer-release parameters))
   (eldev-defbooloptions eldev-release-ignore-untracked eldev-release-notice-untracked eldev-release-ignore-untracked
     ("Ignore untracked files"
