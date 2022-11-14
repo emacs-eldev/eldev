@@ -4978,6 +4978,15 @@ See `eldev-default-required-features' for value description.
 Special value `:default' means to use that variable's value
 instead.")
 
+(defvar eldev-emacs-autorequire-eldev t
+  "Whether to `(require \\='eldev)' in spawned Emacs.
+Eldev may be used to e.g. provide debugging output with
+`eldev-debug' or `eldev-dump'.  If this variable is set to nil,
+the feature won't be required, but Eldev will still be in
+`load-path'.
+
+Since 1.3.")
+
 (eldev-defcommand eldev-emacs (&rest parameters)
   "Launch Emacs in a prepared environment.  Emacs will be able to
 load the project and all its dependencies.
@@ -5025,6 +5034,8 @@ be passed to Emacs, else it will most likely fail."
                     value-forwarding
                     (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
                                             (eldev-required-features eldev-emacs-required-features)))
+                    (when eldev-emacs-autorequire-eldev
+                      '("--eval" "(require 'eldev)"))
                     parameters))
         :pre-execution  (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
         :pre-execution  (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)

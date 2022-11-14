@@ -44,6 +44,16 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
+(ert-deftest eldev-emacs-debugging-output-1 ()
+  ;; Default value of `eldev-emacs-autorequire-eldev' means that function `eldev-debug' is
+  ;; available automatically.
+  (eldev--test-run "project-a" ("--quiet" "emacs" "--batch" "--eval" `(eldev-debug "Hello"))
+    ;; Because of how `:forward-output' of `eldev-call-process' works (this is a
+    ;; limitation of Elisp though, not Eldev), inner Eldev process forwards Emacs' stderr
+    ;; to its own stdout.  So there.
+    (should (string= stdout "Hello\n"))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-emacs-project-isolation-1 ()
   (eldev--test-run "trivial-project" ("emacs" "--batch" "--eval" ` (princ user-emacs-directory))
     (should (file-in-directory-p (string-trim stdout) (eldev--test-project-dir)))
