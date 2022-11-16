@@ -1218,6 +1218,28 @@ Loading mode is not included.  Since 1.2."
     ,(if eldev-prefer-stable-archives "--stable" "--unstable")))
 
 
+(defun eldev-set-up-secondary ()
+  "Setup function to be called in nested Emacs."
+  ;; Lots of code duplication with `bin/bootstrap.el.part', but oh well...
+  (package-initialize t)
+  (let ((eldev-local (getenv "ELDEV_LOCAL"))
+        eldev-pkg)
+    (unless (or (= (length eldev-local) 0) (string-prefix-p ":pa:" eldev-local))
+      (with-temp-buffer
+        (insert-file-contents (expand-file-name "eldev.el" eldev-local))
+        (setf eldev-pkg                    (package-buffer-info)
+              (package-desc-dir eldev-pkg) (expand-file-name eldev-local))))
+    (if eldev-pkg
+        ;; `package--autoloads-file-name' is package-private.
+        (let ((autoloads-file (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
+                                                (package-desc-dir eldev-pkg))))
+          (push `(eldev . (,eldev-pkg)) package-alist)
+          (eldev-advised  (#'load :around (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args))))
+            (package-activate-1 eldev-pkg)))
+      (package-activate 'eldev)))
+  (eldev--set-up))
+
+
 
 ;; Functions for `Eldev' and `Eldev-local'.
 
@@ -4978,14 +5000,22 @@ See `eldev-default-required-features' for value description.
 Special value `:default' means to use that variable's value
 instead.")
 
-(defvar eldev-emacs-autorequire-eldev t
-  "Whether to `(require \\='eldev)' in spawned Emacs.
-Eldev may be used to e.g. provide debugging output with
-`eldev-debug' or `eldev-dump'.  If this variable is set to nil,
-the feature won't be required, but Eldev will still be in
+(defvar eldev-emacs-forward-eldev t
+  "Whether to make Eldev available in spawned Emacs.
+This will also load various Eldev configuration and setup in the
+spawned Emacs, including files `Eldev' and `Eldev-local'.  This
+provides a simple way to affect code running in `eldev emacs'.
+Eldev may also be used to e.g. provide debugging output with
+`eldev-debug' or `eldev-dump'.
+
+If this variable is set to nil, Eldev will still be in the
 `load-path'.
 
 Since 1.3.")
+
+(defvar eldev-emacs-forward-eldev-variables
+  '(debug-on-error eldev-project-dir load-prefer-newer eldev-setup-first-forms eldev-setup-forms)
+  "Additional variables to forward when “forwarding” Eldev.")
 
 (eldev-defcommand eldev-emacs (&rest parameters)
   "Launch Emacs in a prepared environment.  Emacs will be able to
@@ -5018,7 +5048,7 @@ be passed to Emacs, else it will most likely fail."
   :custom-parsing t
   (eldev-load-project-dependencies 'emacs)
   (let (forwarding)
-    (dolist (variable eldev-emacs-forward-variables)
+    (dolist (variable (append eldev-emacs-forward-variables (when eldev-emacs-forward-eldev eldev-emacs-forward-eldev-variables)))
       (when (boundp variable)
         (push variable forwarding)
         (push (eldev-macroexp-quote (symbol-value variable)) forwarding)))
@@ -5032,10 +5062,10 @@ be passed to Emacs, else it will most likely fail."
             (append eldev-emacs-default-command-line
                     autoloads
                     value-forwarding
+                    (when eldev-emacs-forward-eldev
+                      '("--eval" "(progn (require 'eldev) (eldev-set-up-secondary))"))
                     (apply #'append (mapcar (lambda (feature) (list "--eval" (format "(require '%s)" feature)))
                                             (eldev-required-features eldev-emacs-required-features)))
-                    (when eldev-emacs-autorequire-eldev
-                      '("--eval" "(require 'eldev)"))
                     parameters))
         :pre-execution  (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
         :pre-execution  (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)

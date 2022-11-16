@@ -1,1 +1,6 @@
+;; This tests Eldev forwarding to spawned Emacs processes, see `eldev emacs'.  In real use
+;; e.g. `eldev-require-version' needs this.
+(unless (eldev-find-package-descriptor 'eldev nil t)
+  (error "Cannot find Eldev package"))
+
 (eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))

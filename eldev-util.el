@@ -794,7 +794,9 @@ Since 0.2."
              (setf scan (next-single-property-change scan 'face message)))
            (display-warning 'eldev message (if probably-error :error :warning))))
         (_
-         (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output)))))))
+         (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output))))))
+  ;; To make e.g. calling from M-: give nicer results.
+  nil)
 
 (defun eldev--get-colorizing-scheme ()
   ;; Main purpose of this function is to autoguess background, but I
