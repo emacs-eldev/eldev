@@ -5,6 +5,30 @@ Eldev comes with lots of different options and other features that can
 help you debug problems both in your project, Eldev itself or your
 Eldev scripts.
 
+[discrete]
+==== Assistances for debugging your project
+
+While not a direct feature of Eldev itself, file `Eldev-local`
+provides a good place to install temporary advices, overwrite Emacs
+functions etc. in the process of debugging certain problems.
+
+You can temporarily add calls to `eldev-warn`, `eldev-backtrace` and
+other Eldev functions to the tests in your project to provide
+debugging output.  Eldev 1.3 also adds functions/macros `eldev-debug`
+and `eldev-dump` which are also available in <<running-emacs,spawned
+interactive Emacs>>.  In such interactive Emacs they write to Emacs
+stderr by default, i.e. to the console where you have launched Eldev,
+making it easier to spot debugging output.  Additionally,
+<<setup-procedure,the whole project setup procedure>> is repeated in
+such Emacs instances, so e.g. files `Eldev` or `Eldev-local` can
+easily affect those too.
+
+It is, however, a good idea to use Eldev calls only while debugging
+and avoid committing such changes.
+
+[discrete]
+==== Debugging project setup scripts and Eldev itself
+
 * Global options `-t` (`--trace`), `-v` (`--verbose`) and `-q`
   (`--quiet`) control the amount of output Eldev generates.  The first
   one makes Eldev extra verbose, helping you to understand what it is
@@ -43,12 +67,3 @@ Eldev scripts.
   evaluating file `Eldev`, the tool will mention this; if a dependency
   cannot be installed, Eldev will mention what required this
   dependency (can be non-obvious in larger packages).
-
-* While not a direct feature of Eldev itself, file `Eldev-local`
-  provides a good place to install temporary advices, overwrite Emacs
-  functions etc. in the process of debugging certain problems.
-
-* You can temporarily add calls to `eldev-warn`, `eldev-backtrace` and
-  other Eldev functions to the tests in your project to provide
-  additional output.  But it is a good idea to do this only while
-  debugging and avoid committing such changes.

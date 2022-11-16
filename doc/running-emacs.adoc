@@ -41,3 +41,10 @@ to Emacs, otherwise it will probably fail on your `~/.emacs` since it
 will not see your usual packages.  To illustrate:
 
     $ eldev emacs -- -q foo.bar
+
+{since-1-3} The whole Eldev infrastracture including its functions are
+available by default in the launched Emacs too (can be changed in
+`eldev-emacs-autorequire-eldev`).  This is done largely so that 1)
+configuration (files `Eldev`, `Eldev-local` etc.) takes effect also in
+the interactive Emacs; 2) <<debugging-features,various debugging
+functions>> can be easily used there too.
