@@ -1221,22 +1221,29 @@ Loading mode is not included.  Since 1.2."
 (defun eldev-set-up-secondary ()
   "Setup function to be called in nested Emacs."
   ;; Lots of code duplication with `bin/bootstrap.el.part', but oh well...
-  (package-initialize t)
   (let ((eldev-local (getenv "ELDEV_LOCAL"))
         eldev-pkg)
-    (unless (or (= (length eldev-local) 0) (string-prefix-p ":pa:" eldev-local))
+    (if (or (= (length eldev-local) 0) (string-prefix-p ":pa:" eldev-local))
+        (progn (let ((package-user-dir (expand-file-name "bootstrap"
+                                                         (expand-file-name (format "%s.%s" emacs-major-version emacs-minor-version)
+                                                                           eldev-dir))))
+                 (package-initialize t)
+                 (unless (package-activate 'eldev)
+                   (eldev-warn "Cannot activate Eldev package")))
+               (package-load-all-descriptors))
+      (package-initialize t)
       (with-temp-buffer
         (insert-file-contents (expand-file-name "eldev.el" eldev-local))
         (setf eldev-pkg                    (package-buffer-info)
-              (package-desc-dir eldev-pkg) (expand-file-name eldev-local))))
-    (if eldev-pkg
-        ;; `package--autoloads-file-name' is package-private.
-        (let ((autoloads-file (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
-                                                (package-desc-dir eldev-pkg))))
-          (push `(eldev . (,eldev-pkg)) package-alist)
-          (eldev-advised  (#'load :around (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args))))
-            (package-activate-1 eldev-pkg)))
-      (package-activate 'eldev)))
+              (package-desc-dir eldev-pkg) (expand-file-name eldev-local)))
+      (if eldev-pkg
+          ;; `package--autoloads-file-name' is package-private.
+          (let ((autoloads-file (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
+                                                  (package-desc-dir eldev-pkg))))
+            (push `(eldev . (,eldev-pkg)) package-alist)
+            (eldev-advised  (#'load :around (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args))))
+              (package-activate-1 eldev-pkg)))
+        (eldev-warn "Cannot activate Eldev package suppposedly specified by `ELDEV_LOCAL'"))))
   (eldev--set-up))
 
 
