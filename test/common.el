@@ -42,6 +42,7 @@
   (let ((actual-command-line `(list ,@command-line))
         (no-errors           (make-symbol "$no-errors"))
         process-input-form
+        important-values
         important-files
         previous-calls)
     (pcase command-line
@@ -49,6 +50,7 @@
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:process-input   (setf process-input-form (pop body)))
+        (:important-value (push (pop body)         important-values))
         (:important-files (setf important-files    (eldev-listify (pop body))))
         (:previous-call   (let ((name (pop body))
                                 (call (pop body)))
@@ -87,6 +89,9 @@
                                        (signal (car error) (cdr error))))
                  (unless ,no-errors
                    (eldev--test-call-process-show call-info)
+                   ,@(when important-values
+                       `((eldev-warn "Important values:")
+                         ,@(mapcar (lambda (x) `(eldev-warn "%S:\n%S" ',x ,x)) (nreverse important-values))))
                    ,@(when important-files
                        `((eldev-warn "Important files (oldest first):")
                          (dolist (data (sort (mapcar (lambda (file) (cons file (nth 5 (file-attributes file)))) ',important-files)

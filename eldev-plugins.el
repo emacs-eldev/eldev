@@ -240,6 +240,15 @@ per-project basis."
      :options       --do-release
      :hidden-if     :default)
     :for-command    release)
+  (eldev-defcommand eldev-update-copyright (&rest parameters)
+    "Update copyright notices in all project files.  The year to
+include in the notices can be specified on the command line, or
+else defaults to the current year.  Unlike command `release',
+this one doesn't commit the changes.  After the command is
+finished, you should validate and commit them yourself."
+    :parameters   "[YEAR]"
+    :aliases      copyright
+    (eldev--maintainer-update-copyright parameters))
   (eldev-documentation 'eldev--maintainer-plugin))
 
 
@@ -608,6 +617,44 @@ If running interactively, let the user decide."
             ;; Since this is supposed to be important, use `yes-or-no-p', not `y-or-n-p'.
             (eldev-yes-or-no-p (eldev-format-message "\nContinue release process %s? " (eldev-colorize "anyway" 'warn))))
     (signal 'eldev-error `("Refusing to release: %s" ,failure-message))))
+
+
+(defun eldev--maintainer-update-copyright (parameters)
+  (when (cddr parameters)
+    (signal 'eldev-wrong-command-usage `(t "More than one parameter to the command")))
+  (eval-and-compile (require 'copyright))
+  (let ((year        (condition-case error
+                         (eldev-parse-number (if parameters (car parameters) (format-time-string "%Y")) :min 2000 :max 2999)
+                       (error (signal 'eldev-wrong-command-usage `(t ,(eldev-message-upcase-first (eldev-extract-error-message error)))))))
+        (num-updated 0)
+        anything-found)
+    (dolist (file (eldev-find-and-trace-files `(:and (eldev-standard-fileset 'all) ,eldev-update-copyright-fileset) "file%s to check for copyright notice in"))
+      (eldev-trace "Checking file `%s' for a copyright notice..." file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (set-buffer-modified-p nil)
+        (if (save-excursion (save-restriction (copyright-find-copyright)))
+            (progn
+              ;; It has a really dumb interface: non-local variable `copyright-current-year',
+              ;; exists, but you cannot set it, because the value you provide just gets overwriten.
+              ;; The override below is ugly as fuck, but I don't see any other way around that.
+              ;;
+              ;; If this breaks with a future version, that should be caught by a regression test.
+              (eldev-advised ('format-time-string :around (lambda (original &rest arguments)
+                                                            (if (equal arguments '("%Y")) (format "%d" year) (apply original arguments))))
+                (copyright-update nil t))
+              (if (buffer-modified-p)
+                  (progn (eldev-write-to-file file)
+                         (eldev-verbose "Updated the copyright notice in file `%s'" file)
+                         (setf num-updated (1+ num-updated)))
+                (eldev-trace "Copyright notice in the file is up-to-date with year %d" year))
+              (setf anything-found t))
+          (eldev-trace "No such notice found, skipping this file"))))
+    (if anything-found
+        (if (> num-updated 0)
+            (eldev-print "Updated %s" (eldev-message-plural num-updated "copyright notice"))
+          (eldev-print "All found copyright notices are up-to-date"))
+      (eldev-print "No copyright notices found in the project files"))))
 
 
 

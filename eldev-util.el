@@ -486,7 +486,7 @@ Since 1.1.1."
                                 (rx bos (? (any "+-")) (| (seq (+ digit) (? (| (seq "." (* digit)) (seq (any "eE") (? (any "+-")) (+ digit))))) (seq "." (* digit)) eos))
                               (rx bos (? (any "+-")) (+ digit) eos))
                             string)
-      (error (eldev-format-message "`%s' it not a valid number" string)))
+      (error (eldev-format-message (if floating-point "`%s' it not a valid number" "`%s' it not a valid integer number") string)))
     (let ((number (string-to-number string)))
       (when (and min (< number min))
         (error (eldev-format-message "minimum allowed value is %s" min)))

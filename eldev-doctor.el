@@ -291,7 +291,7 @@ and bugs get fixed.
 It is up to you to decide *when* a version is stable enough.  But please don't
 release a stable version only to never do that again in future."))))))
     (backend
-     `(result unknown short-answer ,(eldev-format-message "can't tell for %s" backend)))))
+     `(result unknown short-answer ,(eldev-format-message "can't tell for %s" (eldev-vc-full-name backend))))))
 
 (defun eldev--doctor-last-stable-release-data ()
   (eldev-with-vc nil

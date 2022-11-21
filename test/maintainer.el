@@ -4,15 +4,22 @@
 
 (defmacro eldev--test-maintainer-run (test-project command-line &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
-  (let (extra-setup)
+  (let (extra-setup
+        other-keywords)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
-        (:extra-setup (push (pop body) extra-setup))))
-    `(eldev--test-run ,test-project ,`("--setup" `(eldev-use-plugin 'maintainer)
-                                       "--setup" `(setf eldev-release-interactive nil)
-                                       ,@(apply #'append (mapcar (lambda (form) `("--setup" ,form)) (nreverse extra-setup)))
-                                       ,@command-line)
-       ,@body)))
+        (:extra-setup (push (pop body) extra-setup))
+        (keyword      (push keyword    other-keywords)
+                      (push (pop body) other-keywords))))
+    (let ((actual-command-line `("--setup" `(eldev-use-plugin 'maintainer)
+                                 "--setup" `(setf eldev-release-interactive nil)
+                                 ,@(apply #'append (mapcar (lambda (form) `("--setup" ,form)) (nreverse extra-setup))))))
+      (setf actual-command-line (pcase command-line
+                                  (`(:eval ,expression) `(:eval (append (list ,@actual-command-line) ,expression)))
+                                  (_                    (nconc actual-command-line command-line))))
+      `(eldev--test-run ,test-project ,actual-command-line
+         ,@(nreverse other-keywords)
+         ,@body))))
 
 
 ;; The following tests always use run-together syntax, as Emacs 24 won't understand
@@ -197,6 +204,30 @@
       (should (string= stdout "1.5.1snapshot\n")))
     ;; FIXME: Also validate the tag.
     ))
+
+
+(eldev-ert-defargtest eldev-update-copyright-1 (year)
+                      (2000 nil)
+  (let* ((year-2 (or year (string-to-number (format-time-string "%Y"))))
+         (year-1 (1- year-2))
+         (year-0 (1- year-1)))
+    (eldev--test-with-temp-copy "project-a" nil
+      (eldev--test-with-file-buffer nil "project-a.el"
+        (re-search-forward (rx ";;; Commentary:"))
+        (beginning-of-line)
+        (insert (format ";; Copyright (C) %d-%d John Doe\n" year-0 year-1)))
+      (eldev--test-maintainer-run nil (:eval `("update-copyright" ,@(when year `(,year))))
+        :important-value (eldev--test-file-contents nil "project-a.el")
+        ;; Can be not equal to `year-2' in the extremely unlikely case the tests are run
+        ;; on 31 December around 23:59:59.
+        (let ((year-3  (or year (string-to-number (format-time-string "%Y"))))
+              (updated (eldev--test-file-contents nil "project-a.el")))
+          (should (or (string-match-p (rx-to-string (format "Copyright (C) %d-%d John Doe" year-0 year-2)) updated)
+                      (when (> year-3 year-2)
+                        (string-match-p (rx-to-string (format "Copyright (C) %d-%d, %d John Doe" year-0 year-1 year-3)) updated)))))
+        (should (string-match-p (rx "Updated 1 copyright notice") stdout))
+        (should (= exit-code 0))))))
+
 
 
 (provide 'test/init)

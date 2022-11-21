@@ -5975,6 +5975,14 @@ maybe you have forgotten to add them to the repository.")
   "Don't release if non-nil, just pretend to do so.")
 
 
+(defvar eldev-update-copyright-fileset '("!COPYING" "!COPYING.txt" "!LICENSE" "!LICENSE.txt")
+  "Files in which to update copyright notices.
+Default value excludes some standard cross-project files,
+e.g. the license.
+
+Since 1.3.")
+
+
 
 ;; eldev init, eldev githooks
 
