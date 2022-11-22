@@ -169,6 +169,23 @@ are not available from the command line.  Instead, they should be
 customized in file `Eldev` on a per-project basis; see the next
 section.
 
+==== Command `update-copyright`
+
+The plugin provides a very simple command to update copyright notices,
+based on Emacs’ built-in feature `copyright`.  You can run it simply
+as:
+
+    $ eldev update-copyright
+
+to update the notices everywhere in the project to include the current
+year, or as e.g.:
+
+    $ eldev update-copyright 2023
+
+to include a specific year in the notices.  Unlike command `release`,
+this doesn’t create any VCS commits: it leaves the files modified for
+you to validate and commit the changes.
+
 [#maintainer-settings]
 ==== Maintainer project-specific settings
 
@@ -176,7 +193,8 @@ You can and most often should adapt the plugin to your project’s
 needs.  There are really lots of variables that control command
 `release` behavior.  They have sensible defaults, but your project,
 especially if it is complicated, still might need to tweak some of
-them.
+them.  For command `update-copyright` you may want to change the value
+of `eldev-update-copyright-fileset`.
 
 Not every variable is listed here.  You can always check Eldev source
 code and in-Emacs documentation to find all `eldev-release-…`

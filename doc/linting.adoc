@@ -59,3 +59,17 @@ Command `lint` sets Eldev’s exit status to non-zero if there is at
 least one warning from any requested linter.  This simplifies using
 linting in <<continuous-integration,continuous integration>> should
 you want to do that.
+
+[#doctor]
+=== The doctor
+
+{since-1-3} Eldev comes with a way to “lint” the project and its
+checkout too.  Just run:
+
+    $ eldev doctor
+
+This will check the project for a few common potential problems.  All
+the warnings come with quite verbose explanations, detailing what the
+doctor thinks is wrong, why and how to fix that.  However, it’s up to
+you to decide what and if anything at all should be done — the doctor
+doesn’t, and actually cannot, fix anything itself.
