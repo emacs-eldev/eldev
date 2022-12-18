@@ -51,7 +51,7 @@ jobs:
       run: brew install texinfo mercurial subversion
 
     - name: Check out the source code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Test the project
       run: |
@@ -90,7 +90,7 @@ jobs:
     # don't test bootstrapping, as that is supposed to have been
     # tested by normal ERT tests.
     - name: Test installation 1
-      uses: actions/github-script@v3
+      uses: actions/github-script@v6
       with:
         script: |
           const exec = require('util').promisify(require('child_process').exec);
@@ -104,7 +104,7 @@ jobs:
     # Method 2: general case, with Eldev script installed to
     # `~/.local/bin'.  We don't add it to `$PATH' as we run it using the absolute path
     - name: Test installation 2
-      uses: actions/github-script@v3
+      uses: actions/github-script@v6
       with:
         script: |
           const fs = require('fs');
