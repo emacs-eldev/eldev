@@ -772,7 +772,7 @@ Since 0.2."
                   (next-change (next-single-property-change replaced-up-to 'face message))
                   replaced-faces)
               (when faces
-                (dolist (face faces)
+                (dolist (face (eldev-listify faces))
                   (let ((replacement (gethash face interactive-faces)))
                     (when replacement
                       (push replacement replaced-faces))))
