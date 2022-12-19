@@ -93,12 +93,12 @@ jobs:
       uses: actions/github-script@v6
       with:
         script: |
-          const exec = require('util').promisify(require('child_process').exec);
+          const exec_ = require('util').promisify(require('child_process').exec);
           const {downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
           const fakeBin = expandTilde('~/fake-bin');
           await io.mkdirP(fakeBin);
           const script = await downloadScript(github, context, "bin/eldev", fakeBin);
-          const eldev_out = await exec(script);
+          const eldev_out = await exec_(script);
           console.log(eldev_out.stdout);
 
     # Method 2: general case, with Eldev script installed to
@@ -108,15 +108,15 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const exec = require('util').promisify(require('child_process').exec);
+          const exec_ = require('util').promisify(require('child_process').exec);
           const {getRawUrl,downloadScript,expandTilde} = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/util.js`);
           if (fs.existsSync(expandTilde("~/.local/bin/eldev")))
               throw("~/.local/bin/eldev already exists");
           await io.mkdirP('tmp');
           const script = await downloadScript(github, context, "webinstall/eldev", 'tmp');
           const eldev_bin_url = getRawUrl(context,"bin/eldev");
-          await exec(`${script} ${eldev_bin_url}`);
-          const eldev_out = await exec(expandTilde("~/.local/bin/eldev"));
+          await exec_(`${script} ${eldev_bin_url}`);
+          const eldev_out = await exec_(expandTilde("~/.local/bin/eldev"));
           console.log(eldev_out.stdout);
           await io.rmRF(expandTilde("~/.local/bin"));
 
