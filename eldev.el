@@ -2809,7 +2809,7 @@ descriptor."
                   (let ((file (buffer-substring-no-properties point (point))))
                     (forward-line)
                     (unless (looking-at (rx bol (or "up-to-date" "generated") eol))
-                      (error "Unable to parse child Eldev process output"))
+                      (error "Unable to parse child Eldev process output:\n%s" (buffer-string)))
                     (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-dependency-packages))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 

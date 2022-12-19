@@ -1551,15 +1551,24 @@ Since 1.2:
                           (while (let ((wait-on (cond ((process-live-p process)     process)
                                                       ((process-live-p stderr-pipe) stderr-pipe))))
                                    (when wait-on
-                                     ;; Having nil for the timeout would make the function
-                                     ;; return right away rather than wait "forever".  In
-                                     ;; principle, I'd replace the timeout with a very
-                                     ;; large number, but don't particularly trust Emacs
-                                     ;; not to get stuck here.  Also, having some
-                                     ;; `wait-on' process rather than nil is important for
-                                     ;; making it return quickly if the process dies.
+                                     ;; Having nil for the timeout would make the function return right away
+                                     ;; rather than wait "forever".  In principle, I'd replace the timeout
+                                     ;; with a very large number, but don't particularly trust Emacs not to
+                                     ;; get stuck here.  Also, having some `wait-on' process rather than nil
+                                     ;; is important for making it return quickly if the process dies.
                                      (accept-process-output wait-on 1.0)
                                      t)))
+                          (when (version< emacs-version "25.2")
+                            ;; Apparently only on Emacs 25.1 there was a synchronization bug that occasionally
+                            ;; resulted in parts of child process output getting lost otherwise.  Pretty sure
+                            ;; no-one uses 25.1 anymore, but this also happens on GitHub when packing Eldev
+                            ;; itself during continuous integration for testing, e.g.:
+                            ;; https://github.com/doublep/eldev/actions/runs/3726835847/jobs/6320581066 (also
+                            ;; need to set `debugger-batch-max-lines', else the most important part of the
+                            ;; stacktrace is helpfully cut).
+                            ;;
+                            ;; The below is only a workaround, let's hope it is enough in practice.
+                            (accept-process-output nil 0.5))
                           (process-exit-status process)))
                     (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer
