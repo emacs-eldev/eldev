@@ -54,4 +54,14 @@
       (should (/= exit-code 0)))))
 
 
+;; The error data should never be truncated, even if backtrace lines are.  A smaller limit
+;; (e.g. 80) would truncate _the full line_, which is fine, see comments in `eldev-cli'.
+(eldev-ert-defargtest eldev-untruncated-error-data (limit)
+                      (0 1000)
+  (let ((message "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."))
+    (eldev--test-run "trivial-project" ("--debug" (format "--backtrace=%d" limit) "eval" `(error ,message))
+      (should (string-match-p (rx-to-string `(seq bol "Debugger entered" (1+ any) ,message)) stderr))
+      (should (/= exit-code 0)))))
+
+
 (provide 'test/backtrace)

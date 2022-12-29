@@ -785,6 +785,8 @@ certain options relative to non-option parameters is important.
 
 Since 0.11.")
 
+(defvar backtrace-line-length)
+
 
 (defun eldev-start-up ()
   "Prepare Eldev.
@@ -798,9 +800,9 @@ Used by Eldev startup script."
 
 (defun eldev-cli (command-line)
   "Eldev entry point."
-  ;; We parse command line in a separate from `command-line-args' and
-  ;; `command-line-args-left' way, but whatever code we execute from here should believe
-  ;; there are no arguments left.
+  ;; We parse command line in a way separate from `command-line-args' and
+  ;; `command-line-args-left', but whatever code we execute from here should believe there
+  ;; are no arguments left.
   (let (command-line-args-left
         command
         eldev-too-old
@@ -822,44 +824,51 @@ Used by Eldev startup script."
                       ;; print error stacktraces even if `debug-on-error' is t.  Add a
                       ;; workaround.
                       (eldev-advised (#'debug :around (lambda (original &rest arguments)
-                                                        ;; FIXME: Maybe also try to highlight this?
                                                         (let ((inhibit-message nil))
                                                           (apply original arguments))))
-                        (eldev-parse-options command-line nil t t)
-                        (when eldev-print-backtrace-on-abort
-                          (add-hook 'kill-emacs-hook #'eldev-backtrace))
-                        ;; Since this is printed before `~/.config/eldev/config' is loaded,
-                        ;; it can ignore some settings from that file, e.g. colorizing mode.
-                        (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
-                        (eldev-trace "Running on %s" (emacs-version))
-                        (eldev-trace "Project directory: `%s'" eldev-project-dir)
-                        (condition-case error
-                            (eldev--set-up)
-                          (eldev-too-old (setf eldev-too-old (cdr error))))
-                        (let* ((external-dir     (eldev-external-package-dir))
-                               (package-user-dir (or external-dir package-user-dir)))
-                          (setf command-line (eldev-parse-options command-line nil t))
-                          (if command-line
-                              (let (archive-files-to-delete)
-                                ;; If we are using external directory, maybe rename
-                                ;; archives so that they don't clash with what is
-                                ;; retrieved in that directory already.
-                                (when external-dir
-                                  (dolist (entry package-archives)
-                                    (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
-                                  (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
-                                (setf command (intern (car command-line)))
-                                (unwind-protect
-                                    (progn (eldev--execute-command command-line)
-                                           (setf exit-code 0))
-                                  (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
-                                    (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
-                                                 (eldev-message-enumerate nil archive-files-to-delete))
-                                    (dolist (archive archive-files-to-delete)
-                                      (ignore-errors (delete-directory (eldev--package-archive-dir archive external-dir) t))))))
-                            (eldev-usage)
-                            (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
-                            (setf exit-code 0)))))))
+                        ;; Make sure debugger doesn't truncate strings in error's data, as
+                        ;; they are often very important and in non-interactive usage you
+                        ;; cannot expand "..." manually.  Afterwards lines may still be
+                        ;; truncated if needed; this is fine, as final line length limit
+                        ;; can be adjusted using option `-b'.
+                        (eldev-advised ('debugger--insert-header :around (lambda (original &rest args)
+                                                                           (let ((backtrace-line-length nil))
+                                                                             (apply original args))))
+                          (eldev-parse-options command-line nil t t)
+                          (when eldev-print-backtrace-on-abort
+                            (add-hook 'kill-emacs-hook #'eldev-backtrace))
+                          ;; Since this is printed before `~/.config/eldev/config' is loaded,
+                          ;; it can ignore some settings from that file, e.g. colorizing mode.
+                          (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
+                          (eldev-trace "Running on %s" (emacs-version))
+                          (eldev-trace "Project directory: `%s'" eldev-project-dir)
+                          (condition-case error
+                              (eldev--set-up)
+                            (eldev-too-old (setf eldev-too-old (cdr error))))
+                          (let* ((external-dir     (eldev-external-package-dir))
+                                 (package-user-dir (or external-dir package-user-dir)))
+                            (setf command-line (eldev-parse-options command-line nil t))
+                            (if command-line
+                                (let (archive-files-to-delete)
+                                  ;; If we are using external directory, maybe rename
+                                  ;; archives so that they don't clash with what is
+                                  ;; retrieved in that directory already.
+                                  (when external-dir
+                                    (dolist (entry package-archives)
+                                      (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
+                                    (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
+                                  (setf command (intern (car command-line)))
+                                  (unwind-protect
+                                      (progn (eldev--execute-command command-line)
+                                             (setf exit-code 0))
+                                    (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
+                                      (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
+                                                   (eldev-message-enumerate nil archive-files-to-delete))
+                                      (dolist (archive archive-files-to-delete)
+                                        (ignore-errors (delete-directory (eldev--package-archive-dir archive external-dir) t))))))
+                              (eldev-usage)
+                              (eldev-print "Run `%s help' for more information" (eldev-shell-command t))
+                              (setf exit-code 0))))))))
               ;; FIXME: `command' will be wrong if the error occurs during nested command
               ;;        processing, e.g. `$ eldev profile ... eval --unknown-option ...'.
               (eldev-error (eldev--print-eldev-error error command))
