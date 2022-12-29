@@ -344,4 +344,24 @@ Consider installing %s by running:
                                                        (eldev-message-enumerate nil not-installed) (if (cddr not-installed) "them" "it")))
         '(result t)))))
 
+(eldev-defdoctest eldev-doctest-tar-windows (_results)
+  :caption    "Is the tar executable found compatible with Eldev on MS-Windows?"
+  :categories (eldev package tar)
+  (let ((tar-exe (eldev-tar-executable 'not-required)))
+    (if (not tar-exe)
+        '(result nil warnings "Cannot find a `tar` executable in the `PATH` env variable, `package` commands are likely to fail. Please install a tar program in `PATH`.")
+      (if (eq system-type 'windows-nt)
+          (let ((temp-file (make-temp-file "eldev-doctor-tar-win")))
+            (unwind-protect
+                ;; in absence of any test files, try to tar the tar
+                ;; executable itself.
+                (eldev-call-process tar-exe `("-cf" ,temp-file ,(expand-file-name (eldev-tar-executable)))
+                  (when (/= exit-code 0)
+                    `(result nil warnings ,(eldev-format-message "\
+The tar executable found at `%s` is not compatible with Eldev, please use the one provided with MS-Windows (typically located at `c:\\Windows\\system32\\tar.exe`), by either rearranging the entries in the PATH environment variable to pick that up first, or by setting the `eldev-tar-executable' in `Eldev-local` to something like
+
+(setf eldev-tar-executable \"C:/Windows/system32/tar.exe\")." tar-exe))))
+              (delete-file temp-file)))
+        '(result t)))))
+
 (provide 'eldev-doctor)
