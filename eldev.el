@@ -4369,7 +4369,8 @@ least one warning."
       (setf linters (eldev-filter (not (memq it eldev-lint-disabled)) (mapcar #'car eldev--linters))))
     (setf linters (nreverse linters))
     (if linters
-        (let ((eldev--lint-num-warnings 0))
+        (let ((multiple-linters         (cdr linters))
+              (eldev--lint-num-warnings 0))
           (eldev-trace "Going to run the following %s" (eldev-message-enumerate '("linter:" "linters:") linters))
           (catch 'eldev--lint-stop
             (dolist (linter linters)
@@ -4377,7 +4378,9 @@ least one warning."
                 (when (or (memq linter eldev-lint-disabled) (memq canonical-name eldev-lint-disabled))
                   ;; This can only happen if a linter is requested explicitly.
                   (signal 'eldev-error `("Linter `%s' is disabled (see variable `eldev-lint-disabled')" ,linter)))
-                (eldev-verbose "Running linter `%s'..." linter)
+                (if multiple-linters
+                    (eldev-print :color 'section "Running linter `%s'" linter)
+                  (eldev-verbose "Running linter `%s'..." linter))
                 (condition-case error
                     (funcall (cdr (assq canonical-name eldev--linters)))
                   (eldev-missing-dependency (if eldev-lint-optional
@@ -4385,7 +4388,9 @@ least one warning."
                                               (signal 'eldev-error `("%s; cannot use linter `%s'" ,(eldev-extract-error-message error) ,linter)))))
                 (when (and (eq eldev-lint-stop-mode 'linter) (> eldev--lint-num-warnings 0))
                   (eldev-trace "Stopping after the linter that issued warnings")
-                  (throw 'eldev--lint-stop nil)))))
+                  (throw 'eldev--lint-stop nil))
+                (when multiple-linters
+                  (eldev-print "")))))
           (if (> eldev--lint-num-warnings 0)
               (signal 'eldev-error `("Linting produced warnings"))
             (eldev-print (if (cdr linters) "Linters have %s" "Linter has %s") (eldev-colorize "no complaints" 'success))))
