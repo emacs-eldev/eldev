@@ -39,6 +39,13 @@
 ;; than what is built into Emacs, even if appropriate package archive was configured.  Was
 ;; triggered by the bug in `eldev--global-cache-url-retrieve-synchronously'.
 (ert-deftest eldev-issue-32 ()
+  (when (< emacs-major-version 25)
+    ;; Cannot connect to `orgmode.org' using ancient Emacs 24 anymore, TLS error
+    ;; "handshake failed".  Don't care enough to search for another workaround, so just
+    ;; disabling the test instead.  To check if it still fails:
+    ;;
+    ;;     $ eldev docker 24 exec "(eldev-use-package-archive '(\"org\" . \"https://orgmode.org/elpa/\")) (eldev-add-extra-dependencies 'runtime 'org) (eldev-load-extra-dependencies 'runtime)"
+    (ert-skip "This test fails on Emacs 24 because of TLS issues"))
   (let ((eldev--test-project "issue-32-project"))
     (eldev--test-delete-cache)
     ;; Test that it fails when no archive is configured.
