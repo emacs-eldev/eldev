@@ -140,15 +140,16 @@ use this for ERT framework, unless they can do better."
                                                       (eldev-warn "\nStopping before %s" (eldev-message-plural num-tests-ignored "more test")))
                                                     (signal 'eldev-quit 1))))))))
                                        rest)))
-        ;; Inject profiling support if wanted.
+        ;; Inject profiling support if wanted.  Profile `ert-run-test' if
+        ;; `ert--run-test-internal' is gone in a future Emacs version.
         (eldev-advised ('ert--run-test-internal :around (when (and eldev--effective-profile-mode have-ert--run-test-internal)
                                                           (lambda (original &rest args)
                                                             (eldev-profile-body
                                                               (apply original args)))))
-          (eldev-advised ('ert-run-test :around (when (and eldev--effective-profile-mode (not have-ert--run-test-internal)
-                                                           (lambda (original &rest args)
-                                                             (eldev-profile-body
-                                                               (apply original args))))))
+          (eldev-advised ('ert-run-test :around (when (and eldev--effective-profile-mode (not have-ert--run-test-internal))
+                                                  (lambda (original &rest args)
+                                                    (eldev-profile-body
+                                                      (apply original args)))))
             ;; No easy way to highlight successful test summary with `success' color, so
             ;; not doing this as low-importance and to avoid false positives.
             (let* ((statistics     (ert-run-tests-batch (eldev-build-ert-selector selectors)))
