@@ -6,11 +6,13 @@ Other build tools you might want to use instead of Eldev:
   tool.
 * {uri-makem-sh}[makem.sh] — a shell script that performs many common
   Elisp development tasks; must be copied to your project.
-* {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
-* {uri-keg}[Keg] — a build tool that can be seen as a successor to
+* {uri-eask}[Eask] — a build tool that can be seen as a successor to
   Cask; uses a similar project description file.
+* {uri-keg}[Keg] — another alternative to Cask; likewise, uses a
+  similar project description file.
 * {uri-makel}[makel] — a prebuilt `Makefile` with typical targets
   useful to Elisp projects.
+* {uri-emake}[EMake] — build tool that combines Elisp with GNU Make.
 
 Projects and services that can otherwise help you with developing your
 Elisp code:
