@@ -954,7 +954,7 @@ Since 1.0."
             (throw 'renamed-as new-name))
           (setf k (if k (1+ k) 1)))))))
 
-(defun eldev--print-eldev-error (error &optional command)
+(defun eldev--print-eldev-error (error &optional command as-warning)
   (let* ((arguments (cdr error))
          hint
          hint-about-command)
@@ -965,7 +965,10 @@ Since 1.0."
     (pcase (car arguments)
       (:hint    (pop arguments) (setf hint               (pop arguments)))
       (:command (pop arguments) (setf hint-about-command (pop arguments))))
-    (eldev-error "%s" (apply #'eldev-format-message arguments))
+    (let ((message (apply #'eldev-format-message arguments)))
+      (if as-warning
+          (eldev-warn (if (eq as-warning t) "%s" as-warning) message)
+        (eldev-error "%s" message)))
     (when hint
       (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
     (when hint-about-command
@@ -2218,7 +2221,7 @@ Since 0.2."
                                               (can-be-installed (catch 'skip-uninstallable-optionals
                                                                   (eldev--plan-install-or-upgrade self to-be-upgraded package-plist default-archives plan
                                                                                                   (and pass-archive-statuses (not eldev-upgrade-downgrade-mode))
-                                                                                                  considered highest-requirements))))
+                                                                                                  considered highest-requirements (and (null core) (equal additional-sets '(runtime)))))))
                                           (when (plist-get package-plist :optional)
                                             (let* ((list-of-uninstallable (funcall uninstallable))
                                                    (was-uninstallable     (memq dependency-name list-of-uninstallable)))
@@ -2474,19 +2477,25 @@ Since 0.2."
                   (list archive))))))
 
 ;; Returns non-nil.
-(defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new considered highest-requirements &optional required-by)
+(defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new considered highest-requirements &optional runtime-dependency required-by)
   (let* ((package-name        (plist-get package-plist :package))
          (required-version    (plist-get package-plist :version))
          (optional            (plist-get package-plist :optional))
          (highest-requirement (gethash package-name highest-requirements))
          (real-required-by    required-by)
          (required-by-hint    (lambda (&optional upcase)
-                                (when required-by
-                                  (let ((hint (eldev-format-message "required by package %s"
-                                                                    (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- "))))
-                                    (if upcase
-                                        (eldev-message-upcase-first hint)
-                                      hint)))))
+                                (let (hints)
+                                  (when runtime-dependency
+                                    (push "required as a development tool, not as a dependecy of the project" hints))
+                                  (when required-by
+                                    (push (eldev-format-message "required by package %s"
+                                                                (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- "))
+                                          hints))
+                                  (when hints
+                                    (let ((hint (mapconcat #'identity hints "; ")))
+                                      (if upcase
+                                          (eldev-message-upcase-first hint)
+                                        hint))))))
          (considered-version  (gethash package-name considered)))
     (when (stringp required-version)
       (setf required-version (version-to-list required-version)))
@@ -2522,14 +2531,15 @@ Since 0.2."
                (already-installed-too-old (version-list-< already-installed-version required-version))
                (upgrading                 (or (eq to-be-upgraded t) (memq package-name to-be-upgraded)))
                (package                   (unless (or upgrading already-installed-too-old) already-installed))
-               (archives                  (eldev--package-plist-get-archives package-plist t)))
+               (archives                  (eldev--package-plist-get-archives package-plist t))
+               (external-dir              (unless self (eldev-external-package-dir))))
           (unless package
             ;; Not installed, installed not in the version we need or to be upgraded.
             (let* ((best-version     (unless (or eldev-upgrade-downgrade-mode fail-if-too-new) already-installed-version))
                    (best-preferred   nil)
                    (best-priority    most-negative-fixnum)
                    (built-in-version (eldev-find-built-in-version package-name))
-                   (available        (cdr (assq package-name package-archive-contents)))
+                   (available        (unless external-dir (cdr (assq package-name package-archive-contents))))
                    package-disabled)
               (when (version-list-< best-version built-in-version)
                 (setf best-version built-in-version))
@@ -2585,7 +2595,6 @@ Since 0.2."
                       (eldev-trace "Note: it is %s" hint)))
                   (throw 'skip-uninstallable-optionals nil))
                 (let* ((version-string (eldev-message-version required-version t))
-                       (external-dir   (unless self (eldev-external-package-dir)))
                        (hint           (funcall required-by-hint t))
                        (message        (or package-disabled
                                            (cond ((and best-version (not (eq best-version built-in-version)))
@@ -2606,7 +2615,7 @@ Since 0.2."
                   (signal 'eldev-missing-dependency `(:hint ,hint ,@message))))))
           (dolist (requirement (package-desc-reqs package))
             (eldev--plan-install-or-upgrade self to-be-upgraded (eldev--create-package-plist requirement (or archives default-archives) optional)
-                                            default-archives plan fail-if-too-new considered highest-requirements (cons package-name required-by)))
+                                            default-archives plan fail-if-too-new considered highest-requirements runtime-dependency (cons package-name required-by)))
           (if (eq package already-installed)
               (push package-name (cdr plan))
             (push `(,package . ,already-installed) (car plan)))))
@@ -4384,7 +4393,7 @@ least one warning."
                 (condition-case error
                     (funcall (cdr (assq canonical-name eldev--linters)))
                   (eldev-missing-dependency (if eldev-lint-optional
-                                                (eldev-warn "%s; skipping linter `%s'" (eldev-extract-error-message error) linter)
+                                                (eldev--print-eldev-error error nil (eldev-format-message "%%s; skipping linter `%s'" linter))
                                               (signal 'eldev-error `("%s; cannot use linter `%s'" ,(eldev-extract-error-message error) ,linter)))))
                 (when (and (eq eldev-lint-stop-mode 'linter) (> eldev--lint-num-warnings 0))
                   (eldev-trace "Stopping after the linter that issued warnings")
