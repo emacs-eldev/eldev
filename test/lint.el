@@ -68,4 +68,26 @@
     (should (= exit-code 0))))
 
 
+(ert-deftest eldev-lint-first-unavailable ()
+  (let ((eldev--test-project "trivial-project"))
+    (eldev--test-delete-cache)
+    ;; Install a fake of `relint'.  We don't care about the output, only that it is
+    ;; available, so don't access the network needlessly.
+    (eldev--test-run nil ("--setup" `(push '(relint :archive relint-pseudoarchive) eldev-known-tool-packages)
+                          "--setup" `(setf eldev--known-package-archives '((relint-pseudoarchive ("relint-pseudoarchive" . ,(expand-file-name "../relint-pseudoarchive")) 0)))
+                          "lint" "re")
+      (should (= exit-code 0)))
+    ;; We use `--external' only to forbid it from installing anything now.  Otherwise it
+    ;; is the same directory as normally used.
+    (eldev--test-run nil ("--setup" `(push '(relint :version "0.0.1") eldev-known-tool-packages)
+                          (format "--external=%s" (let ((eldev-project-dir (eldev--test-project-dir)))
+                                                    (expand-file-name "packages" (eldev-cache-dir t))))
+                          "lint" "package" "re")
+      ;; First linter is not available and should thus be skipped, but not `relint', which
+      ;; has been "installed" previously.
+      (should      (string-match-p "skipping linter .package." stderr))
+      (should (not (string-match-p "skipping linter .re."      stderr)))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/lint)

@@ -1469,6 +1469,17 @@ for details."
       (dolist (dependency dependencies)
         (push (if (symbolp dependency) (list dependency) dependency) (cdr set-dependencies))))))
 
+(defmacro eldev-saving-dependency-lists (&rest body)
+  "Save dependency lists and execute BODY.
+Upon exit (normal or via a signal) dependency lists are restored,
+so e.g. effects of `eldev-add-extra-dependencies' are restricted
+to BODY only.
+
+Since 1.4."
+  (declare (indent 0) (debug (body)))
+  `(let ((eldev--extra-dependencies eldev--extra-dependencies))
+     ,@body))
+
 (defun eldev-add-loading-roots (sets &rest roots)
   "Additionally use loading ROOTS for given SETS.
 This would typically be used for `test' command in case your
@@ -4548,8 +4559,9 @@ least one warning."
   "Check package metadata, e.g. correctness of its dependencies."
   :aliases        (package-lint pack)
   :default        t
-  (eldev-add-extra-dependencies 'runtime '(:tool package-lint))
-  (eldev-load-extra-dependencies 'runtime)
+  (eldev-saving-dependency-lists
+    (eldev-add-extra-dependencies 'runtime '(:tool package-lint))
+    (eldev-load-extra-dependencies 'runtime))
   ;; This linter needs access to package archive contents, so at least fetch all archives
   ;; we have never fetched yet.
   (let ((eldev-global-cache-archive-contents-max-age nil))
@@ -4585,8 +4597,9 @@ least one warning."
   "Find errors, deprecated syntax etc. in regular expressions."
   :aliases        (relint regex regexp)
   :default        t
-  (eldev-add-extra-dependencies 'runtime '(:tool relint))
-  (eldev-load-extra-dependencies 'runtime)
+  (eldev-saving-dependency-lists
+    (eldev-add-extra-dependencies 'runtime '(:tool relint))
+    (eldev-load-extra-dependencies 'runtime))
   (require 'relint)
   ;; I see no way to avoid diving into internals.
   (eldev-advised ('relint--output-report :around (lambda (original error-buffer file complaint &rest etc)
@@ -4608,9 +4621,10 @@ least one warning."
 also runs `package-lint', so you either shouldn't run both or
 change `elisp-lint's configuration."
   :aliases        (elisp-lint el)
-  (eldev-add-extra-dependencies 'runtime '(:tool elisp-lint))
-  ;; This linter might need access to package dependencies for byte-compilation.
-  (eldev-load-project-dependencies 'runtime nil t)
+  (eldev-saving-dependency-lists
+    (eldev-add-extra-dependencies 'runtime '(:tool elisp-lint))
+    ;; This linter might need access to package dependencies for byte-compilation.
+    (eldev-load-project-dependencies 'runtime nil t))
   ;; This linter might invoke `package-lint' that needs access to package archive
   ;; contents.  Unlike `eldev-linter-package' (where we load _only_ extra dependencies,
   ;; which might not be enough), here we don't need to fetch archive contents, as it
