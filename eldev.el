@@ -2539,7 +2539,7 @@ Since 0.2."
                    (best-preferred   nil)
                    (best-priority    most-negative-fixnum)
                    (built-in-version (eldev-find-built-in-version package-name))
-                   (available        (unless external-dir (cdr (assq package-name package-archive-contents))))
+                   (available        (cdr (assq package-name package-archive-contents)))
                    package-disabled)
               (when (version-list-< best-version built-in-version)
                 (setf best-version built-in-version))
@@ -2550,8 +2550,10 @@ Since 0.2."
                        (preferred (eldev--stable/unstable-preferred-archive (eldev--find-simple-archive archives archive)))
                        (priority  (eldev-package-archive-priority archive))
                        (disabled  (package-disabled-p package-name version)))
-                  ;; Make sure we don't install a package from a wrong archive.
-                  (when (if local
+                  ;; Make sure we don't install a package from a wrong archive.  In
+                  ;; particular, if using preinstalled dependencies (external-dir), only
+                  ;; "install" local dependencies listed in the internal pseudoarchive.
+                  (when (if (or local external-dir)
                             (string= archive eldev--internal-pseudoarchive)
                           (or (null archives) (eldev--find-simple-archive archives archive)))
                     (cond ((version-list-< version required-version)
