@@ -231,7 +231,8 @@ Only `eq' (also default) and `equal' are supported for COMPARATOR."
   "Determine if REGEXP is valid.
 Since 0.2."
   (ignore-errors
-    (string-match-p regexp "")
+    ;; `ignore' is only here to silence byte-compilation warning.
+    (ignore (string-match-p regexp ""))
     t))
 
 
