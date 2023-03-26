@@ -3882,6 +3882,7 @@ for details."
                        ;; Framework autoguessing can only work if there is at least one file to load, so
                        ;; this `when' is important.
                        (when files
+                         (setf found-any-files t)
                          (when (and (equal fileset "*.el") (not files-looked-up))
                            (eldev-autoinstalling-implicit-dependencies t
                              (dolist (file files)
@@ -3892,7 +3893,6 @@ for details."
                                    (eldev-named-step nil (eldev-format-message "loading test file `%s'" file)
                                      (eldev-trace "%s..." (eldev-current-step-name t))
                                      (load absolute-without-el nil t nil t)))))))
-                         (setf found-any-files t)
                          (let* ((runner-name (or eldev-test-runner 'simple))
                                 (runner      (or (cdr (assq runner-name eldev--test-runners))
                                                  (signal 'eldev-error `(:hint ("Check output of `%s test --list-runners'" ,(eldev-shell-command t)) "Unknown test runner `%s'" ,runner-name))))
