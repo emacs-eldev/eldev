@@ -21,7 +21,6 @@
 
 (require 'package)
 
-
 
 ;; Compatibility.
 
@@ -584,13 +583,20 @@ a (preferably) temporary way as means of debugging output.  The
 output that normally comes to stderr (also from `eldev-warn', for
 example) can be redirected in interactive use as follows:
 
-    `message' or nil   -- show it with `message;
+    `message' or nil   -- show it with `message';
     `debugging-output' -- send to _Emacs_ stderr, similar to output
-                          of `eldev-debug';
+                          of `eldev-debug'; this is the default;
     `display-warning'  -- show with `display-warning', trying to
                           pick a suitable level.
 
 Since 1.3.")
+
+(defvar eldev-debugging-output-level 0
+  "The nesting level of debugging output.
+This shouldn't be set directly, instead use macro
+`eldev-nest-debugging-output' or let-bind this variable.
+
+Since 1.4.")
 
 (defvar eldev--output-rerouted nil)
 (defvar eldev--real-stderr-output nil)
@@ -729,6 +735,10 @@ Since 0.2."
         (_                               (error "Unknown option `%s'" format-string)))
       (setf format-string (pop arguments)))
     (let ((message (if format-string (apply #'eldev-format-message format-string arguments) "")))
+      (when (eq special-destination 'debugging-output)
+        (let ((prefix (eldev-debugging-output-prefix)))
+          (when (and prefix (> (length prefix) 0))
+            (setf message (replace-regexp-in-string (rx bol) prefix message t t)))))
       (when colors
         (setf message (apply #'eldev-colorize message colors)))
       (when eldev-output-time-diffs
@@ -855,20 +865,72 @@ The message is printed to stderr in standing-out color.
 Since 1.3."
   (eldev--output-wrapper '(:debugging-output) 'debug format-string arguments))
 
-(defmacro eldev-dump (&rest variables)
-  "Dump given VARIABLES using `eldev-debug'.
-No specific guarantees about the way it looks other than that it
-should be useful to human eyes.
+(defmacro eldev-dump (&rest forms)
+  "Dump values of given FORMS using `eldev-debug'.
+Typical use is to dump values of variables, but FORMS may contain
+any expressions.  No specific guarantees about the way the output
+looks other than that it should be useful to human eyes.
 
 Since 1.3."
-  (when variables
-    (let (forms)
-      (dolist (variable variables)
-        (push `(insert ,(format "%s%s = " (if forms "\n" "") variable)) forms)
-        (push `(eldev-prin1 ,variable (current-buffer)) forms))
-      `(with-temp-buffer
-         ,@(nreverse forms)
-         (eldev-debug "%s" (buffer-string))))))
+  (when forms
+    (let (bindings
+          dumping-forms)
+      ;; Some complications to properly dump values like e.g. `(point-min)': make sure we
+      ;; precompute everything before switching buffers in the macroexpansion.
+      (dolist (form forms)
+        (let ((variable (make-symbol (format "$%S" form))))
+          (push `(,variable ,form) bindings)
+          (push `(insert ,(format "%s%S = " (if dumping-forms "\n" "") form)) dumping-forms)
+          (push `(eldev-prin1 ,variable (current-buffer)) dumping-forms)))
+      `(let (,@(nreverse bindings))
+         (with-temp-buffer
+           ,@(nreverse dumping-forms)
+           (eldev-debug "%s" (buffer-string)))))))
+
+(defmacro eldev-time-it (format-string &rest body)
+  "Execute BODY and print execution time using `eldev-debug'.
+FORMAT-STRING is used to format the resulting message.  It should
+format exactly one floating-point number (of seconds taken),
+i.e. use \"%f\".  If it doesn't format any variables, \": %.2f
+s\" is appended to it.
+
+This macro uses function `float-time' to measure time spent on
+executing BODY.  It is not particularly suited for measuring very
+small time intervals (e.g. below millisecond granularity), though
+can also be used for that: just consider the result only a rough
+estimation in that case.
+
+Since 1.4."
+  (declare (indent 1) (debug (stringp body)))
+  (let ((notch (make-symbol "$notch")))
+    ;; Detect if `format-string' already formats the seconds.  FIXME: Can this be improved?
+    (unless (ignore-errors (not (string= (format format-string 0) format-string)))
+      (setf format-string (concat format-string ": %.2f s")))
+    `(let ((,notch (float-time)))
+       (prog1 ,(macroexp-progn body)
+         (eldev-debug ,format-string (- (float-time) ,notch))))))
+
+(defmacro eldev-nest-debugging-output (&rest body)
+  "Execute BODY with increased debugging output level.
+All output of `eldev-debug', `eldev-dump' within the BODY will be
+indented (see function `eldev-debugging-output-prefix' for
+details)."
+  (declare (indent 0) (debug (body)))
+  `(let ((eldev-debugging-output-level (1+ eldev-debugging-output-level)))
+     ,@body))
+
+(defun eldev-debugging-output-prefix ()
+  "Return the current debugging output prefix.
+This function has no associated customizable variables.  Instead,
+if you want it to behave differently, either advise or completely
+replace it e.g. in `~/.config/eldev/config': it is meant for
+local use anyway.  An example goal would be to limit effective
+value of `eldev-debugging-output-level' to avoid too long
+prefixes.
+
+Since 1.4."
+  (when (> eldev-debugging-output-level 0)
+    (make-string (* eldev-debugging-output-level 2) ? )))
 
 
 (defmacro eldev-with-verbosity-level-except (level functions-with-original-level &rest body)

@@ -54,6 +54,15 @@
     (should (string= stdout "Hello\n"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-emacs-nested-debugging-output-1 ()
+  (eldev--test-run "project-a" ("--quiet" "emacs" "--batch" "--eval" `(progn (eldev-debug "Before")
+                                                                             (eldev-nest-debugging-output
+                                                                               (eldev-dump (+ 1 2)))
+                                                                             (eldev-debug "After")))
+    ;; See above for why `stdout'.
+    (should (string= stdout (eldev--test-lines "Before" "  (+ 1 2) = 3" "After")))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-emacs-project-isolation-1 ()
   (eldev--test-run "trivial-project" ("emacs" "--batch" "--eval" ` (princ user-emacs-directory))
     (should (file-in-directory-p (string-trim stdout) (eldev--test-project-dir)))
