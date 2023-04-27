@@ -105,4 +105,53 @@
     (should (= exit-code 0))))
 
 
+;; The following tests are for debugging output, not actually for command `exec' directly.
+;; Usually the output is supposed to come from nested emacs invocation (see one test in
+;; `emacs.el'), but it also works from evaluated expression.
+
+(ert-deftest eldev-exec-nested-debugging-output-1 ()
+  (eldev--test-run "project-a" ( "exec" `(progn (eldev-debug "Before")
+                                                (eldev-nest-debugging-output
+                                                  (eldev-debug "%s" "Nested"))
+                                                (eldev-debug "After")))
+    (should (string= stderr (eldev--test-lines "Before" "  Nested" "After")))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-exec-optional-debugging-output-1 ()
+  (eldev--test-run "project-a" ("exec" `(eldev-xdebug "must be disabled by default"))
+    (should (string= stderr ""))
+    (should (= exit-code 0))))
+
+(eldev-ert-defargtest eldev-exec-optional-debugging-output-2 (switching-form enabled)
+                      (('(eldev-enabling-xdebug)  t)
+                       ('(eldev-disabling-xdebug) nil)
+                       ('(eldev-maybe-xdebug t)   t)
+                       ('(eldev-maybe-xdebug nil) nil))
+  (eldev--test-run "project-a" ("exec" `(,@switching-form (eldev-xdebug "optional")))
+    (should (string= stderr (if enabled "optional\n" "")))
+    (should (= exit-code 0))))
+
+(eldev-ert-defargtest eldev-exec-debugging-dump-1 (form output)
+                      (('(+ 1 2)  "(+ 1 2) = 3")
+                       ("string"  "string")
+                       (''symbol  "'symbol")
+                       (100       "100"))
+  (eldev--test-run "project-a" ("exec" `(eldev-dump ,form))
+    (should (string= stderr (format "%s\n" output)))
+    (should (= exit-code 0))))
+
+(eldev-ert-defargtest eldev-exec-debugging-time-it-1 (format-string output)
+                      ((""             ": 0.00 s")
+                       ("spent"        "spent: 0.00 s")
+                       ("spent: %.0fs" "spent: 0s"))
+  (eldev--test-run "project-a" ("exec" `(eldev-time-it ,format-string (ignore)))
+    (should (string= stderr (format "%s\n" output)))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-exec-debugging-time-it-2 ()
+  (eldev--test-run "project-a" ("exec" `(eldev-time-it "%.1f" (sleep-for 1)))
+    (should (<= 0.9 (eldev-parse-number (string-trim stderr) :floating-point t) 1.1))
+    (should (= exit-code 0))))
+
+
 (provide 'test/exec)

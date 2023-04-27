@@ -185,6 +185,16 @@ If X is already a list (including nil), it is returned
 unmodified, else it is wrapped as a single-item list."
   (if (listp x) x `(,x)))
 
+(defun eldev-literalp (x)
+  "Return non-nil if X is a literal, possibly quoted.
+Since Eldev 1.4."
+  (declare (pure t) (side-effect-free t))
+  (if (atom x)
+      (or (not (symbolp x))
+          (memq x '(nil t))
+          (keywordp x))
+    (and (memq (car x) '(quote function)) (consp (cdr x)) (null (cddr x)))))
+
 (defun eldev-string-list-p (x)
   "Determine if X is a list of strings."
   (let ((result t))
@@ -592,6 +602,14 @@ example) can be redirected in interactive use as follows:
 
 Since 1.3.")
 
+(defvar eldev-xdebuging-output-enabled nil
+  "Set if optional debugging output is enabled.
+This shouldn't be set directly, instead use `eldev-maybe-xdebug',
+`eldev-enabling-xdebug', `eldev-disabling-xdebug' or let-bind
+this variable.
+
+Since 1.4.")
+
 (defvar eldev-debugging-output-level 0
   "The nesting level of debugging output.
 This shouldn't be set directly, instead use macro
@@ -866,11 +884,20 @@ The message is printed to stderr in standing-out color.
 Since 1.3."
   (eldev--output-wrapper '(:debugging-output) 'debug format-string arguments))
 
+(defmacro eldev-xdebug (format-string &rest arguments)
+  "As `eldev-debug', but only if optional debugging output is enabled.
+Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Since 1.4."
+  `(when eldev-xdebuging-output-enabled
+     (eldev-debug ,format-string ,@arguments)))
+
 (defmacro eldev-dump (&rest forms)
   "Dump values of given FORMS using `eldev-debug'.
 Typical use is to dump values of variables, but FORMS may contain
 any expressions.  No specific guarantees about the way the output
-looks other than that it should be useful to human eyes.
+looks other than that it should be useful to human eyes.  For
+example, literal forms, most importantly string literals, are
+displayed differently.
 
 Since 1.3."
   (when forms
@@ -879,14 +906,23 @@ Since 1.3."
       ;; Some complications to properly dump values like e.g. `(point-min)': make sure we
       ;; precompute everything before switching buffers in the macroexpansion.
       (dolist (form forms)
-        (let ((variable (make-symbol (format "$%S" form))))
-          (push `(,variable ,form) bindings)
-          (push `(insert ,(format "%s%S = " (if dumping-forms "\n" "") form)) dumping-forms)
-          (push `(eldev-prin1 ,variable (current-buffer)) dumping-forms)))
+        (if (eldev-literalp form)
+            (push `(insert ,(format "%s%s" (if dumping-forms "\n" "") form)) dumping-forms)
+          (let ((variable (make-symbol (format "$%S" form))))
+            (push `(,variable ,form) bindings)
+            (push `(insert ,(format "%s%S = " (if dumping-forms "\n" "") form)) dumping-forms)
+            (push `(eldev-prin1 ,variable (current-buffer)) dumping-forms))))
       `(let (,@(nreverse bindings))
          (with-temp-buffer
            ,@(nreverse dumping-forms)
            (eldev-debug "%s" (buffer-string)))))))
+
+(defmacro eldev-xdump (&rest forms)
+  "As `eldev-dump', but only if optional debugging output is enabled.
+Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Since 1.4."
+  `(when eldev-xdebuging-output-enabled
+     (eldev-dump ,@forms)))
 
 (defmacro eldev-time-it (format-string &rest body)
   "Execute BODY and print execution time using `eldev-debug'.
@@ -910,6 +946,35 @@ Since 1.4."
     `(let ((,notch (float-time)))
        (prog1 ,(macroexp-progn body)
          (eldev-debug ,format-string (- (float-time) ,notch))))))
+
+(defmacro eldev-xtime-it (format-string &rest body)
+  "As `eldev-time-it', but only if optional debugging output is enabled.
+Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Since 1.4."
+  (declare (indent 1) (debug (stringp body)))
+  `(when eldev-xdebuging-output-enabled
+     (eldev-time-it ,format-string ,@body)))
+
+(defmacro eldev-maybe-xdebug (condition &rest body)
+  "Evalue BODY, conditionally enabling `eldev-xdebug' output in it.
+Since 1.4."
+  (declare (indent 0) (debug (body)))
+  `(let ((eldev-xdebuging-output-enabled ,condition))
+     ,@body))
+
+(defmacro eldev-enabling-xdebug (&rest body)
+  "Evalue BODY, enabling `eldev-xdebug' output in it.
+Since 1.4."
+  (declare (indent 0) (debug (body)))
+  `(let ((eldev-xdebuging-output-enabled t))
+     ,@body))
+
+(defmacro eldev-disabling-xdebug (&rest body)
+  "Evalue BODY, disabling `eldev-xdebug' output in it.
+Since 1.4."
+  (declare (indent 0) (debug (body)))
+  `(let ((eldev-xdebuging-output-enabled nil))
+     ,@body))
 
 (defmacro eldev-nest-debugging-output (&rest body)
   "Execute BODY with increased debugging output level.

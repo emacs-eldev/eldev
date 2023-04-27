@@ -44,6 +44,8 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
+;; Most of the test for debugging output are in `exec.el'.  We don't really need to spawn
+;; yet another Emacs to test it.
 (ert-deftest eldev-emacs-debugging-output-1 ()
   ;; Default value of `eldev-emacs-autorequire-eldev' means that function `eldev-debug' is
   ;; available automatically.
@@ -52,15 +54,6 @@
     ;; limitation of Elisp though, not Eldev), inner Eldev process forwards Emacs' stderr
     ;; to its own stdout.  So there.
     (should (string= stdout "Hello\n"))
-    (should (= exit-code 0))))
-
-(ert-deftest eldev-emacs-nested-debugging-output-1 ()
-  (eldev--test-run "project-a" ("--quiet" "emacs" "--batch" "--eval" `(progn (eldev-debug "Before")
-                                                                             (eldev-nest-debugging-output
-                                                                               (eldev-dump (+ 1 2)))
-                                                                             (eldev-debug "After")))
-    ;; See above for why `stdout'.
-    (should (string= stdout (eldev--test-lines "Before" "  (+ 1 2) = 3" "After")))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-emacs-project-isolation-1 ()
