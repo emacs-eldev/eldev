@@ -1810,15 +1810,14 @@ Since 0.2.")
             (with-temp-buffer
               (insert-file-contents desc-file)
               (goto-char (point-min))
-              (unwind-protect
-                  (let* ((pkg-def-parsed (read (current-buffer)))
-                         (pkg-desc
-                          (when (eq (car pkg-def-parsed) 'define-package)
-                            (apply #'package-desc-from-define
-                                   (append (cdr pkg-def-parsed))))))
-                    (when pkg-desc
-                      (setf (package-desc-kind pkg-desc) 'dir)
-                      pkg-desc))))
+              (let* ((pkg-def-parsed (read (current-buffer)))
+                     (pkg-desc
+                      (when (eq (car pkg-def-parsed) 'define-package)
+                        (apply #'package-desc-from-define
+                               (append (cdr pkg-def-parsed))))))
+                (when pkg-desc
+                  (setf (package-desc-kind pkg-desc) 'dir)
+                  pkg-desc)))
           (let ((files (directory-files default-directory t "\\.el\\'" t))
                 info)
             (while files
