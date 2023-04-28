@@ -907,7 +907,8 @@ Since 1.3."
       ;; precompute everything before switching buffers in the macroexpansion.
       (dolist (form forms)
         (if (eldev-literalp form)
-            (push `(insert ,(format "%s%s" (if dumping-forms "\n" "") form)) dumping-forms)
+            ;; `print-quoted' defaulted to nil up to Emacs 26.
+            (push `(insert ,(let ((print-quoted t)) (format "%s%s" (if dumping-forms "\n" "") form))) dumping-forms)
           (let ((variable (make-symbol (format "$%S" form))))
             (push `(,variable ,form) bindings)
             (push `(insert ,(format "%s%S = " (if dumping-forms "\n" "") form)) dumping-forms)
