@@ -41,6 +41,7 @@
   (declare (indent 3) (debug (sexp body)))
   (let ((actual-command-line `(list ,@command-line))
         (no-errors           (make-symbol "$no-errors"))
+        (discard-ansi        t)
         process-input-form
         important-values
         important-files
@@ -50,6 +51,7 @@
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
         (:process-input   (setf process-input-form (pop body)))
+        (:discard-ansi    (setf discard-ansi       (pop body)))
         (:important-value (push (pop body)         important-values))
         (:important-files (setf important-files    (eldev-listify (pop body))))
         (:previous-call   (let ((name (pop body))
@@ -65,7 +67,7 @@
            ;; Using `eldev-call-process' here mostly for a bit of testing for it.
            (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) ,actual-command-line)
              :destination  `(t ,stderr-file)
-             :discard-ansi t
+             :discard-ansi ,discard-ansi
              :infile       process-input-file
              (let* ((stdout    (buffer-string))
                     (stderr    (with-temp-buffer

@@ -1225,9 +1225,12 @@ Loading mode is not included.  Since 1.2."
        (`verbose "--verbose")
        (`trace   "--trace")
        (_        "--normal-output"))
-    ,(format "--color=%s" (if (eldev-output-colorized-p) "always" "never"))
+    ,(eldev--color-setting-option)
     ,(if load-prefer-newer "--load-newer" "--load-first")
     ,(if eldev-prefer-stable-archives "--stable" "--unstable")))
+
+(defun eldev--color-setting-option ()
+  (format "--color=%s" (if (eldev-output-colorized-p) "always" "never")))
 
 
 (defun eldev-set-up-secondary ()
@@ -5298,21 +5301,24 @@ Currently only Linux and macOS systems are supported."
             `(t ,(format eldev--docker-os-error-fmt-string system-type))))
   (unless (car parameters)
     (signal 'eldev-wrong-command-usage `(t "version not specified")))
-  (let* ((img (eldev--docker-determine-img (car parameters)))
-         (docker-exec (eldev-docker-executable))
-         (escaped-params (mapcar #'eldev-quote-sh-string (cdr parameters)))
-         (container-cmd (eldev--docker-container-eldev-cmd escaped-params))
-         (as-gui (and (string= "emacs" container-cmd)
-                      (not (member "--batch" parameters))))
-         (local-eldev (getenv "ELDEV_LOCAL"))
+  (let* ((img             (eldev--docker-determine-img (car parameters)))
+         (docker-exec     (eldev-docker-executable))
+         ;; We don't pass Eldev's global options, user needs to specify them for the child
+         ;; process explicitly if wanted.  But there is one exception: since Docker output
+         ;; is sent to the same terminal as the main process' output, it makes sense to
+         ;; synchronize coloring (can still be overridden).
+         (escaped-params  (mapcar #'eldev-quote-sh-string (cons (eldev--color-setting-option) (cdr parameters))))
+         (container-cmd   (eldev--docker-container-eldev-cmd escaped-params))
+         (as-gui          (and (string= "emacs" container-cmd)
+                               (not (member "--batch" parameters))))
+         (local-eldev     (getenv "ELDEV_LOCAL"))
          (exp-local-eldev (when local-eldev (expand-file-name local-eldev)))
          (eldev--container-bootstrap-cmd-fn
           (if local-eldev
               (apply-partially
                #'eldev--container-eldev-source-install-cmd "/eldev")
             eldev--container-bootstrap-cmd-fn))
-         (args (append
-                (eldev--docker-args img escaped-params as-gui exp-local-eldev))))
+         (args            (append (eldev--docker-args img escaped-params as-gui exp-local-eldev))))
     (unwind-protect
         (eldev-call-process docker-exec args
           :pre-execution (eldev-verbose "Full command line to run a Docker process:\n  %s"
