@@ -1125,8 +1125,11 @@ Returns COMMAND-LINE with options removed."
                 (push (pop command-line) eldev-preprocessed-command-line))))))
       (nreverse eldev-preprocessed-command-line))))
 
-(defun eldev-global-package-archive-cache-dir ()
-  (expand-file-name eldev-global-cache-dir eldev-dir))
+(defun eldev-global-package-archive-cache-dir (&optional ensure-exists)
+  (let ((cache-dir (expand-file-name eldev-global-cache-dir eldev-dir)))
+    (when ensure-exists
+      (make-directory cache-dir t))
+    cache-dir))
 
 (defun eldev-cache-dir (emacs-version-specific &optional ensure-exists)
   "Get the directory where various internal caches should be stored.
@@ -5212,8 +5215,8 @@ owned by root."
 
 ELDEV-ARGS will be appended to the eldev call in the container.
 
-The global config file and cache will be mounted unless
-`eldev-skip-global-config' is nil.
+Unless `eldev-skip-global-config' is nil, the global config file
+will be mounted for the process in Docker to access.
 
 If AS-GUI is non-nil include arguments necessary to run Emacs as a GUI.
 
@@ -5242,11 +5245,12 @@ contain a mount of it at /eldev."
               (list "-v" (format "%s:%s/eldev"
                                  (locate-file "bin/eldev" load-path)
                                  container-bin)))
-            (unless eldev-skip-global-config
-              (list "-v" (format "%s:%s/%s"
-                                 (eldev-global-package-archive-cache-dir)
-                                 container-eldev-cache-dir
-                                 eldev-global-cache-dir)))
+            (list "-v" (format "%s:%s/%s"
+                               ;; Make sure the directory exists, else the process in
+                               ;; Docker may create it with wrong owner/group.
+                               (eldev-global-package-archive-cache-dir t)
+                               container-eldev-cache-dir
+                               eldev-global-cache-dir))
             (unless (or eldev-skip-global-config
                         (not (file-exists-p eldev-user-config-file)))
               (list "-v" (format "%s:%s/config"
