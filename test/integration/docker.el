@@ -6,6 +6,11 @@
 (defvar eldev--test-docker-img-installed nil)
 
 
+;; Emacs 25-27 gets confused otherwise, probably because we "call" the function from
+;; another macro, `eldev--test-run-in-docker'.
+(declare-function skip-unless nil)
+
+
 (defmacro eldev--test-run-in-docker (test-project command-line &rest body)
   (declare (indent 2) (debug (stringp sexp body)))
   (let ((image (cadr (member "docker" command-line))))
