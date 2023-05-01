@@ -53,6 +53,11 @@ jobs:
 
     - name: Test the project
       run: |
+        # In some older Emacs versions there was a bug where the most
+        # important stacktrace part with the error would be cut if the
+        # stacktrace was too long.  Just set it to a large number in
+        # `Eldev-local' and thus have if for the following steps too.
+        echo "(setf debugger-batch-max-lines 10000)" >> Eldev-local
         ./bin/eldev -p -dtTC test --omit-backtraces --expect 400
       env:
         ELDEV_LOCAL: "."
