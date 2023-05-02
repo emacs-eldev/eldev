@@ -5135,12 +5135,6 @@ be passed to Emacs, else it will most likely fail."
 (defvar eldev-docker-run-extra-args nil
   "Extra arguments to pass to \"docker run\".")
 
-(defvar eldev--container-bootstrap-cmd-fn
-  #'eldev--container-bootstrap-cmd-fn
-  "Function to determine the command used by \"docker run\".
-
-It should take one parameter: the arguments of the \"eldev\" call.")
-
 (defvar eldev--docker-home-name "docker-home"
   "Name of the home directory of the docker user.")
 
@@ -5148,7 +5142,8 @@ It should take one parameter: the arguments of the \"eldev\" call.")
   "OS %s is not currently supported by \"eldev docker\""
   "Error message format string if the os is not supported.")
 
-(defun eldev--container-bootstrap-cmd-fn (eldev-args)
+
+(defun eldev--container-bootstrap-cmd (eldev-args)
   "Return a command in the form of an argument list for \"docker run\".
 
 ELDEV-ARGS will be passed to an \"eldev\" call."
@@ -5218,10 +5213,11 @@ ELDEV-ARGS will be appended to the eldev call in the container.
 Unless `eldev-skip-global-config' is nil, the global config file
 will be mounted for the process in Docker to access.
 
-If AS-GUI is non-nil include arguments necessary to run Emacs as a GUI.
+If AS-GUI is non-nil include arguments necessary to run Emacs in
+GUI mode.
 
-If LOCAL-ELDEV (a directory) is specified, the returned arguments will
-contain a mount of it at /eldev."
+If LOCAL-ELDEV (a directory) is specified, the returned arguments
+will contain a mount of it at `/eldev'."
   (let* ((container-project-dir (file-name-nondirectory
                                  (directory-file-name eldev-project-dir)))
          (container-home (concat "/"
@@ -5258,8 +5254,7 @@ contain a mount of it at /eldev."
                                  container-eldev-cache-dir)))
             (eldev--docker-local-dep-mounts container-home)
             eldev-docker-run-extra-args
-            (cons img (funcall eldev--container-bootstrap-cmd-fn
-                               (mapconcat #'identity eldev-args " "))))))
+            (cons img eldev-args))))
 
 (defun eldev--docker-container-eldev-cmd (args)
   "Return the eldev command to call in the docker container deduced from ARGS."
@@ -5316,13 +5311,13 @@ Currently only Linux and macOS systems are supported."
          (as-gui          (and (string= "emacs" container-cmd)
                                (not (member "--batch" parameters))))
          (local-eldev     (getenv "ELDEV_LOCAL"))
-         (exp-local-eldev (when local-eldev (expand-file-name local-eldev)))
-         (eldev--container-bootstrap-cmd-fn
-          (if local-eldev
-              (apply-partially
-               #'eldev--container-eldev-source-install-cmd "/eldev")
-            eldev--container-bootstrap-cmd-fn))
-         (args            (append (eldev--docker-args img escaped-params as-gui exp-local-eldev))))
+         (exp-local-eldev (when (> (length local-eldev) 0) (expand-file-name local-eldev)))
+         (command-line    (mapconcat #'identity escaped-params " "))
+         (args            (eldev--docker-args img
+                                              (if exp-local-eldev
+                                                  (eldev--container-eldev-source-install-cmd "/eldev" command-line)
+                                                (eldev--container-bootstrap-cmd command-line))
+                                              as-gui exp-local-eldev)))
     (unwind-protect
         (eldev-call-process docker-exec args
           :pre-execution (eldev-verbose "Full command line to run a Docker process:\n  %s"
