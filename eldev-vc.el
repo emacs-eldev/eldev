@@ -208,7 +208,7 @@ Since 1.2."
          autoloads
          .ignore)
     (if eldev-init-interactive
-        (cond (requirements
+        (cond ((eldev-any-p (not (eq (car-safe it) 'emacs)) requirements)
                (when (eldev-y-or-n-p "Try to automatically select package archive(s) for dependency lookup? ")
                  (eldev-print "Please wait, this might take a while...")
                  (dolist (archive eldev--known-package-archives)
@@ -241,7 +241,7 @@ Since 1.2."
                  (when (eq archives-to-use t)
                    (eldev-warn "Failed to autoguess needed package archives; please edit `%s' as appropriate later" eldev-file))))
               (package
-               (eldev-print "This project has no dependencies (yet)")))
+               (eldev-print "This project has no dependencies (yet), not activating any archives")))
       (eldev-trace (cond (requirements
                           "Not in interactive mode, not autodetermining package archives to use")
                          (package
