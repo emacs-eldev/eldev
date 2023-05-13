@@ -126,7 +126,7 @@ be executed via `install.sh'."
     ;; Several duplicates with bootstrapping code, but I think it's
     ;; one of those rare cases where this is fine.
     (let* ((eldev--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
-           (package-user-dir     (expand-file-name "bootstrap" (expand-file-name eldev--emacs-version eldev-dir))))
+           (package-user-dir     (expand-file-name "bootstrap" (expand-file-name eldev--emacs-version (eldev-global-cache-dir)))))
       (eldev-install-package-file (expand-file-name (format "dist/eldev-%s.tar" (eldev-message-version (eldev-package-descriptor))))))
     (eldev-print "Installation complete%s"
                  (if (eldev-directory-in-exec-path directory)

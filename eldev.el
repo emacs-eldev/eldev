@@ -101,7 +101,9 @@ instead.")
                         (when (file-directory-p "~/.eldev") "~/.eldev")
                         (expand-file-name "eldev" (eldev-xdg-cache-home)))
   "User's Eldev cache directory, usually `~/.cache/eldev'.
-This directory is global, i.e. not project-specific.")
+This directory is global, i.e. not project-specific.  Since 1.4
+function `eldev-global-cache-dir' can be used to access this
+value.")
 
 (defconst eldev-user-config-file (expand-file-name "config"
                                                    (or (eldev-getenv "ELDEV_DIR")
@@ -121,7 +123,9 @@ This file is global, i.e. not project-specific.")
 See also function `eldev-cache-dir'.")
 
 (defconst eldev-global-cache-dir "global-cache"
-  "Name of the global package cache directory (a subdirectory of `eldev-dir').")
+  "Name of the global package cache directory (a subdirectory of `eldev-dir').
+Since 1.4 function `eldev-global-package-archive-cache-dir' can
+be used instead.")
 
 (defvar eldev--internal-pseudoarchive "--eldev--")
 
@@ -1125,8 +1129,20 @@ Returns COMMAND-LINE with options removed."
                 (push (pop command-line) eldev-preprocessed-command-line))))))
       (nreverse eldev-preprocessed-command-line))))
 
+(defun eldev-global-cache-dir (&optional ensure-exists)
+  "Return `eldev-dir', possibly ensuring that it exists.
+This function always returns an absolute path, even if the value
+of `eldev-dir' is not absolute.  Since 1.4."
+  (let ((cache-dir (expand-file-name eldev-dir)))
+    (when ensure-exists
+      (make-directory cache-dir t))
+    cache-dir))
+
 (defun eldev-global-package-archive-cache-dir (&optional ensure-exists)
-  (let ((cache-dir (expand-file-name eldev-global-cache-dir eldev-dir)))
+  "Return the `global-archive' subdirectory of `eldev-dir'.
+If instructed, this function also makes sure that the directory
+exists.  Since 1.4."
+  (let ((cache-dir (expand-file-name eldev-global-cache-dir (eldev-global-cache-dir))))
     (when ensure-exists
       (make-directory cache-dir t))
     cache-dir))
@@ -1244,7 +1260,7 @@ Loading mode is not included.  Since 1.2."
     (if (or (= (length eldev-local) 0) (string-prefix-p ":pa:" eldev-local))
         (progn (let ((package-user-dir (expand-file-name "bootstrap"
                                                          (expand-file-name (format "%s.%s" emacs-major-version emacs-minor-version)
-                                                                           eldev-dir))))
+                                                                           (eldev-global-cache-dir)))))
                  (package-initialize t)
                  (unless (package-activate 'eldev)
                    (eldev-warn "Cannot activate Eldev package")))
@@ -1943,7 +1959,7 @@ sources will be replaced with a package downloaded from MELPA."
   :works-on-old-eldev t
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
-  (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) eldev-dir)))
+  (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) (eldev-global-cache-dir))))
     (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t))
   (when eldev-upgrade-self-script
     (eldev--upgrade-self-script)))
@@ -5143,27 +5159,6 @@ be passed to Emacs, else it will most likely fail."
   "Error message format string if the os is not supported.")
 
 
-(defun eldev--container-bootstrap-cmd (eldev-args)
-  "Return a command in the form of an argument list for \"docker run\".
-
-ELDEV-ARGS will be passed to an \"eldev\" call."
-  (list
-   "sh" "-c"
-   (format "export PATH=\"$HOME/bin:$PATH\" && eldev %s" eldev-args)))
-
-(defun eldev--container-eldev-source-install-cmd (eldev-src-repo-dir eldev-args)
-  "Return command for \"docker run\" that will install eldev from source.
-
-Return a command that installs eldev from the source repository
-ELDEV-SRC-REPO-DIR (a full path on the container), and then calls eldev
-with ELDEV-ARGS."
-  (list
-   "sh" "-c"
-   (format "ELDEV_LOCAL=%s %s/bin/eldev %s"
-           eldev-src-repo-dir
-           eldev-src-repo-dir
-           eldev-args)))
-
 (defun eldev--docker-determine-img (img-string)
   "Return an appropriate docker image based on IMG-STRING."
   (if (string-match-p ".*/.*" img-string)
@@ -5241,12 +5236,11 @@ will contain a mount of it at `/eldev'."
               (list "-v" (format "%s:%s/eldev"
                                  (locate-file "bin/eldev" load-path)
                                  container-bin)))
-            (list "-v" (format "%s:%s/%s"
-                               ;; Make sure the directory exists, else the process in
-                               ;; Docker may create it with wrong owner/group.
-                               (eldev-global-package-archive-cache-dir t)
-                               container-eldev-cache-dir
-                               eldev-global-cache-dir))
+            ;; Let Eldev inside Docker reuse the global cache — also across invocations! —
+            ;; for bootstrapped Eldev package and the global package archive cache.  Make
+            ;; sure the directory exists, else the process inside Docker may create it
+            ;; with wrong owner/group.
+            (list "-v" (format "%s:%s" (eldev-global-cache-dir t) container-eldev-cache-dir))
             (unless (or eldev-skip-global-config
                         (not (file-exists-p eldev-user-config-file)))
               (list "-v" (format "%s:%s/config"
@@ -5314,9 +5308,10 @@ Currently only Linux and macOS systems are supported."
          (exp-local-eldev (when (> (length local-eldev) 0) (expand-file-name local-eldev)))
          (command-line    (mapconcat #'identity escaped-params " "))
          (args            (eldev--docker-args img
+                                              ;; The relevant virtual Docker mount is supposed to be added later.
                                               (if exp-local-eldev
-                                                  (eldev--container-eldev-source-install-cmd "/eldev" command-line)
-                                                (eldev--container-bootstrap-cmd command-line))
+                                                  `("sh" "-c" ,(format "ELDEV_LOCAL=/eldev /eldev/bin/eldev %s"      command-line))
+                                                `("sh"   "-c" ,(format "export PATH=\"$HOME/bin:$PATH\" && eldev %s" command-line)))
                                               as-gui exp-local-eldev)))
     (unwind-protect
         (eldev-call-process docker-exec args
