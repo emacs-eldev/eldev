@@ -337,14 +337,15 @@ This function may only be called while inside the body of a
                         (if (> num 3) (eldev-colorize (eldev-format-message " + %d more" (- num 3)) 'details) "")))))))
 
 
-(defun eldev--do-build (parameters)
+(defun eldev--do-build (parameters &optional dont-touch-packages)
   ;; When building, project loading mode is ignored.  The reason is that building itself
   ;; can involve compiling or packaging.
   (run-hooks 'eldev-build-system-hook)
-  (let ((eldev-project-loading-mode 'as-is))
-    (when (memq 'test eldev-build-sets)
-      (eldev--inject-loading-roots 'test))
-    (eldev-load-project-dependencies 'build nil t))
+  (unless dont-touch-packages
+    (let ((eldev-project-loading-mode 'as-is))
+      (when (memq 'test eldev-build-sets)
+        (eldev--inject-loading-roots 'test))
+      (eldev-load-project-dependencies 'build nil t)))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))
         target-list
         target-fileset
@@ -392,8 +393,9 @@ This function may only be called while inside the body of a
         ;; would be problematic if this build process was not the main invocation,
         ;; e.g. was only invoked from `autoloads' plugin.  For now, simply always "unload"
         ;; the main package: in the main invocation simply nothing would happen afterwards
-        ;; anyway.
-        (eldev--unload-package (package-desc-name (eldev-package-descriptor)))
+        ;; anyway.  The only exception is when compiling on-demand.
+        (unless dont-touch-packages
+          (eldev--unload-package (package-desc-name (eldev-package-descriptor))))
         (when anything-failed
           (signal 'eldev-error `("Build failed")))))))
 
@@ -550,7 +552,6 @@ possible to build arbitrary targets this way."
 
 (defvar eldev--recursive-byte-compilation   nil)
 (defvar eldev--recursive-elevated-errors-in nil)
-(defvar eldev--feature-providers            (make-hash-table :test #'eq))
 
 (defun eldev--byte-compile-.el (source target)
   (eval-and-compile (require 'bytecomp))
@@ -625,6 +626,7 @@ possible to build arbitrary targets this way."
                            (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
                            nil)
                           (result
+                           ;; Keep in sync with `eldev--do-byte-compile-.el-on-demand'.
                            (when eldev-build-load-before-byte-compiling
                              ;; Load ourselves, since `byte-compile-file' calls `load'
                              ;; without `nomessage' parameter.  Byte-compiled file should
@@ -670,6 +672,31 @@ possible to build arbitrary targets this way."
                                                (mapcar (lambda (entry) `(inherits ,(eldev-replace-suffix (cdr entry) ".el" ".elc")))
                                                        inherited-targets))))))))))
 
+(defvar eldev--byte-compile-.el-on-demand-recursing-for nil)
+
+(defun eldev--do-byte-compile-.el-on-demand (source)
+  (unless (member source eldev--byte-compile-.el-on-demand-recursing-for)
+    (let ((eldev--byte-compile-.el-on-demand-recursing-for eldev--byte-compile-.el-on-demand-recursing-for)
+          (target (eldev-replace-suffix source ".el" ".elc")))
+      (push source eldev--byte-compile-.el-on-demand-recursing-for)
+      (if (and eldev--build-plan (eq (eldev-build-target-status target) 'planned))
+          (eldev-build-target target)
+        ;; This initializes build system even if it is already up, but hasn't planned to
+        ;; build the target previously.  Happens in `compiled-on-demand' loading mode with
+        ;; nested `require', i.e. is a pretty common situation.  Maybe something could be
+        ;; optimized to avoid this.
+        ;;
+        ;; To be consistent with how loading in other modes work, make compilation very
+        ;; quiet here.  Warnings and errors will still be shown, though, possibly in the
+        ;; middle of actual project's output — but that is an unavoidable side-effect of
+        ;; on-demand compilation.
+        (let ((eldev-verbosity-level 'quiet))
+          (eldev--do-build (list target) t)
+          ;; Keep in sync with `eldev--byte-compile-.el'.  Force-load the byte-compiled
+          ;; file now, to replace raw Lisp functions with faster byte-compiled versions.
+          (unless eldev-build-load-before-byte-compiling
+            (load target nil t t)))))))
+
 (defun eldev--trigger-early-byte-compilation (file)
   (when (stringp file)
     ;; Reset `default-directory', because it can have been changed e.g. when called from
@@ -679,36 +706,8 @@ possible to build arbitrary targets this way."
       (unless (or (eldev-external-or-absolute-filename file)
                   (not (eldev-external-or-absolute-filename (file-relative-name file eldev-cache-dir))))
         (setf file (eldev-replace-suffix file ".el" ".elc"))
-        (let ((status (eldev-build-target-status file)))
-          (when (eq status 'planned)
-            (eldev-build-target file)))))))
-
-(defun eldev--find-feature-provider (feature)
-  (or (gethash feature eldev--feature-providers)
-      (puthash feature
-               (if (featurep feature)
-                   (let ((scan     load-history)
-                         (look-for `(provide . ,feature))
-                         (provider 'built-in))
-                     (while scan
-                       (let ((entry (pop scan)))
-                         (when (member look-for (cdr entry))
-                           (setf provider (eldev--validate-el-feature-source (car entry))
-                                 scan     nil))))
-                     provider)
-                 (eldev--validate-el-feature-source (locate-file (symbol-name feature) load-path '(".el" ".elc"))))
-               eldev--feature-providers)))
-
-(defun eldev--validate-el-feature-source (filename)
-  (or (when filename
-        (setf filename (file-relative-name filename eldev-project-dir))
-        (if (or (eldev-external-or-absolute-filename filename)
-                (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
-            'external
-          (setf filename (eldev-replace-suffix filename ".elc" ".el"))
-          (when (file-exists-p (expand-file-name filename eldev-project-dir))
-            filename)))
-      'unknown))
+        (when (eq (eldev-build-target-status file) 'planned)
+          (eldev-build-target file))))))
 
 
 (defun eldev--do-package (sources targets)

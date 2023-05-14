@@ -299,10 +299,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     external-dir))
 
 
+(defun eldev--test-file (file &optional test-project)
+  (expand-file-name file (eldev--test-project-dir test-project)))
+
 (defun eldev--test-file-contents (test-project file &optional not-required)
   (condition-case error
       (with-temp-buffer
-        (insert-file-contents (expand-file-name file (eldev--test-project-dir test-project)))
+        (insert-file-contents (eldev--test-file file test-project))
         (buffer-string))
     (file-error (unless not-required
                   (signal (car error) (cdr error))))))
@@ -310,7 +313,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 (defmacro eldev--test-with-file-buffer (test-project file &rest body)
   "Execute in a buffer with FILE from TEST-PROJECT and write results back."
   (declare (indent 2) (debug (stringp sexp body)))
-  `(eldev-with-file-buffer (expand-file-name ,file (eldev--test-project-dir ,test-project))
+  `(eldev-with-file-buffer (eldev--test-file ,file ,test-project)
      ,@body))
 
 (defmacro eldev--test-capture-output (&rest body)
@@ -378,7 +381,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 (defun eldev--test-find-files (directory)
   ;; Not using `eldev-find-files' if easily possible (Emacs 25 and
-  ;; up) to avoid tests depending on its correctness.
+  ;; up) to avoid making tests depend on its correctness.
   (let (files)
     (if (fboundp #'directory-files-recursively)
         (dolist (file (directory-files-recursively directory (rx (1+ any))))

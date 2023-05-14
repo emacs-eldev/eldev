@@ -139,18 +139,23 @@ This is the recommended mode for continuous integration and other ways
 of automated testing, because it loads in exactly the same manner most
 users will use the project.")
     (source
-     . "Clean project's or dependency's working directory before loading.  As
-a result, Elisp functions in it are not byte-compiled.")
+     . "Clean project's or dependency's working directory first.  As a result,
+Elisp functions in it are not byte-compiled.")
     (byte-compiled
-     . "Compile `.el' files before loading.  This will make Elisp functions
-faster, but backtraces less informative.")
+     . "Compile all `.el' files first.  This will make Elisp functions faster,
+but backtraces less informative.")
+    (compiled-on-demand
+     . "Compile `.el' files only when they are being `require'd.  For larger
+projects this allows to avoid recompiling everything just to test some
+core functionality.  Even more important if higher-level files do not
+even compile at the moment, but you still want to run tests on the
+byte-compiled core.")
     (built
-     . "Build project or dependency before loading.  Only important for those
-projects that define custom rules, i.e. where target `:default' is not
-empty.")
+     . "Build project or dependency first.  Only important for those projects
+that define custom rules, i.e. where target `:default' is not empty.")
     (built-and-compiled
-     . "Build and byte-compile before loading.  Exactly as `built' and
-`compiled' combined.")
+     . "Build and byte-compile first.  Exactly as `built' and `compiled'
+combined.")
     (built-source
      . "Clean the project or dependency, then build target `:default'.  See
 `source' and `built' modes for more explanations.")))
@@ -543,7 +548,7 @@ truncate backtrace lines"
   (let ((modes eldev--loading-modes))
     (while modes
       (let ((mode (pop modes)))
-        (eldev-output "%s\n\n%s" (eldev-colorize (car mode) 'section) (cdr mode))
+        (eldev-output "%s\n\n%s" (eldev-colorize (car mode) 'section) (eldev-format-message (cdr mode)))
         (when modes
           (eldev-output "\n")))))
   (signal 'eldev-quit 0))
@@ -571,6 +576,12 @@ truncate backtrace lines"
   :options        (-c --byte-compiled)
   :hidden-if      (eq eldev-project-loading-mode 'byte-compiled)
   (eldev-set-loading-mode 'byte-compiled))
+
+(eldev-defoption eldev-set-loading-mode-compiled-on-demand ()
+  "Shorthand for `--loading=compiled-on-demand'"
+  :options        (-o --compiled-on-demand)
+  :hidden-if      (eq eldev-project-loading-mode 'compiled-on-demand)
+  (eldev-set-loading-mode 'compiled-on-demand))
 
 (eldev-defbooloptions eldev-load-prefer-newer-mode eldev-load-first-mode load-prefer-newer
   ("Set `load-prefer-newer' to t"
@@ -853,7 +864,8 @@ Used by Eldev startup script."
                                  (package-user-dir (or external-dir package-user-dir)))
                             (setf command-line (eldev-parse-options command-line nil t))
                             (if command-line
-                                (let (archive-files-to-delete)
+                                (let ((compile-on-demand-sources (when (eq eldev-project-loading-mode 'compiled-on-demand) (list nil)))
+                                      archive-files-to-delete)
                                   ;; If we are using external directory, maybe rename
                                   ;; archives so that they don't clash with what is
                                   ;; retrieved in that directory already.
@@ -863,8 +875,26 @@ Used by Eldev startup script."
                                     (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
                                   (setf command (intern (car command-line)))
                                   (unwind-protect
-                                      (progn (eldev--execute-command command-line)
-                                             (setf exit-code 0))
+                                      (eldev-advised (#'load :before (when compile-on-demand-sources
+                                                                       (lambda (file &optional _noerror _nomessage nosuffix &rest _ignored)
+                                                                         (unless nosuffix
+                                                                           (let ((default-directory eldev-project-dir))
+                                                                             (let ((relative-name (file-relative-name file)))
+                                                                               ;; Ignore files outside the project or inside Eldev's local project cache (e.g. from dependencies).
+                                                                               (unless (or (eldev-external-or-absolute-filename relative-name)
+                                                                                           (not (eldev-external-filename (file-relative-name relative-name eldev-cache-dir))))
+                                                                                 (when (if (file-exists-p relative-name)
+                                                                                           (string-suffix-p ".el" relative-name)
+                                                                                         (file-exists-p (setf relative-name (concat relative-name ".el"))))
+                                                                                   (eldev--byte-compile-.el-on-demand relative-name compile-on-demand-sources)))))))))
+                                        ;; See comments in `eldev--byte-compile-.el'.
+                                        (eldev-advised (#'require :before (when compile-on-demand-sources
+                                                                            (lambda (feature &optional filename &rest _ignored)
+                                                                              (unless (and feature (memq feature features))
+                                                                                (let ((default-directory eldev-project-dir))
+                                                                                  (eldev--byte-compile-.el-on-demand (or filename (eldev--find-feature-provider feature)) compile-on-demand-sources))))))
+                                          (eldev--execute-command command-line)
+                                          (setf exit-code 0)))
                                     (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
                                       (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
                                                    (eldev-message-enumerate nil archive-files-to-delete))
@@ -1468,8 +1498,10 @@ in `package-archives', it returns VALUE-IF-NOT-USED."
   "Use local dependency found in DIR.
 See the manual for more information about local dependencies."
   (if loading-mode
-      (unless (assq loading-mode eldev--loading-modes)
-        (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
+      (progn (unless (assq loading-mode eldev--loading-modes)
+               (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
+             (when (eq loading-mode 'compiled-on-demand)
+               (error "Loading mode `%s' is not supported for local dependencies" loading-mode)))
     (setf loading-mode 'as-is))
   (setf dir (file-name-as-directory dir))
   (let* ((absolute-dir (expand-file-name dir eldev-project-dir))
@@ -2421,17 +2453,21 @@ Since 0.2."
                                                                                 (cond ((eq dependency-name package-name)               "project")
                                                                                       ((or recursing (eldev--loading-mode dependency)) "local dependency")
                                                                                       (t                                               "dependency"))
-                                                                                dependency-name)))
-                                    (eldev-pcase-exhaustive (unless recursing (eldev--loading-mode dependency))
+                                                                                dependency-name))
+                                         (loading-mode    (unless recursing (eldev--loading-mode dependency))))
+                                    (eldev-pcase-exhaustive loading-mode
                                       (`nil
                                        (eldev-trace "Activating %s..." description)
                                        (or (let ((inhibit-message t))
                                              (apply original dependency rest))
                                            (progn (setf missing-dependency dependency-name)
                                                   nil)))
-                                      ;; In all these modes dependency is activated in exactly the same
-                                      ;; way, the difference is in `eldev--load-local-dependency'.
-                                      ((or `as-is `source `byte-compiled `built `built-and-compiled `built-source)
+                                      ;; In all these modes dependency is activated in exactly the same way,
+                                      ;; the difference is in `eldev--load-local-dependency'.  Special
+                                      ;; handling of mode `compiled-on-demand' is performed elsewhere.
+                                      ((or `as-is `source `byte-compiled `compiled-on-demand `built `built-and-compiled `built-source)
+                                       (when (and (eq loading-mode 'compiled-on-demand) (not (eq dependency-name package-name)))
+                                         (error "Loading mode `%s' is not supported for local dependencies" loading-mode))
                                        (dolist (requirement (package-desc-reqs dependency))
                                          (unless (package-activate (car requirement))
                                            (throw 'exit nil)))
@@ -2825,22 +2861,23 @@ descriptor."
          (dependency-dir  (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-dependencies))))
          ;; For project itself autoloads are handled differently.  For other loading mode
          ;; they get built without special care.
-         (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled)))
+         (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled compiled-on-demand)))
                             (eldev--cross-project-internal-eval dependency-dir '(not (null (memq 'autoloads (eldev-active-plugins)))) t))))
     (when (cdr (assq dependency-name package-alist))
       (error "Local dependency `%s' is already listed in `package-alist'" dependency-name))
     ;; FIXME: Special-case project itself: no need to launch separate process(es) for it.
     ;; I don't want to move this into an alist, to avoid fixing the way it works.
     (let ((commands (eldev-pcase-exhaustive loading-mode
-                      (`as-is               (when build-autoloads `(("build" ":autoloads"))))
-                      (`source              `(("clean" ".elc" "--set" "main" "--delete")
-                                              ,@(when build-autoloads `(("build" ":autoloads")))))
-                      (`byte-compiled       `(("build" ":compile" ,@(when build-autoloads `(":autoloads")))))
-                      (`built               `(("build" ":default")))
-                      (`built-and-compiled  `(("build" ":default" ":compile")))
-                      (`built-source        `(("clean" ".elc" "--set" "main" "--delete")
-                                              ("build" ":default")))
-                      (`packaged            `(("package" "--output-dir" ,(expand-file-name "local/generated" (eldev-cache-dir t)) "--print-filename"))))))
+                      (`as-is              (when build-autoloads `(("build" ":autoloads"))))
+                      (`source             `(("clean" ".elc" "--set" "main" "--delete")
+                                             ,@(when build-autoloads `(("build" ":autoloads")))))
+                      (`byte-compiled      `(("build" ":compile" ,@(when build-autoloads `(":autoloads")))))
+                      (`compiled-on-demand nil)
+                      (`built              `(("build" ":default")))
+                      (`built-and-compiled `(("build" ":default" ":compile")))
+                      (`built-source       `(("clean" ".elc" "--set" "main" "--delete")
+                                             ("build" ":default")))
+                      (`packaged           `(("package" "--output-dir" ,(expand-file-name "local/generated" (eldev-cache-dir t)) "--print-filename"))))))
       (when commands
         (if project-itself
             (eldev-verbose "Preparing to load the project in mode `%s'" loading-mode)
@@ -5421,6 +5458,8 @@ In addition to t or nil, can also be symbol `concise'.")
 (defvar eldev--package-target-file nil)
 (defvar eldev--package-target-generated nil)
 
+(defvar eldev--feature-providers (make-hash-table :test #'eq))
+
 
 (defsubst eldev-virtual-target-p (target)
   (string-prefix-p ":" target))
@@ -5728,6 +5767,7 @@ as two last lines of output"
 
 
 (declare-function eldev--byte-compile-.el 'eldev-build)
+(declare-function eldev--do-byte-compile-.el-on-demand 'eldev-build)
 
 (eldev-defbuilder eldev-builder-byte-compile-.el (source target)
   :short-name     "ELC"
@@ -5743,6 +5783,19 @@ as two last lines of output"
   :profiling-self t
   (require 'eldev-build)
   (eldev--byte-compile-.el source target))
+
+(defun eldev--byte-compile-.el-on-demand (file all-source-files)
+  ;; Ignore non-string files: this will happen if advice for `require' is called for a feature not within the
+  ;; project being built.
+  (when (and (stringp file) (file-newer-than-file-p file (eldev-replace-suffix file ".el" ".elc")))
+    (unless (car all-source-files)
+      (let ((main-el-files (make-hash-table :test #'equal)))
+        (dolist (source (eldev-find-files `(:and ,(eldev-standard-fileset 'main) "*.el")))
+          (puthash source t main-el-files))
+        (setf (car all-source-files) main-el-files)))
+    (when (gethash file (car all-source-files))
+      (require 'eldev-build)
+      (eldev--do-byte-compile-.el-on-demand file))))
 
 
 (eldev-defbuilder eldev-builder-makeinfo (source target)
@@ -5811,6 +5864,33 @@ Since 1.3."
                  (push target all-generated)))
              (eldev-build-find-targets))
     all-generated))
+
+(defun eldev--find-feature-provider (feature)
+  (or (gethash feature eldev--feature-providers)
+      (puthash feature
+               (if (featurep feature)
+                   (let ((scan     load-history)
+                         (look-for `(provide . ,feature))
+                         (provider 'built-in))
+                     (while scan
+                       (let ((entry (pop scan)))
+                         (when (member look-for (cdr entry))
+                           (setf provider (eldev--validate-el-feature-source (car entry))
+                                 scan     nil))))
+                     provider)
+                 (eldev--validate-el-feature-source (locate-file (symbol-name feature) load-path '(".el" ".elc"))))
+               eldev--feature-providers)))
+
+(defun eldev--validate-el-feature-source (filename)
+  (or (when filename
+        (setf filename (file-relative-name filename eldev-project-dir))
+        (if (or (eldev-external-or-absolute-filename filename)
+                (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))
+            'external
+          (setf filename (eldev-replace-suffix filename ".elc" ".el"))
+          (when (file-exists-p (expand-file-name filename eldev-project-dir))
+            filename)))
+      'unknown))
 
 
 
