@@ -106,9 +106,11 @@ Functions and macros above also come in “conditional” form: just add
 `x` before function name, e.g. `eldev-xdebug`, `eldev-xdump`, etc.
 These functions by default do nothing, but can be activated or
 deactivated using `eldev-enabling-xdebug`, `eldev-disabling-xdebug`
-and `eldev-maybe-xdebug` macros.  Appropriate usage can drastically
-reduce debugging output size in a deeply nested calltree and limit it
-to only relevant (to the bug you are investigating) portions.
+and `eldev-maybe-xdebug` macros.  Global option `-x` also activates
+them initially (can still be deactivated programmatically later).
+Appropriate usage can drastically reduce debugging output size in a
+deeply nested calltree and limit it to only relevant (to the bug you
+are investigating) portions.
 
 Another technique to reduce debugging output is to activate it only
 after the project has been fully loaded and initialized — depending on
