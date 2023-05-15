@@ -2,6 +2,7 @@ Eldev-local
 .eldev
 
 *.elc
+.flycheck_*.el
 
 /dist
 /htmldoc
