@@ -602,7 +602,7 @@ example) can be redirected in interactive use as follows:
 
 Since 1.3.")
 
-(defvar eldev-xdebuging-output-enabled nil
+(defvar eldev-xdebug-output-enabled nil
   "Set if optional debugging output is enabled.
 This shouldn't be set directly, instead use `eldev-maybe-xdebug',
 `eldev-enabling-xdebug', `eldev-disabling-xdebug' or let-bind
@@ -886,9 +886,9 @@ Since 1.3."
 
 (defmacro eldev-xdebug (format-string &rest arguments)
   "As `eldev-debug', but only if optional debugging output is enabled.
-Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Otherwise does nothing.  See `eldev-xdebug-output-enabled'.
 Since 1.4."
-  `(when eldev-xdebuging-output-enabled
+  `(when eldev-xdebug-output-enabled
      (eldev-debug ,format-string ,@arguments)))
 
 (defmacro eldev-dump (&rest forms)
@@ -920,9 +920,9 @@ Since 1.3."
 
 (defmacro eldev-xdump (&rest forms)
   "As `eldev-dump', but only if optional debugging output is enabled.
-Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Otherwise does nothing.  See `eldev-xdebug-output-enabled'.
 Since 1.4."
-  `(when eldev-xdebuging-output-enabled
+  `(when eldev-xdebug-output-enabled
      (eldev-dump ,@forms)))
 
 (defmacro eldev-time-it (format-string &rest body)
@@ -950,31 +950,31 @@ Since 1.4."
 
 (defmacro eldev-xtime-it (format-string &rest body)
   "As `eldev-time-it', but only if optional debugging output is enabled.
-Otherwise does nothing.  See `eldev-xdebuging-output-enabled'.
+Otherwise does nothing.  See `eldev-xdebug-output-enabled'.
 Since 1.4."
   (declare (indent 1) (debug (stringp body)))
-  `(when eldev-xdebuging-output-enabled
+  `(when eldev-xdebug-output-enabled
      (eldev-time-it ,format-string ,@body)))
 
 (defmacro eldev-maybe-xdebug (condition &rest body)
-  "Evalue BODY, conditionally enabling `eldev-xdebug' output in it.
+  "Evaluate BODY, conditionally enabling `eldev-xdebug' output in it.
 Since 1.4."
   (declare (indent 0) (debug (body)))
-  `(let ((eldev-xdebuging-output-enabled ,condition))
+  `(let ((eldev-xdebug-output-enabled ,condition))
      ,@body))
 
 (defmacro eldev-enabling-xdebug (&rest body)
-  "Evalue BODY, enabling `eldev-xdebug' output in it.
+  "Evaluate BODY, enabling `eldev-xdebug' output in it.
 Since 1.4."
   (declare (indent 0) (debug (body)))
-  `(let ((eldev-xdebuging-output-enabled t))
+  `(let ((eldev-xdebug-output-enabled t))
      ,@body))
 
 (defmacro eldev-disabling-xdebug (&rest body)
-  "Evalue BODY, disabling `eldev-xdebug' output in it.
+  "Evaluate BODY, disabling `eldev-xdebug' output in it.
 Since 1.4."
   (declare (indent 0) (debug (body)))
-  `(let ((eldev-xdebuging-output-enabled nil))
+  `(let ((eldev-xdebug-output-enabled nil))
      ,@body))
 
 (defmacro eldev-nest-debugging-output (&rest body)
@@ -1222,6 +1222,13 @@ postprocessed) result of a call to `backtrace-frames' or
 `backtrace-get-frames'.  All frames before the innermost call to
 BACKTRACE-FUNCTION are dropped."
   (eldev-output :stderr "%s" (eldev-backtrace-to-string frames (or backtrace-function #'eldev-backtrace))))
+
+(defmacro eldev-xbacktrace (&optional frames backtrace-function)
+  "As `eldev-backtrace', but only if optional debugging output is enabled.
+Otherwise does nothing.  See `eldev-xdebug-output-enabled'.
+Since 1.4."
+  `(when eldev-xdebug-output-enabled
+     (eldev-backtrace ,frames ,backtrace-function)))
 
 (defun eldev-backtrace-to-string (&optional frames backtrace-function)
   "Return a string containing formatted backtrace.

@@ -674,6 +674,14 @@ truncate backtrace lines"
                       `(:instead-of-default ,(eldev-format-message "(default would be `%s')" dir))))
   (setf eldev-external-package-dir (or dir t)))
 
+(eldev-defbooloptions eldev-enable-xdebug-initially eldev-disable-xdebug-initially eldev-xdebug-output-enabled
+  ("Enable `xdebug' output initially"
+   :options       (-x --xdebug --enable-xdebug)
+   :hidden-if     :default)
+  ("Disable `xdebug' output initially"
+   :options       (--no-xdebug --disable-xdebug)
+   :hidden-if     :default))
+
 
 
 ;; Filesets.
