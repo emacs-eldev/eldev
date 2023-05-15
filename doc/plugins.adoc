@@ -171,9 +171,9 @@ section.
 
 ==== Command `update-copyright`
 
-The plugin provides a very simple command to update copyright notices,
-based on Emacs’ built-in feature `copyright`.  You can run it simply
-as:
+{since-1-3} The plugin provides a very simple command to update
+copyright notices, based on Emacs’ built-in feature `copyright`.  You
+can run it simply as:
 
     $ eldev update-copyright
 
