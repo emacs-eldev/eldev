@@ -27,16 +27,35 @@ Other modes include `byte-compiled` and `source`.  In these modes
 loading is performed just as in `as-is` mode, but before that Eldev
 either byte-compiles everything or, vice-versa, removes `.elc` files.
 
-So, after discussing the loading modes, let’s have a look at how
+{since-1-4} Loading mode `compiled-on-demand` is useful primarily to
+larger projects that include some computation-intensive code which
+needs to be byte-compiled to run in reasonable time.  In this mode,
+only when a project file is loaded, e.g. via `require` form, it is
+byte-compiled if needed.  In contrast, in mode `byte-compiled` _all_
+Elisp files are byte-compiled before a command (e.g. `test`) even gets
+to start working.  This makes the mode useful during work on the
+project “core” because 1) compilation time is reduced; 2) you can test
+or otherwise use the core without even updating higher-level files to
+be compilable first.  However, as a drawback, compilation can run “in
+the middle” of project’s real code, which can occasionally cause
+unforeseen troubles, as well as screw up <<profiling,profiling>>.
+
+When using <<evaluating,commands `exec` and `eval`>> with
+`compiled-on-demand` mode, you may want to use option `-R`
+(`--dont-require`) and then manually `require` only the necessary
+features, to reduce the set of files that have to be (re)compiled.
+
+So, after discussing various loading modes, let’s have a look at how
 exactly you tell Eldev which one to use.
 
 For the project itself, this is done from the command line using
 global option `--loading` (or `-m`) with its argument being the name
 of the mode.  Since this is supposed to be used quite frequently,
 there are also shortcut options to select specific modes: `--as-is`
-(or `-a`), `--packaged` (`-p`), `--source` (`-s`) or `--byte-compiled`
-(`-c`).  For example, the following command will run unit-tests in the
-project, having it loaded as an Emacs package:
+(or `-a`), `--packaged` (`-p`), `--source` (`-s`), `--byte-compiled`
+(`-c`) and `--compiled-on-demand` (`-o`).  For example, the following
+command will run unit-tests in the project, having it loaded as an
+Emacs package:
 
     $ eldev -p test
 

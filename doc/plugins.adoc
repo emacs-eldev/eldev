@@ -72,7 +72,7 @@ autoloaded functions.
 This plugin can also be activated in projects you use as
 <<local-dependencies,local dependencies>> for other projects.  Eldev
 knows how to keep the autoloads file up-to-date in all local
-dependencies, regardless of their loading mode.
+dependencies, regardless of their <<loading-modes,loading mode>>.
 
 [#maintainer-plugin]
 === maintainer
