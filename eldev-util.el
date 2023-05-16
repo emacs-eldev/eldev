@@ -981,7 +981,9 @@ Since 1.4."
   "Execute BODY with increased debugging output level.
 All output of `eldev-debug', `eldev-dump' within the BODY will be
 indented (see function `eldev-debugging-output-prefix' for
-details)."
+details).
+
+Since 1.4."
   (declare (indent 0) (debug (body)))
   `(let ((eldev-debugging-output-level (1+ eldev-debugging-output-level)))
      ,@body))

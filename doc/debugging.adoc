@@ -5,29 +5,139 @@ Eldev comes with lots of different options and other features that can
 help you debug problems both in your project, Eldev itself or your
 Eldev scripts.
 
-[discrete]
-==== Assistances for debugging your project
+File `Eldev-local` provides a good place to install temporary advices,
+overwrite Emacs functions etc. in the process of debugging certain
+problems.
 
-While not a direct feature of Eldev itself, file `Eldev-local`
-provides a good place to install temporary advices, overwrite Emacs
-functions etc. in the process of debugging certain problems.
+=== Debugging output
 
-You can temporarily add calls to `eldev-warn`, `eldev-backtrace` and
-other Eldev functions to the tests in your project to provide
-debugging output.  Eldev 1.3 also adds functions/macros `eldev-debug`
-and `eldev-dump` which are also available in <<running-emacs,spawned
-interactive Emacs>>.  In such interactive Emacs they write to Emacs
-stderr by default, i.e. to the console where you have launched Eldev,
-making it easier to spot debugging output.  Additionally,
-<<setup-procedure,the whole project setup procedure>> is repeated in
-such Emacs instances, so e.g. files `Eldev` or `Eldev-local` can
-easily affect those too.
+There are two common ways of debugging code: interactively, using a
+debugger program to step through the code and determine at which place
+things go wrong, and non-interactively, by adding _debugging output_
+to relevant places in the code.  While Eldev cannot really help you
+with interactive debugging, it provides several functions useful for
+generating debugging output.
 
-It is, however, a good idea to use Eldev calls only while debugging
-and avoid committing such changes.
+{since-1-3} The main such function is predictably called
+`eldev-debug`.  It accepts the same arguments as `message` and writes
+the output to stderr in a standing-out color.
 
-[discrete]
-==== Debugging project setup scripts and Eldev itself
+If you <<running-emacs,launch interactive Emacs>> with your project,
+output of the function comes to _Emacs_ stderr, i.e. the console from
+which you have started up Eldev.  This makes debugging output more
+visible and easily relatable to things going on in Emacs: you have two
+separate OS-level windows and just need to arrange them in such a way
+that they don’t cover each other.  Additionally, <<setup-procedure,the
+whole project setup procedure>> is repeated in such Emacs instances,
+so e.g. files `Eldev` or `Eldev-local` can easily affect those too.
+
+You can call `eldev-debug` from your project’s code directly or from
+an advice defined in `Eldev-local`.  E.g. you could temporarily add
+something like this:
+
+[source]
+----
+(defadvice my-function (around debug-it activate)
+  (let ((result ad-do-it))
+    (eldev-debug "my-function %S -> %S" (ad-get-args 0) result)
+    result))
+----
+
+This will log all calls to `my-function` on the stderr, along with
+arguments and produced result.
+
+{since-1-4} If you need to see how several functions call each other,
+linear logs produced by advices as above may be too confusing.  In
+such a case you may be interested in macro
+`eldev-nest-debugging-output`, which indents _all_ Eldev-generated
+debugging output inside its body.  It is also useful to split output
+shown above into two lines: one for when a function gets called and
+another — when it returns:
+
+[source]
+----
+(defadvice my-function-1 (around debug-it activate)
+  (eldev-debug "my-function-1 %S" (ad-get-args 0))
+  (let ((result (eldev-nest-debugging-output ad-do-it)))
+    (eldev-debug "-> %S" result)
+    result))
+----
+
+Assuming you have similar advices for other functions that call each
+other, output might look something like this:
+
+    my-function-1 (...)
+      my-function-2 (...)
+        my-function-3 (...)
+        -> [RESULT OF my-function-3]
+      -> [RESULT OF my-function-2]
+    -> [RESULT OF my-function-1]
+
+Macro `eldev-dump` reuses `eldev-debug` to show the current value of
+its argument variable(s) or even arbitrary form(s) in a human readable
+way:
+
+[source]
+----
+(eldev-dump load-prefer-newer (* 10 10))
+----
+
+prints
+
+    load-prefer-newer = t
+    (* 10 10) = 100
+
+This allows you to save some typing on debugging output forms that are
+meant to be temporary anyway and get changed quickly.
+
+A pretty useful function to generate debugging output is
+`eldev-backtrace`.  In some cases it is quite difficult to understand
+_how_ a function gets called (with given arguments).  Seeing a
+backtrace can help you out.  Using different project
+<<loading-modes,loading modes>> can be useful here: sometimes a
+backtrace in a byte-compiled code is more readable and provides the
+information you need, while in other cases you rather need
+non-compiled forms.
+
+Macro `eldev-time-it` can be used to roughly estimate performance of
+pieces of code and understand where your project becomes too slow.
+
+Functions and macros above also come in “conditional” form: just add
+`x` before function name, e.g. `eldev-xdebug`, `eldev-xdump`, etc.
+These functions by default do nothing, but can be activated or
+deactivated using `eldev-enabling-xdebug`, `eldev-disabling-xdebug`
+and `eldev-maybe-xdebug` macros.  Global option `-x` also activates
+them initially (can still be deactivated programmatically later).
+Appropriate usage can drastically reduce debugging output size in a
+deeply nested calltree and limit it to only relevant (to the bug you
+are investigating) portions.
+
+Another technique to reduce debugging output is to activate it only
+after the project has been fully loaded and initialized — depending on
+the project, the setup can involve quite a lot of function calls on
+its own, e.g. from computation of constants, `eval-when-compile` forms
+and so on.  In this case it might be useful to install debugging
+advices inside a `with-eval-after-load` form.
+
+=== Preventing accidental commits
+
+It is, generally, a good idea to use Eldev calls only in files `Eldev`
+and `Eldev-local`.  Actual project source code should be limited to
+using Eldev only while debugging — in all other cases Eldev is hardly
+a proper dependency, at least for most projects.  However, as I have
+found from experience, it is pretty easy to forget and accidentally
+commit debugging output changes that were meant only as a temporary
+aid for investigating one specific issue.
+
+If you use Git as your VCS, you may want to employ Git hooks that
+prevent such accidental commits.  Eldev even has a <<githooks,special
+command>> for that.
+
+=== Debugging setup scripts
+
+The following is an overview of Eldev features that can help you in
+debugging project setup scripts and Eldev — which is also not
+bug-proof — itself.
 
 * Global options `-t` (`--trace`), `-v` (`--verbose`) and `-q`
   (`--quiet`) control the amount of output Eldev generates.  The first
