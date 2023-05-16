@@ -525,7 +525,13 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_script_commands">Script commands</a></li>
 </ul>
 </li>
-<li><a href="#debugging-features">Debugging features</a></li>
+<li><a href="#debugging-features">Debugging features</a>
+<ul class="sectlevel2">
+<li><a href="#_debugging_output">Debugging output</a></li>
+<li><a href="#_preventing_accidental_commits">Preventing accidental commits</a></li>
+<li><a href="#_debugging_setup_scripts">Debugging setup scripts</a></li>
+</ul>
+</li>
 <li><a href="#_plugins">Plugins</a>
 <ul class="sectlevel2">
 <li><a href="#autoloads-plugin">autoloads</a></li>
@@ -1729,7 +1735,27 @@ loading is performed just as in <code>as-is</code> mode, but before that Eldev
 either byte-compiles everything or, vice-versa, removes <code>.elc</code> files.</p>
 </div>
 <div class="paragraph">
-<p>So, after discussing the loading modes, let’s have a look at how
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.4-8be" alt="Since 1.4"></span> Loading mode <code>compiled-on-demand</code> is useful primarily to
+larger projects that include some computation-intensive code which
+needs to be byte-compiled to run in reasonable time.  In this mode,
+only when a project file is loaded, e.g. via <code>require</code> form, it is
+byte-compiled if needed.  In contrast, in mode <code>byte-compiled</code> <em>all</em>
+Elisp files are byte-compiled before a command (e.g. <code>test</code>) even gets
+to start working.  This makes the mode useful during work on the
+project “core” because 1) compilation time is reduced; 2) you can test
+or otherwise use the core without even updating higher-level files to
+be compilable first.  However, as a drawback, compilation can run “in
+the middle” of project’s real code, which can occasionally cause
+unforeseen troubles, as well as screw up <a href="#profiling">profiling</a>.</p>
+</div>
+<div class="paragraph">
+<p>When using <a href="#evaluating">commands <code>exec</code> and <code>eval</code></a> with
+<code>compiled-on-demand</code> mode, you may want to use option <code>-R</code>
+(<code>--dont-require</code>) and then manually <code>require</code> only the necessary
+features, to reduce the set of files that have to be (re)compiled.</p>
+</div>
+<div class="paragraph">
+<p>So, after discussing various loading modes, let’s have a look at how
 exactly you tell Eldev which one to use.</p>
 </div>
 <div class="paragraph">
@@ -1737,9 +1763,10 @@ exactly you tell Eldev which one to use.</p>
 global option <code>--loading</code> (or <code>-m</code>) with its argument being the name
 of the mode.  Since this is supposed to be used quite frequently,
 there are also shortcut options to select specific modes: <code>--as-is</code>
-(or <code>-a</code>), <code>--packaged</code> (<code>-p</code>), <code>--source</code> (<code>-s</code>) or <code>--byte-compiled</code>
-(<code>-c</code>).  For example, the following command will run unit-tests in the
-project, having it loaded as an Emacs package:</p>
+(or <code>-a</code>), <code>--packaged</code> (<code>-p</code>), <code>--source</code> (<code>-s</code>), <code>--byte-compiled</code>
+(<code>-c</code>) and <code>--compiled-on-demand</code> (<code>-o</code>).  For example, the following
+command will run unit-tests in the project, having it loaded as an
+Emacs package:</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -3452,29 +3479,166 @@ your source warning-free today, it might detect problems tomorrow.
 help you debug problems both in your project, Eldev itself or your
 Eldev scripts.</p>
 </div>
-<h4 id="_assistances_for_debugging_your_project" class="discrete">Assistances for debugging your project</h4>
 <div class="paragraph">
-<p>While not a direct feature of Eldev itself, file <code>Eldev-local</code>
-provides a good place to install temporary advices, overwrite Emacs
-functions etc. in the process of debugging certain problems.</p>
+<p>File <code>Eldev-local</code> provides a good place to install temporary advices,
+overwrite Emacs functions etc. in the process of debugging certain
+problems.</p>
+</div>
+<div class="sect2">
+<h3 id="_debugging_output">Debugging output</h3>
+<div class="paragraph">
+<p>There are two common ways of debugging code: interactively, using a
+debugger program to step through the code and determine at which place
+things go wrong, and non-interactively, by adding <em>debugging output</em>
+to relevant places in the code.  While Eldev cannot really help you
+with interactive debugging, it provides several functions useful for
+generating debugging output.</p>
 </div>
 <div class="paragraph">
-<p>You can temporarily add calls to <code>eldev-warn</code>, <code>eldev-backtrace</code> and
-other Eldev functions to the tests in your project to provide
-debugging output.  Eldev 1.3 also adds functions/macros <code>eldev-debug</code>
-and <code>eldev-dump</code> which are also available in <a href="#running-emacs">spawned
-interactive Emacs</a>.  In such interactive Emacs they write to Emacs
-stderr by default, i.e. to the console where you have launched Eldev,
-making it easier to spot debugging output.  Additionally,
-<a href="#setup-procedure">the whole project setup procedure</a> is repeated in
-such Emacs instances, so e.g. files <code>Eldev</code> or <code>Eldev-local</code> can
-easily affect those too.</p>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.3-8be" alt="Since 1.3"></span> The main such function is predictably called
+<code>eldev-debug</code>.  It accepts the same arguments as <code>message</code> and writes
+the output to stderr in a standing-out color.</p>
 </div>
 <div class="paragraph">
-<p>It is, however, a good idea to use Eldev calls only while debugging
-and avoid committing such changes.</p>
+<p>If you <a href="#running-emacs">launch interactive Emacs</a> with your project,
+output of the function comes to <em>Emacs</em> stderr, i.e. the console from
+which you have started up Eldev.  This makes debugging output more
+visible and easily relatable to things going on in Emacs: you have two
+separate OS-level windows and just need to arrange them in such a way
+that they don’t cover each other.  Additionally, <a href="#setup-procedure">the
+whole project setup procedure</a> is repeated in such Emacs instances,
+so e.g. files <code>Eldev</code> or <code>Eldev-local</code> can easily affect those too.</p>
 </div>
-<h4 id="_debugging_project_setup_scripts_and_eldev_itself" class="discrete">Debugging project setup scripts and Eldev itself</h4>
+<div class="paragraph">
+<p>You can call <code>eldev-debug</code> from your project’s code directly or from
+an advice defined in <code>Eldev-local</code>.  E.g. you could temporarily add
+something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(defadvice my-function (around debug-it activate)
+  (let ((result ad-do-it))
+    (eldev-debug "my-function %S -&gt; %S" (ad-get-args 0) result)
+    result))</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will log all calls to <code>my-function</code> on the stderr, along with
+arguments and produced result.</p>
+</div>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.4-8be" alt="Since 1.4"></span> If you need to see how several functions call each other,
+linear logs produced by advices as above may be too confusing.  In
+such a case you may be interested in macro
+<code>eldev-nest-debugging-output</code>, which indents <em>all</em> Eldev-generated
+debugging output inside its body.  It is also useful to split output
+shown above into two lines: one for when a function gets called and
+another — when it returns:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(defadvice my-function-1 (around debug-it activate)
+  (eldev-debug "my-function-1 %S" (ad-get-args 0))
+  (let ((result (eldev-nest-debugging-output ad-do-it)))
+    (eldev-debug "-&gt; %S" result)
+    result))</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Assuming you have similar advices for other functions that call each
+other, output might look something like this:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>my-function-1 (...)
+  my-function-2 (...)
+    my-function-3 (...)
+    -&gt; [RESULT OF my-function-3]
+  -&gt; [RESULT OF my-function-2]
+-&gt; [RESULT OF my-function-1]</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Macro <code>eldev-dump</code> reuses <code>eldev-debug</code> to show the current value of
+its argument variable(s) or even arbitrary form(s) in a human readable
+way:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-dump load-prefer-newer (* 10 10))</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>prints</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>load-prefer-newer = t
+(* 10 10) = 100</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This allows you to save some typing on debugging output forms that are
+meant to be temporary anyway and get changed quickly.</p>
+</div>
+<div class="paragraph">
+<p>A pretty useful function to generate debugging output is
+<code>eldev-backtrace</code>.  In some cases it is quite difficult to understand
+<em>how</em> a function gets called (with given arguments).  Seeing a
+backtrace can help you out.  Using different project
+<a href="#loading-modes">loading modes</a> can be useful here: sometimes a
+backtrace in a byte-compiled code is more readable and provides the
+information you need, while in other cases you rather need
+non-compiled forms.</p>
+</div>
+<div class="paragraph">
+<p>Macro <code>eldev-time-it</code> can be used to roughly estimate performance of
+pieces of code and understand where your project becomes too slow.</p>
+</div>
+<div class="paragraph">
+<p>Functions and macros above also come in “conditional” form: just add
+<code>x</code> before function name, e.g. <code>eldev-xdebug</code>, <code>eldev-xdump</code>, etc.
+These functions by default do nothing, but can be activated or
+deactivated using <code>eldev-enabling-xdebug</code>, <code>eldev-disabling-xdebug</code>
+and <code>eldev-maybe-xdebug</code> macros.  Global option <code>-x</code> also activates
+them initially (can still be deactivated programmatically later).
+Appropriate usage can drastically reduce debugging output size in a
+deeply nested calltree and limit it to only relevant (to the bug you
+are investigating) portions.</p>
+</div>
+<div class="paragraph">
+<p>Another technique to reduce debugging output is to activate it only
+after the project has been fully loaded and initialized — depending on
+the project, the setup can involve quite a lot of function calls on
+its own, e.g. from computation of constants, <code>eval-when-compile</code> forms
+and so on.  In this case it might be useful to install debugging
+advices inside a <code>with-eval-after-load</code> form.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_preventing_accidental_commits">Preventing accidental commits</h3>
+<div class="paragraph">
+<p>It is, generally, a good idea to use Eldev calls only in files <code>Eldev</code>
+and <code>Eldev-local</code>.  Actual project source code should be limited to
+using Eldev only while debugging — in all other cases Eldev is hardly
+a proper dependency, at least for most projects.  However, as I have
+found from experience, it is pretty easy to forget and accidentally
+commit debugging output changes that were meant only as a temporary
+aid for investigating one specific issue.</p>
+</div>
+<div class="paragraph">
+<p>If you use Git as your VCS, you may want to employ Git hooks that
+prevent such accidental commits.  Eldev even has a <a href="#githooks">special
+command</a> for that.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_debugging_setup_scripts">Debugging setup scripts</h3>
+<div class="paragraph">
+<p>The following is an overview of Eldev features that can help you in
+debugging project setup scripts and Eldev — which is also not
+bug-proof — itself.</p>
+</div>
 <div class="ulist">
 <ul>
 <li>
@@ -3525,6 +3689,7 @@ cannot be installed, Eldev will mention what required this
 dependency (can be non-obvious in larger packages).</p>
 </li>
 </ul>
+</div>
 </div>
 </div>
 </div>
@@ -3621,7 +3786,7 @@ autoloaded functions.</p>
 <p>This plugin can also be activated in projects you use as
 <a href="#local-dependencies">local dependencies</a> for other projects.  Eldev
 knows how to keep the autoloads file up-to-date in all local
-dependencies, regardless of their loading mode.</p>
+dependencies, regardless of their <a href="#loading-modes">loading mode</a>.</p>
 </div>
 </div>
 <div class="sect2">
@@ -3743,9 +3908,9 @@ section.</p>
 <div class="sect3">
 <h4 id="_command_update_copyright">Command <code>update-copyright</code></h4>
 <div class="paragraph">
-<p>The plugin provides a very simple command to update copyright notices,
-based on Emacs’ built-in feature <code>copyright</code>.  You can run it simply
-as:</p>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.3-8be" alt="Since 1.3"></span> The plugin provides a very simple command to update
+copyright notices, based on Emacs’ built-in feature <code>copyright</code>.  You
+can run it simply as:</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -4702,7 +4867,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-01-19 22:03:11 UTC
+Last updated 2023-05-16 17:04:05 UTC
 </div>
 </div>
 </body>
