@@ -2688,6 +2688,10 @@ Since 0.2."
                                                  (external-dir
                                                   `("Dependency `%s' is not installed in `%s'" ,package-name ,external-dir))
                                                  (t
+                                                  (unless (locate-file eldev-file (list eldev-project-dir))
+                                                    ;; Project configuration file is supposed to call `eldev-use-package-archive'.
+                                                    (setf hint (concat (if hint (concat hint "\n") "")
+                                                                       (eldev-format-message "There is no file `%s' in the project; consider running `%s init'" eldev-file (eldev-shell-command t)))))
                                                   `("Dependency `%s' is not available" ,package-name))))))
                   (when external-dir
                     (setf hint (concat (eldev-format-message "Either install it there, or use global option `--isolated' (`-I')") (if hint (concat "\n" hint) ""))))
