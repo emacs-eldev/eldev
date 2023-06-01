@@ -297,36 +297,37 @@ release a stable version only to never do that again in future."))))))
   (eldev-with-vc nil
     (pcase backend
       (`Git
-       (let (last-version
-             last-version-tag)
-         (eldev-call-process (eldev-git-executable) '("for-each-ref" "refs/tags" "--format" "%(refname)")
-           :destination  '(t nil)
-           :discard-ansi t
-           :die-on-error t
-           (while (not (eobp))
-             (let* ((tag     (string-remove-prefix "refs/tags/" (buffer-substring (point) (line-end-position))))
-                    (version (string-remove-prefix (rx (any "rRvV")) tag)))
-               (when (and (ignore-errors (version-to-list version)) (or (null last-version) (version< last-version version)))
-                 (setf last-version     version
-                       last-version-tag tag)))
-             (forward-line 1)))
-         (if last-version
-             `(,last-version
-               ;; `git show' doesn't print _only_ date for signed commits.
-               ,(eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch" ,last-version-tag)
-                  :destination  '(t nil)
-                  :discard-ansi t
-                  :die-on-error t
-                  (let ((date-string (string-trim (buffer-string))))
-                    ;; Don't match the whole, but just a bit of assertion here.
-                    (when (string-match-p (rx bos (= 4 num) "-" (= 2 num) "-" (= 2 num)) date-string)
-                      date-string)))
-               ,(eldev-call-process (eldev-git-executable) `("rev-list" ,(format "%s.." last-version-tag) "--count")
-                  :destination  '(t nil)
-                  :discard-ansi t
-                  :die-on-error t
-                  (string-to-number (buffer-string))))
-           'none)))
+       (when (eldev-git-executable t)
+         (let (last-version
+               last-version-tag)
+           (eldev-call-process (eldev-git-executable) '("for-each-ref" "refs/tags" "--format" "%(refname)")
+             :destination  '(t nil)
+             :discard-ansi t
+             :die-on-error t
+             (while (not (eobp))
+               (let* ((tag     (string-remove-prefix "refs/tags/" (buffer-substring (point) (line-end-position))))
+                      (version (string-remove-prefix (rx (any "rRvV")) tag)))
+                 (when (and (ignore-errors (version-to-list version)) (or (null last-version) (version< last-version version)))
+                   (setf last-version     version
+                         last-version-tag tag)))
+               (forward-line 1)))
+           (if last-version
+               `(,last-version
+                 ;; `git show' doesn't print _only_ date for signed commits.
+                 ,(eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch" ,last-version-tag)
+                    :destination  '(t nil)
+                    :discard-ansi t
+                    :die-on-error t
+                    (let ((date-string (string-trim (buffer-string))))
+                      ;; Don't match the whole, but just a bit of assertion here.
+                      (when (string-match-p (rx bos (= 4 num) "-" (= 2 num) "-" (= 2 num)) date-string)
+                        date-string)))
+                 ,(eldev-call-process (eldev-git-executable) `("rev-list" ,(format "%s.." last-version-tag) "--count")
+                    :destination  '(t nil)
+                    :discard-ansi t
+                    :die-on-error t
+                    (string-to-number (buffer-string))))
+             'none))))
       (_
        backend))))
 
@@ -343,5 +344,56 @@ Consider installing %s by running:
     $ eldev githooks"
                                                        (eldev-message-enumerate nil not-installed) (if (cddr not-installed) "them" "it")))
         '(result t)))))
+
+(eldev-defdoctest eldev-doctest-eldev-file-owners (_results)
+  :caption    "Are Eldev cache files owned by the current user?"
+  :categories eldev
+  (let ((expected-user          (user-uid))
+        (expected-group         (group-gid))
+        (unexpected-owner-files (list nil)))
+    (dolist (cache-dir (list (eldev-global-cache-dir) (eldev-cache-dir nil)))
+      ;; `directory-files-recursively' is too new for Emacs 24.
+      (eldev--find-files-with-wrong-owner cache-dir cache-dir expected-user expected-group unexpected-owner-files))
+    (if (setf unexpected-owner-files (nreverse (car unexpected-owner-files)))
+        ;; It is just too hard to format several filenames sanely, so mention only the first.
+        (let ((first (car unexpected-owner-files)))
+          `(result nil warnings ,(eldev-format-message "\
+File `%s' in Eldev cache directory `%s' appears to be owned by a
+“wrong” user/group: `%s/%s' (expected is `%s/%s').%s
+
+This is likely a consequence of erroneous Eldev behavior when
+using Docker: hopefully all bugs that would cause this have been
+fixed by now, but previous invocations might have lead to
+existence of such files.  Unfortunately, you have to delete them
+manually, otherwise Eldev might misbehave."
+                                                       (nth 1 first) (nth 0 first)
+                                                       (eldev--user-name (nth 2 first)) (eldev--group-name (nth 3 first))
+                                                       (eldev--user-name expected-user) (eldev--group-name expected-group)
+                                                       (if (cdr unexpected-owner-files)
+                                                           (format "  There also appears to be %s." (eldev-message-plural (1- (length unexpected-owner-files)) "more such file"))
+                                                         ""))))
+      `(result t))))
+
+(defun eldev--find-files-with-wrong-owner (root directory expected-user expected-group result)
+  (setf directory (file-name-as-directory directory))
+  (dolist (file (sort (file-name-all-completions "" directory) #'string<))
+    (unless (member file '("./" "../"))
+      (setf file (expand-file-name file directory))
+      (let* ((attributes (file-attributes file 'integer))
+             ;; `file-attribute-user-id' and `file-attribute-group-id' are only available
+             ;; since Emacs 26.
+             (file-user  (nth 2 attributes))
+             (file-group (nth 3 attributes)))
+        (if (and (equal file-user expected-user) (equal file-group expected-group))
+            (when (equal (file-name-as-directory file) file)
+              (eldev--find-files-with-wrong-owner root file expected-user expected-group result))
+          (push `(,root ,(file-relative-name file root) ,file-user ,file-group) (car result)))))))
+
+(defun eldev--user-name (uid)
+  (or (ignore-errors (user-login-name uid)) uid))
+
+(defun eldev--group-name (gid)
+  (or (ignore-errors (group-name gid)) gid))
+
 
 (provide 'eldev-doctor)
