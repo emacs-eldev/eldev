@@ -89,6 +89,15 @@ jobs:
       env:
         ELDEV_LOCAL: "."
 
+    - name: Doctor the project
+      run: |
+        # Run `doctor' on the project itself.  Git hooks are not going
+        # to be installed in this checkout.  Also, don't insist on
+        # recent stable releases here.
+        ./bin/eldev -p -dtTC doctor -- -githooks -recent-stable-releases
+      env:
+        ELDEV_LOCAL: "."
+
     # Method 1: if you have a catch-all directory for executables.  We
     # don't test bootstrapping, as that is supposed to have been
     # tested by normal ERT tests.
