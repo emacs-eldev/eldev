@@ -392,6 +392,7 @@ manually, otherwise Eldev might misbehave."
 (defun eldev--user-name (uid)
   (or (ignore-errors (user-login-name uid)) uid))
 
+(declare-function group-name nil) 
 (defun eldev--group-name (gid)
   (or (ignore-errors (group-name gid)) gid))
 
