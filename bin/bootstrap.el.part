@@ -61,8 +61,12 @@
       (let* ((autoloads-file     (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
                                                    (package-desc-dir eldev-pkg)))
              (autoloads-disabler (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args)))))
+        ;; Otherwise old Emacs versions print an ugly error having not found the autoloads file.
         (advice-add #'load :around autoloads-disabler)
         (package-activate-1 eldev-pkg)
+        ;; As of commit 1d5b164109b in Emacs repository, `package-activate-1' no longer modifies `load-path',
+        ;; leaving this to the autoloads file.  As we don't have such a file, we have to do that ourselves.
+        (add-to-list 'load-path (package-desc-dir eldev-pkg))
         (advice-remove #'load autoloads-disabler))))
   (require 'eldev)
   (eldev-start-up))

@@ -1313,6 +1313,7 @@ Loading mode is not included.  Since 1.2."
           (let ((autoloads-file (expand-file-name (format "%s-autoloads" (package-desc-name eldev-pkg))
                                                   (package-desc-dir eldev-pkg))))
             (push `(eldev . (,eldev-pkg)) package-alist)
+            ;; Otherwise old Emacs versions print an ugly error having not found the autoloads file.
             (eldev-advised  (#'load :around (lambda (do-load file &rest args) (unless (equal file autoloads-file) (apply do-load file args))))
               (package-activate-1 eldev-pkg)))
         (eldev-warn "Cannot activate Eldev package suppposedly specified by `ELDEV_LOCAL'"))))

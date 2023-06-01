@@ -95,8 +95,12 @@ REM the newline variable above MUST be followed by two empty lines.
       (let* ((autoloads-file     (expand-file-name (format """%%s-autoloads""" (package-desc-name eldev-pkg)) !NL!^
                                                    (package-desc-dir eldev-pkg))) !NL!^
              (autoloads-disabler (lambda (do-load file ^&rest args) (unless (equal file autoloads-file) (apply do-load file args))))) !NL!^
+        ;; Otherwise old Emacs versions print an ugly error having not found the autoloads file. !NL!^
         (advice-add #'load :around autoloads-disabler) !NL!^
         (package-activate-1 eldev-pkg) !NL!^
+        ;; As of commit 1d5b164109b in Emacs repository, `package-activate-1' no longer modifies `load-path', !NL!^
+        ;; leaving this to the autoloads file.  As we don't have such a file, we have to do that ourselves. !NL!^
+        (add-to-list 'load-path (package-desc-dir eldev-pkg)) !NL!^
         (advice-remove #'load autoloads-disabler)))) !NL!^
   (require 'eldev) !NL!^
   (eldev-start-up))" --execute "(kill-emacs (eldev-cli (append (cdr (member """--""" command-line-args)) nil)))" -- !ARGS!
