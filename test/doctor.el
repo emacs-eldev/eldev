@@ -57,5 +57,19 @@
     (should-not (string-match-p "eldev-presence"        stdout))
     (should     (= exit-code 0))))
 
+(ert-deftest eldev-doctor-tar-win ()
+  (eldev--test-run "trivial-project" ("doctor" "tar-windows")
+    (should (= exit-code 0)))
+  (when (eq system-type 'windows-nt)
+    (let* ((file (make-temp-file "doctor-" nil ".bat"))
+	   (eldev-tar-executable file))
+      (unwind-protect
+	  ;; use a mock .bat file that will fail when run
+	  (with-temp-file file
+	    (insert "@echo off\nexit 1"))
+	(eldev--test-run "trivial-project" ("--setup" `(setf eldev-tar-executable ,file) "doctor" "tar-windows")
+			 (should (string-match-p "The tar executable" stdout))
+			 (should (= exit-code 1)))
+	(delete-file file)))))
 
 (provide 'test/doctor)
