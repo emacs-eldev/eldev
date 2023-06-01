@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-buttercup.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2020-2023 Paul Pogonyshev
 
@@ -82,3 +82,5 @@
 
 
 (provide 'eldev-buttercup)
+
+;;; eldev-buttercup.el ends here

@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-vc.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2020-2023 Paul Pogonyshev
 
@@ -431,3 +431,5 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
 
 
 (provide 'eldev-vc)
+
+;;; eldev-vc.el ends here

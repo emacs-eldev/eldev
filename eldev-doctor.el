@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-doctor.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2022, 2023 Paul Pogonyshev
 
@@ -398,3 +398,5 @@ manually, otherwise Eldev might misbehave."
 
 
 (provide 'eldev-doctor)
+
+;;; eldev-doctor.el ends here

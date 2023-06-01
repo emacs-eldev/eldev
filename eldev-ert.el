@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-ert.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2019-2023 Paul Pogonyshev
 

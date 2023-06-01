@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-ecukes.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2021-2023 Paul Pogonyshev
 
@@ -158,3 +158,5 @@
 
 
 (provide 'eldev-ecukes)
+
+;;; eldev-ecukes.el ends here

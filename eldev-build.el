@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-build.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2019-2023 Paul Pogonyshev
 
@@ -780,3 +780,5 @@ possible to build arbitrary targets this way."
 
 
 (provide 'eldev-build)
+
+;;; eldev-build.el ends here

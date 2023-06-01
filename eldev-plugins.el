@@ -1,4 +1,4 @@
-;;; eldev.el --- Elisp development tool  -*- lexical-binding: t -*-
+;;; eldev-plugins.el --- Elisp development tool  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2020-2023 Paul Pogonyshev
 
@@ -869,3 +869,5 @@ plugin documentation for more information."
 
 
 (provide 'eldev-plugins)
+
+;;; eldev-plugins.el ends here
