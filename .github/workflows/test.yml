@@ -94,7 +94,7 @@ jobs:
         # Run `doctor' on the project itself.  Git hooks are not going
         # to be installed in this checkout.  Also, don't insist on
         # recent stable releases here.
-        ./bin/eldev -p -dtTC doctor -- -githooks -recent-stable-releases
+        ./bin/eldev -p -dtTC doctor "--" -githooks -recent-stable-releases
       env:
         ELDEV_LOCAL: "."
 
