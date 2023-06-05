@@ -51,7 +51,10 @@
 (ert-deftest eldev-doctor-disabling-doctests ()
   ;; Pretend that the project has disabled it in its `Eldev'.
   (eldev--test-run "trivial-project" ("--setup" `(push 'eldev-presence eldev-doctor-disabled-tests) "doctor" "eldev-presence")
-    (should (= exit-code 0)))
+    ;; It would previously write "1 doctest", erroneously counting the test it hasn't
+    ;; actually executed.
+    (should     (string-match-p "0 doctests" stdout))
+    (should     (= exit-code 0)))
   (eldev--test-run "trivial-project" ("--setup" `(push 'eldev-presence eldev-doctor-disabled-tests) "doctor" "--list-tests")
     (should     (string-match-p "eldev-byte-compilable" stdout))
     (should-not (string-match-p "eldev-presence"        stdout))

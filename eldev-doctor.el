@@ -74,9 +74,9 @@ or “NO”, depending on `ok'."
                                      "Selector `%s' matches neither a doctest name nor a category" ,selector)))
             (setf doctests (eldev-filter (if (memq it matches) (not negate) (memq it doctests)) eldev--doctests))))))
     (if doctests
-        (let ((num-user-requested (length doctests))
-              (num-visibly-failed 0)
-              (doctests-sequence  (list nil))
+        (let ((num-executed-on-request 0)
+              (num-visibly-failed      0)
+              (doctests-sequence       (list nil))
               results
               generated-output
               last-with-warnings)
@@ -87,6 +87,8 @@ or “NO”, depending on `ok'."
                    (function       (cdr (assq name eldev--doctests)))
                    (user-requested (cdr doctest)))
               (eldev-verbose "Running doctest `%s' %s..." name (if user-requested "on user request" "needed by some other test"))
+              (when user-requested
+                (setf num-executed-on-request (1+ num-executed-on-request)))
               (let ((plist (funcall function results)))
                 (when plist
                   (push (cons name (plist-get plist 'result)) results)
@@ -120,12 +122,12 @@ or “NO”, depending on `ok'."
                         (setf last-with-warnings with-warnings
                               generated-output   t))))))))
           (if (= num-visibly-failed 0)
-              (eldev-print "\nRan %s, %s" (eldev-message-plural num-user-requested "doctest")
-                           (eldev-colorize (if (= num-user-requested 1) "it didn't generate any warnings" "none generated any warnings") 'success))
+              (eldev-print "\nRan %s, %s" (eldev-message-plural num-executed-on-request "doctest")
+                           (eldev-colorize (if (= num-executed-on-request 1) "it didn't generate any warnings" "none generated any warnings") 'success))
             (eldev-warn "Ran %s, %s generated %s"
-                        (eldev-message-plural num-user-requested "doctest")
-                        (if (= num-visibly-failed num-user-requested)
-                            (if (= num-user-requested 1) "it" "all of them")
+                        (eldev-message-plural num-executed-on-request "doctest")
+                        (if (= num-visibly-failed num-executed-on-request)
+                            (if (= num-executed-on-request 1) "it" "all of them")
                           (eldev-format-message "%d of them" num-visibly-failed))
                         (if (= num-visibly-failed 1) "a warning" "warnings"))
             (signal 'eldev-quit 1)))
@@ -134,7 +136,8 @@ or “NO”, depending on `ok'."
 (defun eldev--doctor-build-sequence (sequence name user-requested &optional dependency-stack)
   ;; A project may disable certain tests.  They still run when non-user-requested
   ;; (i.e. because of depedencies), but results are not printed.
-  (unless (and user-requested (eldev--doctor-test-disabled-p name))
+  (if (and user-requested (eldev--doctor-test-disabled-p name))
+      (eldev-trace "Ignoring doctest `%s' as disabled in this project" name)
     (let ((scheduled (assq name (car sequence))))
       (if scheduled
           (when user-requested
