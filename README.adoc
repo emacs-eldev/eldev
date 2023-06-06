@@ -191,4 +191,5 @@ name and command-specific options — after it.
 
 IMPORTANT: Please refer to the
 {uri-documentation}#modifying-filesets[full documentation] for the
-reasons of the warning that sent you here.
+reasons of the warning that sent you here.  If you are here not
+because of a warning, just ignore this message.
