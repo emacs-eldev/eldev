@@ -94,7 +94,19 @@ jobs:
         # Run `doctor' on the project itself.  Git hooks are not going
         # to be installed in this checkout.  Also, don't insist on
         # recent stable releases here.
-        ./bin/eldev -p -dtTC doctor "--" -githooks -recent-stable-releases
+        #
+        # Notes
+        #
+        # 1. The `eldev-file-owners` test is disabled on MS-Windows
+        # because the test expects the onwer of the cache to match the
+        # user name, but it is instead set to the administrators group
+        # on the GH CI, see discussion in
+        # https://github.com/doublep/eldev/pull/88.
+        #
+        # 2. The `--` is escaped with `"` for cross platform
+        # compatibility because in PowerShell `--` is a special
+        # operator.
+        ./bin/eldev -S "(when (eq system-type 'windows-nt) (push 'eldev-file-owners eldev-doctor-disabled-tests))" -p -dtTC doctor "--" -githooks -recent-stable-releases
       env:
         ELDEV_LOCAL: "."
 
