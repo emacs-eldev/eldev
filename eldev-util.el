@@ -959,7 +959,7 @@ Since 1.4."
 (defmacro eldev-maybe-xdebug (condition &rest body)
   "Evaluate BODY, conditionally enabling `eldev-xdebug' output in it.
 Since 1.4."
-  (declare (indent 0) (debug (body)))
+  (declare (indent 1) (debug (body)))
   `(let ((eldev-xdebug-output-enabled ,condition))
      ,@body))
 
