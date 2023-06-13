@@ -2220,7 +2220,7 @@ Since 0.2."
          uninstallable-list-changed)
     (eldev--lazy-scope (uninstallable
                         (eldev-do-load-cache-file uninstallable-cache-file "list of uninstallable optional packages" 1
-                          (assq 'packages contents))
+                          (cdr (assq 'packages contents)))
                         (when uninstallable-list-changed
                           (eldev-do-save-cache-file uninstallable-cache-file "list of uninstallable optional packages" 1
                             `((packages . ,(funcall uninstallable))))))
