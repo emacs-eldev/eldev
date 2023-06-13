@@ -68,4 +68,21 @@
       (should (= exit-code 0)))))
 
 
+;; This test would make Eldev fall into an infinite loop previously.  Not nice, but now it
+;; shouldn't do that anymore, and I don't know how to impose a timeout here.  If this test
+;; starts failing again, it doesn't matter much how, something has to be fixed.
+(ert-deftest eldev-prepare-duplicate-dependency ()
+  (let ((eldev--test-project "project-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'extra-set 'dependency-b 'dependency-b)
+                          "prepare" "extra-set")
+      ;; It also shouldn't try to install `dependency-b' twice.
+      (should     (string-match-p "2/2.+Installing package.+dependency-b" stderr))
+      (should-not (string-match-p "3/3.+Installing package.+dependency-b" stderr))
+      (should     (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'extra-set 'dependency-b 'dependency-b)
+                          "version" "dependency-b")
+      (should (string= stdout "dependency-b 1.0\n")))))
+
+
 (provide 'test/prepare)

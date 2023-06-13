@@ -2554,7 +2554,7 @@ Since 0.2."
                 (when archive
                   (list archive))))))
 
-;; Returns non-nil.
+;; Returns non-nil if the package can be installed.
 (defun eldev--plan-install-or-upgrade (self to-be-upgraded package-plist default-archives plan fail-if-too-new considered highest-requirements &optional runtime-dependency required-by)
   (let* ((package-name        (plist-get package-plist :package))
          (required-version    (plist-get package-plist :version))
@@ -2574,7 +2574,9 @@ Since 0.2."
                                       (if upcase
                                           (eldev-message-upcase-first hint)
                                         hint))))))
-         (considered-version  (gethash package-name considered)))
+         (considered-version  (gethash package-name considered))
+         ;; Associated value in the hash-table can be `nil'.
+         (considered-before   (not (eq (gethash package-name considered considered) considered))))
     (when (stringp required-version)
       (setf required-version (version-to-list required-version)))
     ;; See test `eldev-optional-dependencies-2' with parameters `project-a' and
@@ -2583,18 +2585,18 @@ Since 0.2."
     ;;
     ;; FIXME: Might need to do that not only for built-ins; however, for non-built-ins it
     ;;        is not clear how to determine if those are available in that version.
-    (when (and optional considered-version (package-built-in-p package-name) (not (package-built-in-p package-name required-version)))
+    (when (and optional considered-before (package-built-in-p package-name) (not (package-built-in-p package-name required-version)))
       (throw 'skip-uninstallable-optionals nil))
     ;; Elevate requirement if needed.
     (when (version-list-< required-version (car highest-requirement))
       (setf required-version (car highest-requirement)
             real-required-by (cdr highest-requirement)))
-    (when (and considered-version (version-list-< considered-version required-version))
+    (when (and considered-before (version-list-< considered-version required-version))
       (puthash package-name (cons required-version real-required-by) highest-requirements)
       ;; Unlike `considered', `highest-requirements' must not be cleared between passes.
       (clrhash considered)
       (throw 'restart-planning t))
-    (unless (and considered-version (version-list-<= required-version considered-version))
+    (unless (and considered-before (version-list-<= required-version considered-version))
       (unless (package-built-in-p package-name required-version)
         (when (eq package-name 'emacs)
           (when optional
@@ -2703,7 +2705,8 @@ Since 0.2."
           (if (eq package already-installed)
               (push package-name (cdr plan))
             (push `(,package . ,already-installed) (car plan)))))
-      (puthash package-name (or required-version `(,most-negative-fixnum)) considered))))
+      (puthash package-name required-version considered)
+      t)))
 
 (defun eldev--upgrade-self-script ()
   (let ((scripts (list (eldev--shell-script-name))))
