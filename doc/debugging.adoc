@@ -38,9 +38,8 @@ something like this:
 [source]
 ----
 (defadvice my-function (around debug-it activate)
-  (let ((result ad-do-it))
-    (eldev-debug "my-function %S -> %S" (ad-get-args 0) result)
-    result))
+  ad-do-it
+  (eldev-debug "my-function %S -> %S" (ad-get-args 0) ad-return-value))
 ----
 
 This will log all calls to `my-function` on the stderr, along with
@@ -58,9 +57,8 @@ another — when it returns:
 ----
 (defadvice my-function-1 (around debug-it activate)
   (eldev-debug "my-function-1 %S" (ad-get-args 0))
-  (let ((result (eldev-nest-debugging-output ad-do-it)))
-    (eldev-debug "-> %S" result)
-    result))
+  (eldev-nest-debugging-output ad-do-it)
+  (eldev-debug "-> %S" ad-return-value))
 ----
 
 Assuming you have similar advices for other functions that call each
