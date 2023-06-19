@@ -3517,9 +3517,8 @@ something like this:</p>
 <div class="listingblock">
 <div class="content">
 <pre class="highlight"><code class="language-lisp" data-lang="lisp">(defadvice my-function (around debug-it activate)
-  (let ((result ad-do-it))
-    (eldev-debug "my-function %S -&gt; %S" (ad-get-args 0) result)
-    result))</code></pre>
+  ad-do-it
+  (eldev-debug "my-function %S -&gt; %S" (ad-get-args 0) ad-return-value))</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -3539,9 +3538,8 @@ another — when it returns:</p>
 <div class="content">
 <pre class="highlight"><code class="language-lisp" data-lang="lisp">(defadvice my-function-1 (around debug-it activate)
   (eldev-debug "my-function-1 %S" (ad-get-args 0))
-  (let ((result (eldev-nest-debugging-output ad-do-it)))
-    (eldev-debug "-&gt; %S" result)
-    result))</code></pre>
+  (eldev-nest-debugging-output ad-do-it)
+  (eldev-debug "-&gt; %S" ad-return-value))</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -4867,7 +4865,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-05-16 17:04:05 UTC
+Last updated 2023-06-19 17:43:47 UTC
 </div>
 </div>
 </body>
