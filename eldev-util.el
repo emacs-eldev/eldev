@@ -957,9 +957,10 @@ Since 1.4."
      (eldev-time-it ,format-string ,@body)))
 
 (defmacro eldev-maybe-xdebug (condition &rest body)
-  "Evaluate BODY, conditionally enabling `eldev-xdebug' output in it.
-Since 1.4."
-  (declare (indent 1) (debug (body)))
+  "Evaluate BODY with or without `eldev-xdebug' output in it.
+Whether the output is enabled fully depends on CONDITION.  Since
+1.4."
+  (declare (indent 1) (debug (form body)))
   `(let ((eldev-xdebug-output-enabled ,condition))
      ,@body))
 
@@ -970,11 +971,28 @@ Since 1.4."
   `(let ((eldev-xdebug-output-enabled t))
      ,@body))
 
+(defmacro eldev-maybe-enabling-xdebug (condition &rest body)
+  "Evaluate BODY, possibly enabling `eldev-xdebug' output in it.
+If the output is already enabled, it stays enabled.  Otherwise it
+is enabled if CONDITION evaluates to a non-nil value.  Since 1.5."
+  (declare (indent 1) (debug (form body)))
+  `(let ((eldev-xdebug-output-enabled (or eldev-xdebug-output-enabled ,condition)))
+     ,@body))
+
 (defmacro eldev-disabling-xdebug (&rest body)
   "Evaluate BODY, disabling `eldev-xdebug' output in it.
 Since 1.4."
   (declare (indent 0) (debug (body)))
   `(let ((eldev-xdebug-output-enabled nil))
+     ,@body))
+
+(defmacro eldev-maybe-disabling-xdebug (condition &rest body)
+  "Evaluate BODY, possibly disabling `eldev-xdebug' output in it.
+If the output is already disabled, it stays disabled.  Otherwise
+it is disabled if CONDITION evaluates to a non-nil value.  Since
+1.5."
+  (declare (indent 1) (debug (form body)))
+  `(let ((eldev-xdebug-output-enabled (and eldev-xdebug-output-enabled (null ,condition))))
      ,@body))
 
 (defmacro eldev-nest-debugging-output (&rest body)
