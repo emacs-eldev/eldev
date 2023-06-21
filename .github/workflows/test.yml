@@ -23,11 +23,8 @@ jobs:
         os: [ubuntu-latest]
         emacs_version: ['24.4', '24.5', '25.1', '25.2', '25.3', '26.1', '26.2', '26.3', '27.1', '27.2', '28.1', '28.2', 'snapshot']
         include:
-          # Temporarily disabled, apparently cannot install Emacs since GitHub upgraded to 12.6.6 (?).
-          # See: https://github.com/doublep/eldev/actions/runs/5326471086/jobs/9648988096
-          # "Could not set environment: 150: Operation not permitted while System Integrity Protection is engaged"
-          # - os: macos-latest
-          #   emacs_version: '28.2'
+          - os: macos-latest
+            emacs_version: '28.2'
           - os: windows-latest
             emacs_version: '28.2'
 
