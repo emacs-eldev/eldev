@@ -1192,16 +1192,28 @@ later.  Any unknown value is treated as t.
 
 Since 0.8")
 
+(defvar eldev-cut-backtraces nil
+  "Whether to use “notches” to shorten backtraces.
+When a notch is used, all backtrace frames below it (i.e. from
+which the function installing the notch got called) are omitted.
+This variable may be nil (to ignore all notches), t (to use all
+of them) or a list of notch types to use.
+
+Since 1.5.")
+
 (defvar eldev-handle-debug-backtrace t
   "Whether to try and handle backtraces issued by Elisp debugger.
 When non-nil, `eldev-backtrace-style' and highlighting is also
 applied to backtraces printed because of `--debug' option.
 
- Since 0.10.")
+Since 0.10.")
+
+(defvar eldev--backtrace-notches nil)
 
 (defvar backtrace-line-length)
 (defvar print-escape-control-characters)
 
+(declare-function mapbacktrace nil)
 (declare-function backtrace-get-frames "backtrace")
 (declare-function backtrace-frames "backtrace")
 (declare-function backtrace-to-string "backtrace")
@@ -1216,21 +1228,52 @@ dropped.  This uses either `backtrace-frames' or newer
   (unless backtrace-function
     (setf backtrace-function #'eldev-backtrace-frames))
   (require 'backtrace nil t)
-  (cond ((fboundp #'backtrace-get-frames)
-         (backtrace-get-frames backtrace-function))
-        ((fboundp #'backtrace-frames)
-         (backtrace-frames backtrace-function))
-        (t
-         ;; On Emacs 24 and 25 there are no such functions.
-         (let ((n 0)
-               frames)
-           ;; Result of `backtrace-frame' is incompatible with what `backtrace-frames'
-           ;; delivers.  Elisp...  Restructure for compatibility.
-           (while (let ((frame (backtrace-frame n backtrace-function)))
-                    (when frame
-                      (push (list (nth 0 frame) (nth 1 frame) (nthcdr 2 frame)) frames)
-                      (setf n (1+ n)))))
-           (nreverse frames)))))
+  (let ((backtrace
+         (cond ((fboundp #'backtrace-get-frames)
+                (backtrace-get-frames backtrace-function))
+               ((fboundp #'backtrace-frames)
+                (backtrace-frames backtrace-function))
+               (t
+                ;; On Emacs 24 and 25 there are no such functions.
+                (let ((n 0)
+                      frames)
+                  ;; Result of `backtrace-frame' is incompatible with what `backtrace-frames'
+                  ;; delivers.  Elisp...  Restructure for compatibility.
+                  (while (let ((frame (backtrace-frame n backtrace-function)))
+                           (when frame
+                             (push (list (nth 0 frame) (nth 1 frame) (nthcdr 2 frame)) frames)
+                             (setf n (1+ n)))))
+                  (nreverse frames))))))
+    (when eldev-cut-backtraces
+      (let ((notches eldev--backtrace-notches))
+        (while notches
+          (let ((notch (pop notches)))
+            (when (or (eq eldev-cut-backtraces t) (memq (car notch) eldev-cut-backtraces))
+              (setf (cdr (last backtrace (cdr notch))) nil
+                    notches                            nil))))))
+    backtrace))
+
+(defun eldev--backtrace-length (&optional backtrace-function)
+  "Get the number of frames in the current backtrace."
+  (unless backtrace-function
+    (setf backtrace-function #'eldev--backtrace-length))
+  ;; Brief benchmarking suggests that this is very fast with typical backtrace lengths, so
+  ;; you don't need to care too much how often you call it.
+  (if (fboundp #'mapbacktrace)
+      (let ((n 0))
+        (mapbacktrace (lambda (&rest _frame) (setf n (1+ n))) backtrace-function)
+        n)
+    (require 'backtrace nil t)
+    ;; The first two ways are likely irrelevant because of `mapbacktrace' above.
+    (cond ((fboundp #'backtrace-frames)
+           (length (backtrace-frames backtrace-function)))
+          ((fboundp #'backtrace-get-frames)
+           (length (backtrace-get-frames backtrace-function)))
+          (t
+           (let ((n 0))
+             (while (backtrace-frame n backtrace-function)
+               (setf n (1+ n)))
+             n)))))
 
 (defun eldev-backtrace (&optional frames backtrace-function)
   "Print backtrace to stderr.
@@ -1298,6 +1341,11 @@ Emacs 27+.  Since 0.3."
     (if (fboundp #'backtrace-frame-fun)
         (backtrace-frame-fun frame)
       (aref 1 frame))))
+
+(defmacro eldev-backtrace-notch (type &rest body)
+  (declare (indent 1) (debug (form body)))
+  `(let ((eldev--backtrace-notches (cons (cons ,type (1- (eldev--backtrace-length))) eldev--backtrace-notches)))
+     ,@body))
 
 (defun eldev--truncate-backtrace-lines (limit)
   ;; Optionally truncate long lines.

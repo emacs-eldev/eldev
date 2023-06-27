@@ -530,6 +530,27 @@ truncate backtrace lines"
                     "untruncated")
   (setf eldev-backtrace-style (if width (eldev-with-errors-as 'eldev-wrong-option-usage (eldev-parse-number width :min 0)) t)))
 
+(eldev-defoption eldev-cut-backtraces (&optional types)
+  "Cut backtraces; active notches can be limited to
+comma/space-separated TYPES"
+  :options        (-u --cut-backtraces)
+  :optional-value TYPES
+  :default-value  (cond ((consp eldev-cut-backtraces)
+                         (eldev-message-enumerate nil eldev-cut-backtraces #'symbol-name))
+                        ((eq eldev-cut-backtraces t)
+                         "all")
+                        (t
+                         :no-default))
+  (setf eldev-cut-backtraces (cond ((member types '(nil "all")) t)
+                                   ((string= types "none")      nil)
+                                   (t                           (mapcar #'intern (split-string types "[ \t,]" t))))))
+
+(eldev-defoption eldev-dont-cut-backtraces ()
+  "Never cut backtraces"
+  :options        (-U --full-backtraces --dont-cut-backtraces)
+  :hidden-if      (null eldev-cut-backtraces)
+  (setf eldev-cut-backtraces nil))
+
 (eldev-defoption eldev-set-loading-mode (mode)
   "Set the project's loading mode"
   :options        (-m --loading)
@@ -4918,9 +4939,10 @@ being that it doesn't print form results."
                                   (function         (byte-compile `(lambda (,@result-variables) (ignore ,@result-variables) ,(car form))))
                                   (result-arguments (when all-results
                                                       (cons (car (last all-results)) all-results))))
-                             (eldev-profile-body
-                               (dotimes (_ repetitions)
-                                 (setf result (apply function result-arguments))))))
+                             (eldev-backtrace-notch 'eldev
+                               (eldev-profile-body
+                                 (dotimes (_ repetitions)
+                                   (setf result (apply function result-arguments)))))))
                   (let ((final-form (if (eq eldev-eval-preprocess-forms 'macroexpand)
                                         (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
                                                (macroexpand-all (car form)))
@@ -4935,9 +4957,10 @@ being that it doesn't print form results."
                                               ,@(mapcar (lambda (n) `(,(intern (format "@%d" n)) ',(nth (1- n) all-results)))
                                                         (number-sequence 1 (length all-results))))
                                           ,@(macroexp-unprogn final-form))))
-                    (eldev-profile-body
-                      (dotimes (_ repetitions)
-                        (setf result (eval final-form (not (null eldev-eval-lexical)))))))))
+                    (eldev-backtrace-notch 'eldev
+                      (eldev-profile-body
+                        (dotimes (_ repetitions)
+                          (setf result (eval final-form (not (null eldev-eval-lexical))))))))))
               (setf all-results (append all-results (list result)))
               (when print-results
                 (with-temp-buffer
