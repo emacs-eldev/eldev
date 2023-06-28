@@ -474,7 +474,7 @@ in the VERSION as unknown back then."
             (beginning-of-line)
             (kill-line 1)))
         (unless (= (point-min) (point-max))
-          (signal 'eldev-error `(:hint ,(eldev-format-message "Status as reported by %s:\n%s" (eldev-vc-full-name backend) (eldev-message-enumerate "x" (buffer-string)))
+          (signal 'eldev-error `(:hint ,(eldev-format-message "Status as reported by %s:\n%s" (eldev-vc-full-name backend) (buffer-string))
                                        "Refusing to release: working directory is not clean"))))
       (when eldev-release-allowed-branch
         (let* ((current-branch   (eldev-vc-branch-name))
@@ -556,7 +556,7 @@ No pre-release testing configured.  If you have used a continuous integration
 server for testing the latest commit or have otherwise tested it, this is not
 a problem.
 
-Run the tests locally anyway? ")))
+Run the standard regression tests locally at least? ")))
               (eldev--release-do-test-locally nil nil))
             (dolist (extra-emacs (eldev-listify eldev-release-test-other-emacses))
               (eldev--release-do-test-locally extra-emacs nil))
