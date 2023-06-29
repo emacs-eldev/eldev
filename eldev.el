@@ -4904,16 +4904,14 @@ being that it doesn't print form results."
         (setf parameter `(,parameter)))
       (if (stringp parameter)
           (let ((parameter-forms (eldev-read-wholly parameter (eldev-format-message "%s from `%s'" (if print-results "expression(s)" "form(s) to evaluate") parameter) t)))
-            (if (cdr parameter-forms)
-                (dolist (form parameter-forms)
-                  (push `(,form ,(prin1-to-string form)) forms))
-              (push `(,(car parameter-forms) ,parameter) forms)))
+            (dolist (form (eldev-listify parameter-forms))
+              (push `(,form ,(eldev--eval-short-form-string form)) forms)))
         (let* ((file       (car parameter))
                (short-name (abbreviate-file-name file)))
           (eldev-trace "Reading forms from file `%s'..." file)
           (condition-case nil
               (dolist (form (eldev-read-file-forms file))
-                (push `(,form ,(prin1-to-string form) ,short-name) forms))
+                (push `(,form ,(eldev--eval-short-form-string form) ,short-name) forms))
             (file-error (signal 'eldev-error `("Unable to read forms from file `%s': file is missing or unreadable" ,short-name)))))))
     (when eldev-eval-load-project
       (eldev-load-project-dependencies (if print-results 'eval 'exec)))
@@ -4970,6 +4968,18 @@ being that it doesn't print form results."
                   (when (equal (char-before) ?\n)
                     (delete-char -1))
                   (eldev-output "%s" (buffer-string)))))))))))
+
+(defun eldev--eval-short-form-string (form)
+  "Return a possibly shortened string representation of FORM."
+  (let* ((print-level  4)
+         (print-length 10)
+         (as-string    (with-temp-buffer
+                         (eldev-prin1 form (current-buffer))
+                         (buffer-string))))
+    (setf as-string (replace-regexp-in-string "\n" "\\n" as-string t t))
+    (if (< (length as-string) 150)
+        as-string
+      (concat (substring as-string 0 147) "..."))))
 
 (eldev-defoption eldev-eval-from-file (file)
   "Read expressions (forms) from given file"
