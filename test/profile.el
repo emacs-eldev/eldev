@@ -19,7 +19,7 @@
   (let ((eldev--test-project "trivial-project"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("profile" "--file" (make-temp-file "eldev-profile") "compile" "there-is-no-such-file.el")
-      (should (string= "Nothing to do\n" stdout))
+      (should (string-match-p "Nothing to do" stdout))
       (should (= exit-code 0)))))
 
 ;; Profiler would choke on recursive compilation (`project-d.el' requires
@@ -31,8 +31,9 @@
       (should (= exit-code 0)))
     (eldev--test-run nil ("profile" "--file" (make-temp-file "eldev-profile") "compile" "project-d.el" "project-d-misc.el")
       ;; Assert that the order is preserved, resulting in recursion to compile the second
-      ;; file only once the compilation of the first is already started.
-      (should (string= (eldev--test-lines "ELC      project-d.el" "ELC      project-d-misc.el") stdout))
+      ;; file only once the compilation of the first is already started.  Ignore extra
+      ;; crap written by ancient Emacs versions ('#' is just a "won't appear" character").
+      (should (string-match-p "ELC +project-d\\.el[^#]+ELC +project-d-misc\\.el" stdout))
       (should (= exit-code 0)))))
 
 
