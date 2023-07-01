@@ -14,5 +14,26 @@
                    ("~/cpu/bar/just-a-name"     "~/cpu/bar/just-a-name-mem")))
     (should (string= (eldev--profile-derive-memory-file (car names)) (cadr names)))))
 
+;; Profiler would choke when nothing was ever profiled.
+(ert-deftest eldev-profile-no-op ()
+  (let ((eldev--test-project "trivial-project"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("profile" "--file" (make-temp-file "eldev-profile") "compile" "there-is-no-such-file.el")
+      (should (string= "Nothing to do\n" stdout))
+      (should (= exit-code 0)))))
+
+;; Profiler would choke on recursive compilation (`project-d.el' requires
+;; `project-d-misc.el').
+(ert-deftest eldev-profile-recursive-compilation ()
+  (let ((eldev--test-project "project-d"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("clean" "all")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("profile" "--file" (make-temp-file "eldev-profile") "compile" "project-d.el" "project-d-misc.el")
+      ;; Assert that the order is preserved, resulting in recursion to compile the second
+      ;; file only once the compilation of the first is already started.
+      (should (string= (eldev--test-lines "ELC      project-d.el" "ELC      project-d-misc.el") stdout))
+      (should (= exit-code 0)))))
+
 
 (provide 'test/profile)

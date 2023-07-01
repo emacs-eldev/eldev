@@ -3470,6 +3470,7 @@ mode output is restricted to just the version."
   "Whether to profile only project code.")
 
 (defvar eldev--effective-profile-mode nil)
+(defvar eldev--profile-ever-started nil)
 
 
 ;; I had an idea of profiling in a thread (Emacs 26+) to shorten backtraces, but this
@@ -3479,16 +3480,19 @@ mode output is restricted to just the version."
 (defmacro eldev-profile-body (&rest body)
   "Execute BODY, gathering profiling information if requested."
   (declare (indent 0) (debug (body)))
-  `(progn
-     (when eldev--effective-profile-mode
-       (eval-and-compile (require 'profiler))
-       (let ((inhibit-message t))
-         (profiler-start eldev--effective-profile-mode)))
-     (unwind-protect
-         (progn ,@body)
-       (when eldev--effective-profile-mode
+  (let ((do-start (make-symbol "$do-start")))
+    `(let ((,do-start (and eldev--effective-profile-mode
+                           (progn (eval-and-compile (require 'profiler))
+                                  (not (profiler-running-p eldev--effective-profile-mode))))))
+       (when ,do-start
+         (setf eldev--profile-ever-started t)
          (let ((inhibit-message t))
-           (profiler-stop))))))
+           (profiler-start eldev--effective-profile-mode)))
+       (unwind-protect
+           (progn ,@body)
+         (when ,do-start
+           (let ((inhibit-message t))
+             (profiler-stop)))))))
 
 (eldev-defcommand eldev-profile (&rest parameters)
   "Profile given Eldev command.  Particularly useful with
@@ -3528,7 +3532,10 @@ At least one of options `--file' and `--open' is required."
          memory-profile
          memory-profile-file)
     (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
-        (eldev--execute-command parameters)
+        (progn (eldev--execute-command parameters)
+               ;; See test `eldev-profile-no-op'.
+               (unless eldev--profile-ever-started
+                 (eldev-profile-body)))
       (eldev-profile-body
         (let ((eldev--effective-profile-mode nil))
           (eldev--execute-command parameters))))
