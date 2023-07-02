@@ -158,7 +158,8 @@
 
 (ert-deftest eldev-exec-debugging-time-it-2 ()
   (eldev--test-run "project-a" ("exec" `(eldev-time-it "%.1f" (sleep-for 1)))
-    (should (<= 0.9 (eldev-parse-number (string-trim stderr) :floating-point t) 1.1))
+    ;; Just be extra-generous for CI machines.  Has been 1.2 at least once.
+    (should (<= 0.9 (eldev-parse-number (string-trim stderr) :floating-point t) 2.0))
     (should (= exit-code 0))))
 
 
