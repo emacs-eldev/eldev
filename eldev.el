@@ -3532,10 +3532,16 @@ At least one of options `--file' and `--open' is required."
          memory-profile
          memory-profile-file)
     (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
-        (progn (eldev--execute-command parameters)
-               ;; See test `eldev-profile-no-op'.
-               (unless eldev--profile-ever-started
-                 (eldev-profile-body)))
+        (progn
+          ;; Starting with Emacs 27 these functions would get called on profiler stopping,
+          ;; retrieving the collected profiling information, but also clearing it and
+          ;; making unavailable for later joins (see test `eldev-profile-joins-multiple').
+          (eldev-advised ('profiler-cpu-log :override (lambda (&rest _)))
+            (eldev-advised ('profiler-memory-log :override (lambda (&rest _)))
+              (eldev--execute-command parameters)))
+          ;; See test `eldev-profile-no-op'.  For 27 and up this also retrieves "the
+          ;; final, everything joined data", see advises above.
+          (eldev-profile-body))
       (eldev-profile-body
         (let ((eldev--effective-profile-mode nil))
           (eldev--execute-command parameters))))
@@ -3560,6 +3566,7 @@ At least one of options `--file' and `--open' is required."
                                                        (nth (- num-files (if (and (> num-files 1) (eq eldev--effective-profile-mode 'cpu+mem)) 2 1)) files)
                                                      (make-temp-file temp-prefix nil ".cpu.prof"))
                                                    eldev-project-dir))
+          (eldev-verbose "Storing the generated CPU profile in file `%s'..." cpu-profile-file)
           (profiler-write-profile cpu-profile cpu-profile-file))
         (when memory-profile
           (setf memory-profile-file (expand-file-name (if files
@@ -3568,6 +3575,7 @@ At least one of options `--file' and `--open' is required."
                                                       eldev-project-dir))
           (when (and cpu-profile-file (string= memory-profile-file cpu-profile-file))
             (setf memory-profile-file (eldev--profile-derive-memory-file cpu-profile-file)))
+          (eldev-verbose "Storing the generated memory profile in file `%s'..." memory-profile-file)
           (profiler-write-profile memory-profile memory-profile-file))))
     (when eldev-profile-open-in-emacs
       (when cpu-profile-file
@@ -3598,6 +3606,7 @@ At least one of options `--file' and `--open' is required."
 	                             (format "%s/emacs" xdg_runtime_dir)
 	                           (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid)))))))
         (form              `(progn (profiler-report-profile (profiler-read-profile ,filename)) t)))
+    (eldev-verbose "Trying to open the generated profile `%s' in your normal Emacs..." filename)
     ;; Ugly in that if something goes wrong with evaluating expression "there", no error
     ;; is signalled "here".  But what can we do other than rewriting all this crap?  At
     ;; least it will give an error if the server is not running.

@@ -36,5 +36,17 @@
       (should (string-match-p "ELC +project-d\\.el[^#]+ELC +project-d-misc\\.el" stdout))
       (should (= exit-code 0)))))
 
+;; Depending on Emacs version (27 and up, apparently), profiles created later would
+;; replace earlier profiles, instead of being merged with them.  For the standard profiler
+;; usage this would make sense, but certainly not when used from Eldev.
+(eldev-ert-defargtest eldev-profile-merges-multiple (meaningful-is-last)
+                      (nil t)
+  (let ((profile-file (make-temp-file "eldev-profile")))
+    (eldev--test-run "trivial-project" (:eval `("-d" "profile" "--file" ,profile-file
+                                                "exec" ,`(defun must-appear-in-profile (x) (dotimes (_ 100000) (setf x (1+ x))) x)
+                                                ,`(must-appear-in-profile 0) ,@(unless meaningful-is-last '(nil))))
+      (should (string-match-p "must-appear-in-profile" (eldev--test-file-contents nil profile-file)))
+      (should (= exit-code 0)))))
+
 
 (provide 'test/profile)
