@@ -14,6 +14,12 @@ packages, but instead has access to the project being built with Eldev
 commands, features listed in variable `eldev-emacs-required-features`
 are required automatically.
 
+IMPORTANT: Eldev currently doesn’t support running Emacs in terminal
+mode (this might be even impossible in Elisp given Eldev’s design).
+If your Emacs is configured `--with-x` (as is usual), this shouldn’t
+be a problem.  Otherwise it will only function if you run it in batch
+mode.
+
 You can also pass any Emacs options through the command line.  For
 example, this will visit file `foo.bar`, which is useful if your
 project is a mode for `.bar` files:
