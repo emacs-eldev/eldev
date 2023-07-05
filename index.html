@@ -2991,6 +2991,22 @@ packages, but instead has access to the project being built with Eldev
 commands, features listed in variable <code>eldev-emacs-required-features</code>
 are required automatically.</p>
 </div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+Eldev currently doesn’t support running Emacs in terminal
+mode (this might be even impossible in Elisp given Eldev’s design).
+If your Emacs is configured <code>--with-x</code> (as is usual), this shouldn’t
+be a problem.  Otherwise it will only function if you run it in batch
+mode.
+</td>
+</tr>
+</table>
+</div>
 <div class="paragraph">
 <p>You can also pass any Emacs options through the command line.  For
 example, this will visit file <code>foo.bar</code>, which is useful if your
@@ -4865,7 +4881,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-06-19 17:43:47 UTC
+Last updated 2023-07-05 19:33:07 UTC
 </div>
 </div>
 </body>
