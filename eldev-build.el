@@ -526,10 +526,11 @@ possible to build arbitrary targets this way."
                        (unless eldev-build-dry-run-mode
                          (if eldev-build-keep-going
                              (condition-case error
-                                 (if (eldev-get builder :profiling-self)
-                                     (funcall builder source-argument target-argument)
-                                   (eldev-profile-body
-                                     (funcall builder source-argument target-argument)))
+                                 (eldev-backtrace-notch 'eldev
+                                   (if (eldev-get builder :profiling-self)
+                                       (funcall builder source-argument target-argument)
+                                     (eldev-profile-body
+                                       (funcall builder source-argument target-argument))))
                                (eldev-build-abort-branch
                                 (signal (car error) (cdr error)))
                                (eldev-error
@@ -617,11 +618,12 @@ possible to build arbitrary targets this way."
                                                                                     (unless (and eldev-build-suppress-warnings (eq level :warning))
                                                                                       (apply original string fill level etc)))))
                                        (eldev--silence-file-writing-message (expand-file-name target)
-                                         (eldev-profile-body
-                                           (and (byte-compile-file source)
-                                                (if (memq source (car eldev--recursive-elevated-errors-in))
-                                                    (progn (delete-file target) nil)
-                                                  t))))))))
+                                         (eldev-backtrace-notch 'eldev
+                                           (eldev-profile-body
+                                             (and (byte-compile-file source)
+                                                  (if (memq source (car eldev--recursive-elevated-errors-in))
+                                                      (progn (delete-file target) nil)
+                                                    t)))))))))
                     (cond ((eq result 'no-byte-compile)
                            (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
                            nil)

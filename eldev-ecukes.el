@@ -110,8 +110,9 @@
             ;; Inject profiling support if wanted.
             (eldev-advised ('ecukes-run-steps :around (when eldev--effective-profile-mode
                                                         (lambda (original &rest args)
-                                                          (eldev-profile-body
-                                                            (apply original args)))))
+                                                          (eldev-backtrace-notch 'eldev
+                                                            (eldev-profile-body
+                                                              (apply original args))))))
               (if eldev-test-print-backtraces
                   (let ((eldev--ecukes-backtraces (make-hash-table :test #'eq)))
                     (eldev-advised ('ecukes-run-step :around #'eldev--ecukes-run-step)

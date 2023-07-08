@@ -59,8 +59,9 @@
     ;; Inject profiling support if wanted.
     (let* ((result     (eldev-advised ('buttercup--run-spec :around (when eldev--effective-profile-mode
                                                                       (lambda (original &rest args)
-                                                                        (eldev-profile-body
-                                                                          (apply original args)))))
+                                                                        (eldev-backtrace-notch 'eldev
+                                                                          (eldev-profile-body
+                                                                            (apply original args))))))
                          ;; Not trying to highlight the summary, Buttercup already does that itself.
                          (buttercup-run t)))
            (num-failed (buttercup-suites-total-specs-failed buttercup-suites)))

@@ -1343,6 +1343,13 @@ Emacs 27+.  Since 0.3."
       (aref 1 frame))))
 
 (defmacro eldev-backtrace-notch (type &rest body)
+  "Leave a “notch” for `eldev-backtrace-frames' to use.
+Whenever that function encounters an enabled notch, it cuts
+produced backtrace in order to reduce its size by dropping the
+common outmost frames.  From the command line notches can be
+enabled with global option `--cut-backtraces'.  Eldev always
+leaves notches of type `eldev'; all other types are reserved for
+your own use."
   (declare (indent 1) (debug (form body)))
   `(let ((eldev--backtrace-notches (cons (cons ,type (1- (eldev--backtrace-length))) eldev--backtrace-notches)))
      ,@body))

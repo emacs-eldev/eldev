@@ -4031,10 +4031,11 @@ for details."
                                    (condition-case error
                                        (if (eq pass 'run)
                                            (unwind-protect
-                                               (if profiling-self
-                                                   (funcall runner framework actual-selectors files)
-                                                 (eldev-profile-body
-                                                   (funcall runner framework actual-selectors files)))
+                                               (eldev-backtrace-notch 'eldev
+                                                 (if profiling-self
+                                                     (funcall runner framework actual-selectors files)
+                                                   (eldev-profile-body
+                                                     (funcall runner framework actual-selectors files))))
                                              (eldev-test-finalize-framework framework actual-selectors))
                                          (let ((count-tests (eldev-test-get-framework-entry framework 'count-tests)))
                                            (if count-tests
