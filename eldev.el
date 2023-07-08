@@ -5225,7 +5225,13 @@ be passed to Emacs, else it will most likely fail."
     (let* ((autoloads           (apply #'nconc (mapcar (lambda (file) `("--load" ,file)) eldev--loaded-autoloads-files)))
            (value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
            (effective-load-path (mapconcat #'identity load-path path-separator))
-           (process-environment `(,(format "EMACSLOADPATH=%s" effective-load-path) ,@process-environment)))
+           ;; See https://github.com/doublep/eldev/issues/89.  The idea here is to make
+           ;; nested Emacs die on its own if run in terminal mode.  I also tried adding an
+           ;; evalled call on its command line that'd invoke `kill-emacs' in that mode,
+           ;; but this turned out not to quite work: it's called too late, when Emacs
+           ;; already has set up itself on the terminal, and I couldn't make it print any
+           ;; helpful output: it would just get lost.
+           (process-environment `(,(format "EMACSLOADPATH=%s" effective-load-path) ,"TERM=eldev-emacs-batch-mode" ,@process-environment)))
       (eldev-call-process eldev-emacs-executable
           (if (string= (car parameters) "--")
               (append autoloads value-forwarding (cdr parameters))
@@ -5240,7 +5246,12 @@ be passed to Emacs, else it will most likely fail."
         :pre-execution  (eldev-verbose "Full command line to run child Emacs process:\n  %s" (eldev-message-command-line executable command-line))
         :pre-execution  (eldev-verbose "Effective load path for it:\n  %s" effective-load-path)
         :forward-output t
-        :die-on-error   "child Emacs"))))
+        :destination    t
+        (when (/= exit-code 0)
+          (signal 'eldev-error `(:hint ,(when (looking-at ".*eldev-emacs-batch-mode.+not defined")
+                                          (concat "Eldev cannot start Emacs in terminal mode due to Elisp limitations\n"
+                                                  "Use either a graphical window mode (if supported in your Emacs) or batch mode"))
+                                       "Child Emacs exited with error code %d" ,exit-code)))))))
 
 
 
