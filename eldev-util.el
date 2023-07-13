@@ -1312,11 +1312,13 @@ See `eldev-backtrace' for more information.  Since 0.10."
   (with-temp-buffer
     (let ((limit       (eldev-shrink-screen-width-as-needed eldev-backtrace-style))
           (indentation (when eldev-indent-backtraces (eldev-debugging-output-prefix))))
-      (setf limit (when (and (integerp limit) (> limit 0)) (max (- limit (length indentation)) 1)))
+      (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
       ;; Use `backtrace-to-string' only with new-style frames.
       (if (and (fboundp #'backtrace-to-string) (not (listp (car frames))))
-          ;; Emacs' `backtrace' module can die if this value is too small or nil.
-          (let ((backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
+          ;; Accound for indentation separately here, else backtrace lines may be too long.
+          (let* ((limit                 (when limit (- limit (length indentation))))
+                 ;; Emacs' `backtrace' module can die if this value is too small or nil.
+                 (backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
             (insert (backtrace-to-string frames))
             (when indentation
               (goto-char 1)

@@ -34,19 +34,27 @@
       (should     (= exit-code 0)))))
 
 
-(eldev-ert-defargtest eldev-backtrace-length-limit-1 (with-time-diff)
-                      (nil t)
+(eldev-ert-defargtest eldev-backtrace-length-limit-1 (with-time-diff indent)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
   ;; Backtrace length limit should be adjusted accordingly when option `-T' is used.
-  (eldev--test-run "trivial-project" ("--backtrace=30" (if with-time-diff "--time" "--no-time") "exec" `(eldev-backtrace))
+  (eldev--test-run "trivial-project" ("--backtrace=30" (if with-time-diff "--time" "--no-time") "exec"
+                                      (if indent `(eldev-nest-debugging-output (eldev-backtrace)) `(eldev-backtrace)))
     (let ((lines (eldev--test-backtrace-lines stderr)))
       (should (string= stdout ""))
       (should (eldev-all-p (<  (length it) 30) lines))
       (should (eldev-any-p (>= (length it) 29) lines))
       (should (= exit-code 0)))))
 
-(eldev-ert-defargtest eldev-backtrace-length-limit-2 (with-time-diff)
-                      (nil t)
-  (eldev--test-run "trivial-project" ("--backtrace=30" "--debug" (if with-time-diff "--time" "--no-time") "eval" "this-variable-is-not-bound")
+(eldev-ert-defargtest eldev-backtrace-length-limit-2 (with-time-diff indent)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
+  (eldev--test-run "trivial-project" ("--backtrace=30" "--debug" (if with-time-diff "--time" "--no-time") "eval"
+                                      (if indent `(eldev-nest-debugging-output this-variable-is-not-bound) `this-variable-is-not-bound))
     (let ((lines (eldev--test-backtrace-lines stderr)))
       (should (string= stdout ""))
       (should (eldev-all-p (<  (length it) 30) lines))
