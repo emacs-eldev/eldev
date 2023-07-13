@@ -1208,6 +1208,16 @@ applied to backtraces printed because of `--debug' option.
 
 Since 0.10.")
 
+(defvar eldev-indent-backtraces t
+  "Whether to use `eldev-debugging-output-prefix' for backtraces.
+In previous versions backtraces would never be additionally
+indented, possibly resulting in confusing output.  On the other
+hand, space usage for backtrace with truncated lines would then
+be better.  You can restore original behavior by setting this
+variable to nil.
+
+Since 1.5.")
+
 (defvar eldev--backtrace-notches nil)
 
 (defvar backtrace-line-length)
@@ -1300,19 +1310,26 @@ See `eldev-backtrace' for more information.  Since 0.10."
   (unless frames
     (setf frames (eldev-backtrace-frames (or backtrace-function #'eldev-backtrace-to-string))))
   (with-temp-buffer
-    (let ((limit (eldev-shrink-screen-width-as-needed eldev-backtrace-style)))
-      (setf limit (when (and (integerp limit) (> limit 0)) (max (1- limit) 1)))
+    (let ((limit       (eldev-shrink-screen-width-as-needed eldev-backtrace-style))
+          (indentation (when eldev-indent-backtraces (eldev-debugging-output-prefix))))
+      (setf limit (when (and (integerp limit) (> limit 0)) (max (- limit (length indentation)) 1)))
       ;; Use `backtrace-to-string' only with new-style frames.
       (if (and (fboundp #'backtrace-to-string) (not (listp (car frames))))
           ;; Emacs' `backtrace' module can die if this value is too small or nil.
           (let ((backtrace-line-length (if (and limit (>= limit 60)) limit 0)))
-            (insert (backtrace-to-string frames)))
+            (insert (backtrace-to-string frames))
+            (when indentation
+              (goto-char 1)
+              (while (progn (insert indentation)
+                            (forward-line)
+                            (not (eobp))))))
         (let ((standard-output                 (current-buffer))
               (print-level                     (or print-level 8))
               (print-escape-control-characters t)
               (print-escape-newlines           t))
+          (setf indentation (concat (or indentation "") "  "))
           (dolist (frame frames)
-            (princ "  ")
+            (princ indentation)
             (let ((fn   (nth 1 frame))
                   (args (nth 2 frame)))
               (if (nth 0 frame)
