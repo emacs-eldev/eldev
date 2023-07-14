@@ -34,6 +34,22 @@
       (should     (= exit-code 0)))))
 
 
+(defun eldev--test-infer-backtrace-indentation (lines with-time-diff error-backtrace)
+  (when with-time-diff
+    (setf lines (mapcar (lambda (line) (substring line 13)) lines)))
+  (let ((indentation (progn (string-match "^ *" (car lines))
+                            (- (length (match-string 0 (car lines))) (if error-backtrace 0 2)))))
+    (if (eldev-all-p (or (= (length it) 0)
+                         ;; Ignore lines used to mark backtrace cutting; `backtrace' module apparently does
+                         ;; not indent them, at least in current Emacs versions.
+                         (string-match-p (rx bol (0+ whitespace) "..." eol) it)
+                         (progn (string-match "^ *" it) (= indentation (- (length (match-string 0 it)) 2)))
+                         (eldev-dump it indentation)
+                         nil)
+                     (cdr lines))
+        indentation
+      'cannot-infer)))
+
 (eldev-ert-defargtest eldev-backtrace-length-limit-1 (with-time-diff indent)
                       ((nil nil)
                        (nil t)
@@ -46,6 +62,7 @@
       (should (string= stdout ""))
       (should (eldev-all-p (<  (length it) 30) lines))
       (should (eldev-any-p (>= (length it) 29) lines))
+      (should (equal (eldev--test-infer-backtrace-indentation lines with-time-diff nil) (if indent 2 0)))
       (should (= exit-code 0)))))
 
 (eldev-ert-defargtest eldev-backtrace-length-limit-2 (with-time-diff indent)
@@ -59,6 +76,8 @@
       (should (string= stdout ""))
       (should (eldev-all-p (<  (length it) 30) lines))
       (should (eldev-any-p (>= (length it) 29) lines))
+      ;; Backtraces that are a result of an error must never be indented.
+      (should (equal (eldev--test-infer-backtrace-indentation lines with-time-diff t) 0))
       (should (/= exit-code 0)))))
 
 

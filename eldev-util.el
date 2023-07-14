@@ -1210,11 +1210,13 @@ Since 0.10.")
 
 (defvar eldev-indent-backtraces t
   "Whether to use `eldev-debugging-output-prefix' for backtraces.
-In previous versions backtraces would never be additionally
-indented, possibly resulting in confusing output.  On the other
-hand, space usage for backtrace with truncated lines would then
-be better.  You can restore original behavior by setting this
-variable to nil.
+Honored only by `eldev-backtrace' and similar functions, not when
+an error is raised while Eldev is being run with `--debug'
+option.  In previous versions backtraces would never be
+additionally indented, possibly resulting in confusing output.
+On the other hand, space usage for backtrace with truncated lines
+would then be better.  You can restore original behavior by
+setting this variable to nil.
 
 Since 1.5.")
 
