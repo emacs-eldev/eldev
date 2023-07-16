@@ -264,6 +264,21 @@ Since 0.5")
   "Forms executed as the last step of Eldev setup.
 Should normally be specified only via command line.")
 
+(defvar eldev-robust-mode 'auto
+  "Whether to retry on certain errors instead of giving up.
+Special symbol \\='auto means that Eldev should retry if executed
+on a continuous integration server, i.e. where sleeping and
+retrying later generally makes sense.
+
+Since 1.5.")
+
+(defvar eldev-robust-mode-retry-delays '(30 60 120 180 300)
+  "Delays before robust-mode-retrials, in seconds.
+This is not controllable from the command line, but can be
+changed directly.
+
+Since 1.5.")
+
 (defvar eldev-skip-global-config nil
   "Whether to skip file `~/.config/eldev/config'.
 Occasionally useful to some external tools.  Not exposed through
@@ -649,11 +664,7 @@ comma/space-separated TYPES"
   :options        (-C --color)
   :optional-value WHEN
   :default-value  (if eldev-coloring-mode (if (eq eldev-coloring-mode 'auto) "auto" "always") "never")
-  (setf mode                (when mode (downcase mode))
-        eldev-coloring-mode (cond ((or (null mode) (member mode '("always" "on"))) t)
-                                  ((string= mode "auto")                           'auto)
-                                  ((member mode '("never" "off"))                   nil)
-                                  (t (signal 'eldev-wrong-option-usage `("argument must be `always', `auto' or `never'"))))))
+  (setf eldev-coloring-mode (eldev--auto-always-never-option mode)))
 
 ;; Not advertised, this is mostly for external tools.
 (eldev-defoption eldev-setup-first-form (form)
@@ -695,6 +706,13 @@ comma/space-separated TYPES"
                       `(:instead-of-default ,(eldev-format-message "(default would be `%s')" dir))))
   (setf eldev-external-package-dir (or dir t)))
 
+(eldev-defoption eldev-robust-mode (&optional mode)
+  "Whether to retry on certain errors; WHEN can be `always', `auto' or `never'"
+  :options        (-R --robust-mode --ci-mode)
+  :optional-value WHEN
+  :default-value  (if eldev-robust-mode (if (eq eldev-robust-mode 'auto) "auto" "always") "never")
+  (setf eldev-robust-mode (eldev--auto-always-never-option mode)))
+
 (eldev-defbooloptions eldev-enable-xdebug-initially eldev-disable-xdebug-initially eldev-xdebug-output-enabled
   ("Enable `xdebug' output initially"
    :options       (-x --xdebug --enable-xdebug)
@@ -702,6 +720,14 @@ comma/space-separated TYPES"
   ("Disable `xdebug' output initially"
    :options       (--no-xdebug --disable-xdebug)
    :hidden-if     :default))
+
+(defun eldev--auto-always-never-option (mode)
+  (when mode
+    (setf mode (downcase mode)))
+  (cond ((or (null mode) (member mode '("always" "on"))) t)
+        ((string= mode "auto")                           'auto)
+        ((member mode '("never" "off"))                   nil)
+        (t (signal 'eldev-wrong-option-usage `("argument must be `always', `auto' or `never'")))))
 
 
 
@@ -934,7 +960,7 @@ Used by Eldev startup script."
                               (setf exit-code 0))))))))
               ;; FIXME: `command' will be wrong if the error occurs during nested command
               ;;        processing, e.g. `$ eldev profile ... eval --unknown-option ...'.
-              (eldev-error (eldev--print-eldev-error error command))
+              (eldev-error (eldev--print-error error command))
               (eldev-quit  (setf exit-code (cdr error))))
           (error (eldev-error "%s" (error-message-string error))
                  (eldev--inform-about-named-steps)
@@ -1017,25 +1043,34 @@ Since 1.0."
             (throw 'renamed-as new-name))
           (setf k (if k (1+ k) 1)))))))
 
-(defun eldev--print-eldev-error (error &optional command as-warning)
+(defun eldev--print-error (error &optional command as-warning)
   (let* ((arguments (cdr error))
+         eldev-error
          hint
          hint-about-command)
-    (when (and (eq (car error) 'eldev-wrong-command-usage) (not (stringp (car arguments))))
-      (setf arguments `(:command ,(or command t) ,@(cdr arguments))))
-    (when (eq arguments eldev-too-old)
-      (setf eldev-too-old nil))
-    (pcase (car arguments)
-      (:hint    (pop arguments) (setf hint               (pop arguments)))
-      (:command (pop arguments) (setf hint-about-command (pop arguments))))
-    (let ((message (apply #'eldev-format-message arguments)))
-      (if as-warning
-          (eldev-warn (if (eq as-warning t) "%s" as-warning) message)
-        (eldev-error "%s" message)))
-    (when hint
-      (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
-    (when hint-about-command
-      (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command))))
+    ;; Elisp apparently doesn't expose that information.
+    (ignore-errors
+      (condition-case nil
+          (signal (car error) nil)
+        (eldev-error (setf eldev-error t))))
+    (if eldev-error
+        (progn
+          (when (and (eq (car error) 'eldev-wrong-command-usage) (not (stringp (car arguments))))
+            (setf arguments `(:command ,(or command t) ,@(cdr arguments))))
+          (when (eq arguments eldev-too-old)
+            (setf eldev-too-old nil))
+          (pcase (car arguments)
+            (:hint    (pop arguments) (setf hint               (pop arguments)))
+            (:command (pop arguments) (setf hint-about-command (pop arguments))))
+          (let ((message (apply #'eldev-format-message arguments)))
+            (if as-warning
+                (eldev-warn (if (eq as-warning t) "%s" as-warning) message)
+              (eldev-error "%s" message)))
+          (when hint
+            (eldev-print :stderr "%s" (apply #'eldev-format-message (eldev-listify hint))))
+          (when hint-about-command
+            (eldev-print :stderr "Run `%s help%s' for more information" (eldev-shell-command t) (if (eq hint-about-command t) "" (format " %s" hint-about-command)))))
+      (eldev-error "%s" (error-message-string error)))
     (eldev--inform-about-named-steps)))
 
 (defun eldev--inform-about-named-steps ()
@@ -1339,6 +1374,52 @@ Loading mode is not included.  Since 1.2."
               (package-activate-1 eldev-pkg)))
         (eldev-warn "Cannot activate Eldev package suppposedly specified by `ELDEV_LOCAL'"))))
   (eldev--set-up))
+
+
+(defun eldev-retry-on-errors-p ()
+  "Determine if we should retry on certain errors.
+This should be used in cases where it is expected that certain
+things might occasionally fail because of an external factor,
+e.g. a short-living networking problem.
+
+Since 1.5."
+  (if (eq eldev-robust-mode 'auto) (eldev--on-ci-server-p) eldev-robust-mode))
+
+(defun eldev--on-ci-server-p ()
+  ;; This environment variable appears to be sort-of standard.  We don't care if the users
+  ;; "spoofs" it or not, this is only a heuristic.
+  (equal (getenv "CI") "true"))
+
+(defmacro eldev-retrying-for-robustness (&rest body)
+  (declare (indent 0) (debug (body)))
+  (let ((all-retry-delays (make-symbol "$all-retry-delays"))
+        (remaining-delays (make-symbol "$remaining-delays")))
+    `(let* ((,all-retry-delays (when (eldev-retry-on-errors-p) eldev-robust-mode-retry-delays))
+            (,remaining-delays ,all-retry-delays))
+       (catch 'obtained-result
+         (while t
+           (condition-case error
+               ;; If we still plan to retry, we need to unset `debug-on-error' locally.
+               (throw 'obtained-result (let ((debug-on-error (and debug-on-error (null ,remaining-delays))))
+                                         ,@body))
+             (error (eldev--maybe-retry error ,all-retry-delays ,remaining-delays)
+                    (pop ,remaining-delays))))))))
+
+(defun eldev--maybe-retry (error all-retry-delays remaining-delays)
+  (let ((delay (pop remaining-delays)))
+    (unless delay
+      (when all-retry-delays
+        (eldev-warn "Giving up: too many retries already"))
+      (signal (car error) (cdr error)))
+    (eldev--print-error error)
+    (eldev-warn "Assuming this is an intermittent problem, waiting %s before retrying..."
+                (cond ((< delay 60)         (format "%s s" delay))
+                      ((= (mod delay 60) 0) (format "%s m" (/ delay 60)))
+                      (t                    (format "%s m %s s" (/ delay 60) (mod delay 60)))))
+    (sleep-for delay)
+    (let* ((total (length all-retry-delays))
+           (n     (- total (length remaining-delays))))
+      (eldev-warn "Retry #%d%s..." n (if (= n total) ", the last" (format " of maximum %d" total))))))
 
 
 
@@ -2818,22 +2899,23 @@ for all archives instead."
     (let ((eldev-message-rerouting-destination         :stderr)
           (eldev-global-cache-archive-contents-max-age (if refetch-contents -1 eldev-global-cache-archive-contents-max-age))
           (package-archives                            archives)
-          (inhibit-message                             t)
-          failure)
+          (inhibit-message                             t))
       (eldev--with-pa-access-workarounds (lambda ()
-                                           (eldev-using-global-package-archive-cache
-                                             ;; Emacs package system eats up all errors in `package-refresh-contents',
-                                             ;; unless in debug mode.  Try to work around that and issue a nice error.
-                                             (eldev-advised (#'package--download-one-archive
-                                                             :around (lambda (original archive &rest arguments)
-                                                                       (unless failure
-                                                                         (condition-case-unless-debug error
-                                                                             (apply original archive arguments)
-                                                                           (error (setf failure (cons error (if (consp archive) (car archive) archive))))))))
-                                               (package-refresh-contents)
-                                               (when failure
-                                                 (signal 'eldev-error `(:hint ,(eldev-format-message "When updating contents of package archive `%s'" (cdr failure))
-                                                                              ,(error-message-string (car failure))))))))))))
+                                           (eldev-retrying-for-robustness
+                                             (let (failure)
+                                               (eldev-using-global-package-archive-cache
+                                                 ;; Emacs package system eats up all errors in `package-refresh-contents',
+                                                 ;; unless in debug mode.  Try to work around that and issue a nice error.
+                                                 (eldev-advised (#'package--download-one-archive
+                                                                 :around (lambda (original archive &rest arguments)
+                                                                           (unless failure
+                                                                             (condition-case-unless-debug error
+                                                                                 (apply original archive arguments)
+                                                                               (error (setf failure (cons error (if (consp archive) (car archive) archive))))))))
+                                                   (package-refresh-contents)
+                                                   (when failure
+                                                     (signal 'eldev-error `(:hint ,(eldev-format-message "When updating contents of package archive `%s'" (cdr failure))
+                                                                                  ,(error-message-string (car failure))))))))))))))
 
 (defun eldev--with-pa-access-workarounds (callback &optional call-after-working-around)
   ;; This is only to reduce noise from old Emacs versions a bit.
@@ -4043,7 +4125,7 @@ for details."
                                              (push framework noncounting-frameworks))))
                                      (eldev-error
                                       ;; Normally we just print and continue for other frameworks.
-                                      (eldev--print-eldev-error error 'test)
+                                      (eldev--print-error error 'test)
                                       (setf any-frameworks-failed t))))))))))))
                  (when (eq pass 'count)
                    (if (>= num-matched-tests eldev-test-expect-at-least)
@@ -4519,7 +4601,7 @@ least one warning."
                 (condition-case error
                     (funcall (cdr (assq canonical-name eldev--linters)))
                   (eldev-missing-dependency (if eldev-lint-optional
-                                                (eldev--print-eldev-error error nil (eldev-format-message "%%s; skipping linter `%s'" linter))
+                                                (eldev--print-error error nil (eldev-format-message "%%s; skipping linter `%s'" linter))
                                               (signal 'eldev-error `("%s; cannot use linter `%s'" ,(eldev-extract-error-message error) ,linter)))))
                 (when (and (eq eldev-lint-stop-mode 'linter) (> eldev--lint-num-warnings 0))
                   (eldev-trace "Stopping after the linter that issued warnings")

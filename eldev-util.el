@@ -2172,7 +2172,7 @@ is non-nil when this function is called."
 (defconst eldev--snapshot (cadr (version-to-list "0snapshot")))
 
 (defun eldev-version-snapshot-p (version)
-  "Determine if VERSION contains is a snapshot one.
+  "Determine if VERSION is a snapshot one.
 Both lists and strings are accepted.  Since 1.2."
   (when (stringp version)
     (setf version (version-to-list version)))

@@ -42,6 +42,7 @@
   (let ((actual-command-line `(list ,@command-line))
         (no-errors           (make-symbol "$no-errors"))
         (discard-ansi        t)
+        (robust-mode         'propagate)
         process-input-form
         important-values
         important-files
@@ -52,20 +53,26 @@
       (eldev-pcase-exhaustive (pop body)
         (:process-input   (setf process-input-form (pop body)))
         (:discard-ansi    (setf discard-ansi       (pop body)))
+        (:robust-mode     (unless (equal program-name "Eldev")
+                            (error "`:robust-mode' is only for invoking child Eldev"))
+                          (setf robust-mode        (pop body)))
         (:important-value (push (pop body)         important-values))
         (:important-files (setf important-files    (eldev-listify (pop body))))
         (:previous-call   (let ((name (pop body))
                                 (call (pop body)))
                             (push `(cons ,name ,call) previous-calls)))))
-    `(let* ((process-input      ,process-input-form)
+    `(let* ((command-line       ,actual-command-line)
+            (process-input      ,process-input-form)
             (process-input-file (when process-input (make-temp-file "eldev-test")))
             (stderr-file        (make-temp-file "eldev-stderr-")))
        (when process-input-file
          (with-temp-file process-input-file
            (insert process-input)))
+       ,@(when (equal program-name "Eldev")
+           `((push ,(format "--robust-mode=%s" (if (if (eq robust-mode 'propagate) (eldev-retry-on-errors-p) robust-mode) "always" "never")) command-line)))
        (unwind-protect
            ;; Using `eldev-call-process' here mostly for a bit of testing for it.
-           (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) ,actual-command-line)
+           (eldev-call-process ,executable (mapcar (lambda (argument) (if (stringp argument) argument (prin1-to-string argument))) command-line)
              :destination  `(t ,stderr-file)
              :discard-ansi ,discard-ansi
              :infile       process-input-file
