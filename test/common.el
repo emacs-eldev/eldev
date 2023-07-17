@@ -208,7 +208,12 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     (unless executable
       (ert-skip (eldev-format-message "%s doesn't appear to be installed" (eldev-vc-full-name vc-backend))))
     (let* ((project-dir    (eldev--test-project-dir test-project))
-           (copy-dir       (file-name-as-directory (make-temp-file "eldev-" t (if vc-backend (format "-test-%s" (downcase (symbol-name vc-backend))) "-test"))))
+           (copy-base-dir  (file-name-as-directory (make-temp-file "eldev-" t (if vc-backend (format "-test-%s" (downcase (symbol-name vc-backend))) "-test"))))
+           ;; Since the result of `package-dir-info' depends on the directory name (oh
+           ;; lol, the robustness) when reading `*-pkg.el' file, create a subdirectory
+           ;; with "the proper" name here.  Eventually need a subdirectory anyway if we
+           ;; copy our local package archives along.
+           (copy-dir       (file-name-as-directory (expand-file-name test-project copy-base-dir)))
            (repository-dir (when svnadmin
                              (file-name-as-directory (make-temp-file "eldev-" t "-test-svnrepo"))))
            (repository-url  (format "file://%s%s"
@@ -216,11 +221,6 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                                     ;; extra root node at the front
                                     (if (eq system-type 'windows-nt) "/" "")
                                     repository-dir)))
-      ;; Since the result of `package-dir-info' depends on the directory name (oh lol, the
-      ;; robustness) when reading `*-pkg.el' file, create a subdirectory with "the proper"
-      ;; name here.
-      (setf copy-dir (file-name-as-directory (expand-file-name test-project copy-dir)))
-      (make-directory copy-dir)
       ;; To avoid copying generated files.
       (eldev--test-run test-project ("clean" "everything")
         (should (= exit-code 0)))
@@ -229,6 +229,20 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (eldev-call-process executable `("mkdir" ,(format "%s/trunk" repository-url) ,(format "%s/branches" repository-url) "--message" "Init") :die-on-error t)
         (eldev-call-process executable `("checkout" ,(format "%s/trunk" repository-url) ,copy-dir) :die-on-error t))
       (copy-directory project-dir copy-dir t nil t)
+      (let (local-archives-to-copy)
+        ;; Pretty ugly, but here it is only important that it works.  Copy local package
+        ;; archives that are referred to in file `Eldev' of the project.  Otherwise you
+        ;; wouldn't even be able to run the tests in the temporary copy, for example.
+        ;; Another option would be to modify paths in the copied `Eldev', but that feels
+        ;; even uglier.
+        (with-temp-buffer
+          (ignore-errors (insert-file-contents (locate-file eldev-file (list project-dir))))
+          (while (re-search-forward (rx "(expand-file-name \"../" (group (1+ (not (any ?\"))))) nil t)
+            (let ((archive-path (file-name-as-directory (match-string 1))))
+              (unless (member archive-path local-archives-to-copy)
+                (push archive-path local-archives-to-copy)))))
+        (dolist (archive-path local-archives-to-copy)
+          (copy-directory (expand-file-name archive-path (eldev--test-dir)) (expand-file-name archive-path copy-base-dir) t nil t)))
       (let ((default-directory copy-dir))
         (when after-copy
           (funcall after-copy))
