@@ -65,9 +65,8 @@ jobs:
     - name: Verify robust mode activation
       run: |
         # Robust mode is automatic by default.  Make sure that this
-        # resolves to "yes" on GitHub and "no" for non-CI machines.
-        ./bin/eldev -p -dtTC             exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error '(\"Must default to robust mode on GitHub\")))"
-        ./bin/eldev -p -dtTC docker 27.2 exec "(when   (eldev-retry-on-errors-p) (signal 'eldev-error '(\"Must not default to robust mode on a normal machine\")))"
+        # resolves to "yes" on GitHub at least.
+        ./bin/eldev -p -dtTC exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error '(\"Must default to robust mode on GitHub\")))"
       env:
         ELDEV_LOCAL: "."
 

@@ -68,4 +68,14 @@
     (should (= exit-code 0))))
 
 
+(ert-deftest eldev-robust-mode-effectively-nil ()
+  ;; Put here rather than in `robust-mode.el', since the test needs Docker.  Robust mode
+  ;; defaults to "auto" and must effectively result in nil on non-CI machines, which
+  ;; Docker image emulates.
+  (eldev--test-run-in-docker "trivial-project" ("docker" eldev--test-docker-emacs-version
+                                                "eval" `(eldev-retry-on-errors-p))
+    (should (string= stdout "nil\n"))
+    (should (= exit-code 0))))
+
+
 (provide 'test/emacs-docker)
