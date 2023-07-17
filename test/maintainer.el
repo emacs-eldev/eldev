@@ -166,6 +166,8 @@
   (eldev--test-with-temp-copy "project-b" 'Git
     (eldev--test-maintainer-run nil ("release" "1.5" "--dry-run")
       :extra-setup `(setf eldev-release-test-local t)
+      ;; Make sure that it gets to run the tests and doesn't simply fail even before that.
+      (should (string-match-p "Running [0-9]+ tests" stdout))
       (should (string-match-p "tests do not pass" stderr))
       (should (= exit-code 1)))))
 
