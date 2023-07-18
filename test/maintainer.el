@@ -157,13 +157,15 @@
       (should (= exit-code 1)))))
 
 (ert-deftest eldev-release-failing-tests-1 ()
-  (eldev--test-with-temp-copy "project-b" 'Git
+  ;; Used to use `project-b' here, but it requires `makeinfo', which complicates things on
+  ;; Windows.
+  (eldev--test-with-temp-copy "project-d" 'Git
     (eldev--test-maintainer-run nil ("release" "1.5" "--dry-run")
       ;; There are failing tests, but in the default configuration we don't run them.
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-release-failing-tests-2 ()
-  (eldev--test-with-temp-copy "project-b" 'Git
+  (eldev--test-with-temp-copy "project-d" 'Git
     (eldev--test-maintainer-run nil ("release" "1.5" "--dry-run")
       :extra-setup `(setf eldev-release-test-local t)
       ;; Make sure that it gets to run the tests and doesn't simply fail even before that.
