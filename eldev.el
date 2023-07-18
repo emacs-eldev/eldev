@@ -5350,10 +5350,6 @@ be passed to Emacs, else it will most likely fail."
 (defvar eldev--docker-home-name "docker-home"
   "Name of the home directory of the docker user.")
 
-(defvar eldev--docker-os-error-fmt-string
-  "OS %s is not currently supported by \"eldev docker\""
-  "Error message format string if the os is not supported.")
-
 
 (defun eldev--docker-determine-img (img-string)
   "Return an appropriate docker image based on IMG-STRING."
@@ -5486,8 +5482,7 @@ Currently only Linux and macOS systems are supported."
   :category       running
   :custom-parsing t
   (unless (eldev--docker-on-supported-os)
-    (signal 'eldev-error
-            `(t ,(format eldev--docker-os-error-fmt-string system-type))))
+    (signal 'eldev-error `("OS `%s' is currently not supported by Eldev's `docker' command" ,system-type)))
   (unless (car parameters)
     (signal 'eldev-wrong-command-usage `(t "version not specified")))
   (let* ((img             (eldev--docker-determine-img (car parameters)))
