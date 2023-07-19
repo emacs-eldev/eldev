@@ -65,8 +65,9 @@ jobs:
     - name: Verify robust mode activation
       run: |
         # Robust mode is automatic by default.  Make sure that this
-        # resolves to "yes" on GitHub at least.
-        ./bin/eldev -p -dtTC exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error '(\"Must default to robust mode on GitHub\")))"
+        # resolves to "yes" on GitHub at least.  See comments in the
+        # function for reason of this weirdness.
+        ./bin/eldev -p -dtTC exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error (list (eldev--list-to-string '(Must default to robust mode on GitHub)))))"
       env:
         ELDEV_LOCAL: "."
 

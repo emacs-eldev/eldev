@@ -99,6 +99,13 @@ Since Eldev 0.11."
     (eldev--xdg-dir-home "XDG_CACHE_HOME" "~/.cache")))
 
 
+;; This is rather for compatibility across shells, as Windows PowerShell has weird quote
+;; escaping rules.  Can be used as `(eldev--list-to-string '(foo bar baz))' and produces
+;; "foo bar baz" without using quotes on the command line.  Currently package-"private".
+(defun eldev--list-to-string (list)
+  (mapconcat #'prin1-to-string list " "))
+
+
 
 ;; General.
 
