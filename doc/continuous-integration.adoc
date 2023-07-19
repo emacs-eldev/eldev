@@ -7,6 +7,9 @@ servers.  But of course this only applies if the test framework your
 project uses is already supported (currently <<ert,ERT>>,
 <<buttercup,Buttercup>> and <<ecukes,Ecukes>>).
 
+Eldev will even try to make your CI runs <<robust-mode,more
+reliable>>.
+
 [#github-workflows]
 === GitHub workflows
 
@@ -188,3 +191,32 @@ your source warning-free today, it might detect problems tomorrow.
 `relint` is probably one of the “safer” linters in this regard:
 
     $ eldev -dtT lint re
+
+[#robust-mode]
+=== Robust mode
+
+{since-1-5} Eldev can make your continuous integration runs more
+_robust_.  This means that when facing certain _externally-caused_
+errors, Eldev will not give up immediately, but rather wait for a
+while and then retry — several times.  This makes CI runs more
+reliable and less likely to fail because of reasons completely
+unrelated to your project.
+
+This is a work in progress, as examples of such errors are pretty
+difficult to collect, as they are intermittent and happen only
+occasionally.  As of 1.5, Eldev will retry if it fails to fetch
+contents of a package archive.  In practice such an error has been
+observed at least with MELPA and is _probably_ caused by MELPA updates
+being non-atomic, meaning that at the end of each archive rebuild,
+there is a relatively short period where its current contents is not
+properly reported.  Another possibility might be network problems.
+
+In any case, normally you don’t even have to do anything to get these
+improvements in Eldev.  They are activated using option
+`--robust-mode` (`-R`), which by default has value “auto”.  If this
+value is unchanged, robust mode is inactive on normal machines
+(e.g. when you run Eldev locally), but gets activated if environment
+variable `$CI` is `true`, which appears to be an unwritten standard
+for continuous integration servers.  For example, it is set on
+{uri-github-wflows-vars}[GitHub workflow servers].  Anyway, you can
+also set this option to “always” or “never” — as you prefer.

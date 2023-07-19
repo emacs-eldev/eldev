@@ -30,6 +30,7 @@
 :uri-elisp-lint: https://github.com/gonewest818/elisp-lint/
 :uri-projectile: https://github.com/bbatsov/projectile
 :uri-github-wflows: https://help.github.com/en/actions
+:uri-github-wflows-vars: https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
 :uri-travis: https://travis-ci.org/
 :uri-circle: https://circleci.com/
 :uri-docker: https://www.docker.com/
@@ -60,6 +61,7 @@
 :since-1-2: image:https://img.shields.io/badge/since-1.2-8be[Since 1.2,float=right]
 :since-1-3: image:https://img.shields.io/badge/since-1.3-8be[Since 1.3,float=right]
 :since-1-4: image:https://img.shields.io/badge/since-1.4-8be[Since 1.4,float=right]
+:since-1-5: image:https://img.shields.io/badge/since-1.5-8be[Since 1.5,float=right]
 
 
 toc::[]
