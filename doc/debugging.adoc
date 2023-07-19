@@ -103,9 +103,12 @@ pieces of code and understand where your project becomes too slow.
 Functions and macros above also come in “conditional” form: just add
 `x` before function name, e.g. `eldev-xdebug`, `eldev-xdump`, etc.
 These functions by default do nothing, but can be activated or
-deactivated using `eldev-enabling-xdebug`, `eldev-disabling-xdebug`
-and `eldev-maybe-xdebug` macros.  Global option `-x` also activates
-them initially (can still be deactivated programmatically later).
+deactivated using one of `eldev-enabling-xdebug`,
+`eldev-disabling-xdebug`, `eldev-maybe-xdebug`,
+`eldev-maybe-enabling-xdebug` and `eldev-maybe-disabling-xdebug`
+macros, all with different semantics explained in their in-Emacs
+documentation.  Global option `-x` also activates `eldev-xdebug`-like
+output initially (can still be deactivated programmatically later).
 Appropriate usage can drastically reduce debugging output size in a
 deeply nested calltree and limit it to only relevant (to the bug you
 are investigating) portions.
