@@ -97,6 +97,16 @@ backtrace in a byte-compiled code is more readable and provides the
 information you need, while in other cases you rather need
 non-compiled forms.
 
+{since-1-5} Global option `-u` (`--cut-backtraces`) lets you make
+backtraces more informative by omitting the common outermost frames.
+This becomes particularly useful if you call `eldev-backtrace` more
+than once in order to compare the output.  Eldev itself will put
+“notches” in backtraces when it invokes project code, and will later
+cut the result of `eldev-backtrace` at the deepmost encountered notch.
+You can also do the same — which might be even more useful — with
+macro `eldev-backtrace-notch`.  Cutting is not applied to backtraces
+that are printed because of errors in combination with option `-d`.
+
 Macro `eldev-time-it` can be used to roughly estimate performance of
 pieces of code and understand where your project becomes too slow.
 
