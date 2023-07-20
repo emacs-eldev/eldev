@@ -523,6 +523,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#travis-ci">Travis CI</a></li>
 <li><a href="#circle-ci">CircleCI</a></li>
 <li><a href="#_script_commands">Script commands</a></li>
+<li><a href="#robust-mode">Robust mode</a></li>
 </ul>
 </li>
 <li><a href="#debugging-features">Debugging features</a>
@@ -3269,6 +3270,10 @@ servers.  But of course this only applies if the test framework your
 project uses is already supported (currently <a href="#ert">ERT</a>,
 <a href="#buttercup">Buttercup</a> and <a href="#ecukes">Ecukes</a>).</p>
 </div>
+<div class="paragraph">
+<p>Eldev will even try to make your CI runs <a href="#robust-mode">more
+reliable</a>.</p>
+</div>
 <div class="sect2">
 <h3 id="github-workflows">GitHub workflows</h3>
 <div class="paragraph">
@@ -3485,6 +3490,38 @@ your source warning-free today, it might detect problems tomorrow.
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="robust-mode">Robust mode</h3>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.5-8be" alt="Since 1.5"></span> Eldev can make your continuous integration runs more
+<em>robust</em>.  This means that when facing certain <em>externally-caused</em>
+errors, Eldev will not give up immediately, but rather wait for a
+while and then retry — several times.  This makes CI runs more
+reliable and less likely to fail because of reasons completely
+unrelated to your project.</p>
+</div>
+<div class="paragraph">
+<p>This is a work in progress, as examples of such errors are pretty
+difficult to collect, as they are intermittent and happen only
+occasionally.  As of 1.5, Eldev will retry if it fails to fetch
+contents of a package archive.  In practice such an error has been
+observed at least with MELPA and is <em>probably</em> caused by MELPA updates
+being non-atomic, meaning that at the end of each archive rebuild,
+there is a relatively short period where its current contents is not
+properly reported.  Another possibility might be network problems.</p>
+</div>
+<div class="paragraph">
+<p>In any case, normally you don’t even have to do anything to get these
+improvements in Eldev.  They are activated using option
+<code>--robust-mode</code> (<code>-R</code>), which by default has value “auto”.  If this
+value is unchanged, robust mode is inactive on normal machines
+(e.g. when you run Eldev locally), but gets activated if environment
+variable <code>$CI</code> is <code>true</code>, which appears to be an unwritten standard
+for continuous integration servers.  For example, it is set on
+<a href="https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables">GitHub workflow servers</a>.  Anyway, you can
+also set this option to “always” or “never” — as you prefer.</p>
+</div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -3606,6 +3643,17 @@ information you need, while in other cases you rather need
 non-compiled forms.</p>
 </div>
 <div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.5-8be" alt="Since 1.5"></span> Global option <code>-u</code> (<code>--cut-backtraces</code>) lets you make
+backtraces more informative by omitting the common outermost frames.
+This becomes particularly useful if you call <code>eldev-backtrace</code> more
+than once in order to compare the output.  Eldev itself will put
+“notches” in backtraces when it invokes project code, and will later
+cut the result of <code>eldev-backtrace</code> at the deepmost encountered notch.
+You can also do the same — which might be even more useful — with
+macro <code>eldev-backtrace-notch</code>.  Cutting is not applied to backtraces
+that are printed because of errors in combination with option <code>-d</code>.</p>
+</div>
+<div class="paragraph">
 <p>Macro <code>eldev-time-it</code> can be used to roughly estimate performance of
 pieces of code and understand where your project becomes too slow.</p>
 </div>
@@ -3613,9 +3661,12 @@ pieces of code and understand where your project becomes too slow.</p>
 <p>Functions and macros above also come in “conditional” form: just add
 <code>x</code> before function name, e.g. <code>eldev-xdebug</code>, <code>eldev-xdump</code>, etc.
 These functions by default do nothing, but can be activated or
-deactivated using <code>eldev-enabling-xdebug</code>, <code>eldev-disabling-xdebug</code>
-and <code>eldev-maybe-xdebug</code> macros.  Global option <code>-x</code> also activates
-them initially (can still be deactivated programmatically later).
+deactivated using one of <code>eldev-enabling-xdebug</code>,
+<code>eldev-disabling-xdebug</code>, <code>eldev-maybe-xdebug</code>,
+<code>eldev-maybe-enabling-xdebug</code> and <code>eldev-maybe-disabling-xdebug</code>
+macros, all with different semantics explained in their in-Emacs
+documentation.  Global option <code>-x</code> also activates <code>eldev-xdebug</code>-like
+output initially (can still be deactivated programmatically later).
 Appropriate usage can drastically reduce debugging output size in a
 deeply nested calltree and limit it to only relevant (to the bug you
 are investigating) portions.</p>
@@ -4881,7 +4932,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-07-05 19:33:07 UTC
+Last updated 2023-07-20 17:16:11 UTC
 </div>
 </div>
 </body>
