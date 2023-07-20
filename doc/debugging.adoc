@@ -97,15 +97,28 @@ backtrace in a byte-compiled code is more readable and provides the
 information you need, while in other cases you rather need
 non-compiled forms.
 
+{since-1-5} Global option `-u` (`--cut-backtraces`) lets you make
+backtraces more informative by omitting the common outermost frames.
+This becomes particularly useful if you call `eldev-backtrace` more
+than once in order to compare the output.  Eldev itself will put
+“notches” in backtraces when it invokes project code, and will later
+cut the result of `eldev-backtrace` at the deepmost encountered notch.
+You can also do the same — which might be even more useful — with
+macro `eldev-backtrace-notch`.  Cutting is not applied to backtraces
+that are printed because of errors in combination with option `-d`.
+
 Macro `eldev-time-it` can be used to roughly estimate performance of
 pieces of code and understand where your project becomes too slow.
 
 Functions and macros above also come in “conditional” form: just add
 `x` before function name, e.g. `eldev-xdebug`, `eldev-xdump`, etc.
 These functions by default do nothing, but can be activated or
-deactivated using `eldev-enabling-xdebug`, `eldev-disabling-xdebug`
-and `eldev-maybe-xdebug` macros.  Global option `-x` also activates
-them initially (can still be deactivated programmatically later).
+deactivated using one of `eldev-enabling-xdebug`,
+`eldev-disabling-xdebug`, `eldev-maybe-xdebug`,
+`eldev-maybe-enabling-xdebug` and `eldev-maybe-disabling-xdebug`
+macros, all with different semantics explained in their in-Emacs
+documentation.  Global option `-x` also activates `eldev-xdebug`-like
+output initially (can still be deactivated programmatically later).
 Appropriate usage can drastically reduce debugging output size in a
 deeply nested calltree and limit it to only relevant (to the bug you
 are investigating) portions.
