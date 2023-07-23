@@ -4086,7 +4086,9 @@ for details."
                                      (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
                                    (eldev-named-step nil (eldev-format-message "loading test file `%s'" file)
                                      (eldev-trace "%s..." (eldev-current-step-name t))
-                                     (load absolute-without-el nil t nil t)))))))
+                                     ;; Loading the test file can results in evaluation, which might use `eldev-backtrace'.
+                                     (eldev-backtrace-notch 'eldev
+                                       (load absolute-without-el nil t nil t))))))))
                          (let* ((runner-name (or eldev-test-runner 'simple))
                                 (runner      (or (cdr (assq runner-name eldev--test-runners))
                                                  (signal 'eldev-error `(:hint ("Check output of `%s test --list-runners'" ,(eldev-shell-command t)) "Unknown test runner `%s'" ,runner-name))))
