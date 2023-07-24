@@ -5024,51 +5024,58 @@ being that it doesn't print form results."
             (require feature))))
       (let (all-results)
         (dolist (form (nreverse forms))
-          (eldev-named-step nil (eldev-format-message (if print-results "evaluating expression #%d, `%s'%s" "executing form #%d, `%s'%s")
-                                                      (1+ (length all-results)) (cadr form) (if (nth 2 form) (eldev-format-message " (from file `%s')" (nth 2 form)) ""))
-            (eldev-verbose (if print-results "%s:" "%s...") (eldev-current-step-name t))
-            (let (result)
-              ;; For these commands we restore the standard behavior of `message' of writing to stderr,
-              (let ((eldev-message-rerouting-destination :stderr))
-                (if (eq eldev-eval-preprocess-forms 'byte-compile)
-                    (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
-                           (let* ((lexical-binding  eldev-eval-lexical)
-                                  (result-variables (when all-results
-                                                      `(@ ,@(mapcar (lambda (n) (intern (format "@%d" n))) (number-sequence 1 (length all-results))))))
-                                  (function         (byte-compile `(lambda (,@result-variables) (ignore ,@result-variables) ,(car form))))
-                                  (result-arguments (when all-results
-                                                      (cons (car (last all-results)) all-results))))
-                             (eldev-backtrace-notch 'eldev
-                               (eldev-profile-body
-                                 (dotimes (_ repetitions)
-                                   (setf result (apply function result-arguments)))))))
-                  (let ((final-form (if (eq eldev-eval-preprocess-forms 'macroexpand)
-                                        (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
-                                               (macroexpand-all (car form)))
-                                      (when eldev-eval-preprocess-forms
-                                        (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms))
-                                      (car form))))
-                    ;; Evaluated forms get access to variables `@' that holds the result of
-                    ;; the previous form and `@1', `@2'... that hold results of previous
-                    ;; form at that index.
-                    (when all-results
-                      (setf final-form `(let ((@ ',(car (last all-results)))
-                                              ,@(mapcar (lambda (n) `(,(intern (format "@%d" n)) ',(nth (1- n) all-results)))
-                                                        (number-sequence 1 (length all-results))))
-                                          ,@(macroexp-unprogn final-form))))
-                    (eldev-backtrace-notch 'eldev
-                      (eldev-profile-body
-                        (dotimes (_ repetitions)
-                          (setf result (eval final-form (not (null eldev-eval-lexical))))))))))
-              (setf all-results (append all-results (list result)))
-              (when print-results
-                (with-temp-buffer
-                  (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
-                  ;; Older Emacs version end some value representations with a linefeed for
-                  ;; whatever reasons.
-                  (when (equal (char-before) ?\n)
-                    (delete-char -1))
-                  (eldev-output "%s" (buffer-string)))))))))))
+          (let ((description (eldev-format-message (if print-results "expression #%d, `%s'%s" "form #%d, `%s'%s")
+                                                   (1+ (length all-results)) (cadr form)
+                                                   (if (nth 2 form) (eldev-format-message " (from file `%s')" (nth 2 form)) ""))))
+            (eldev-named-step nil (eldev-format-message (if print-results "evaluating %s" "executing %s") description)
+              (eldev-verbose (if print-results "%s:" "%s...") (eldev-current-step-name t))
+              (let (result)
+                ;; For these commands we restore the standard behavior of `message' of writing to stderr,
+                (let ((eldev-message-rerouting-destination :stderr))
+                  (if (eq eldev-eval-preprocess-forms 'byte-compile)
+                      (progn (eldev-trace "Byte-compiling first, as instructed by `eldev-eval-preprocess-forms'...")
+                             (let* ((lexical-binding  eldev-eval-lexical)
+                                    (result-variables (when all-results
+                                                        `(@ ,@(mapcar (lambda (n) (intern (format "@%d" n))) (number-sequence 1 (length all-results))))))
+                                    (function         (byte-compile `(lambda (,@result-variables) (ignore ,@result-variables) ,(car form))))
+                                    (result-arguments (when all-results
+                                                        (cons (car (last all-results)) all-results))))
+                               (unless function
+                                 ;; As an exception, fake-end the last named step, as its
+                                 ;; text is nearly the same as the error message anyway.
+                                 (pop eldev-ongoing-named-steps)
+                                 (signal 'eldev-error `("Couldn't byte-compile %s" ,description)))
+                               (eldev-backtrace-notch 'eldev
+                                 (eldev-profile-body
+                                   (dotimes (_ repetitions)
+                                     (setf result (apply function result-arguments)))))))
+                    (let ((final-form (if (eq eldev-eval-preprocess-forms 'macroexpand)
+                                          (progn (eldev-trace "Expanding macros first, as instructed by `eldev-eval-preprocess-forms'...")
+                                                 (macroexpand-all (car form)))
+                                        (when eldev-eval-preprocess-forms
+                                          (eldev-warn "Ignoring unknown value %S of variable `eldev-eval-preprocess-forms'" eldev-eval-preprocess-forms))
+                                        (car form))))
+                      ;; Evaluated forms get access to variables `@' that holds the result of
+                      ;; the previous form and `@1', `@2'... that hold results of previous
+                      ;; form at that index.
+                      (when all-results
+                        (setf final-form `(let ((@ ',(car (last all-results)))
+                                                ,@(mapcar (lambda (n) `(,(intern (format "@%d" n)) ',(nth (1- n) all-results)))
+                                                          (number-sequence 1 (length all-results))))
+                                            ,@(macroexp-unprogn final-form))))
+                      (eldev-backtrace-notch 'eldev
+                        (eldev-profile-body
+                          (dotimes (_ repetitions)
+                            (setf result (eval final-form (not (null eldev-eval-lexical))))))))))
+                (setf all-results (append all-results (list result)))
+                (when print-results
+                  (with-temp-buffer
+                    (funcall (or eldev-eval-printer-function #'prin1) result (current-buffer))
+                    ;; Older Emacs version end some value representations with a linefeed for
+                    ;; whatever reasons.
+                    (when (equal (char-before) ?\n)
+                      (delete-char -1))
+                    (eldev-output "%s" (buffer-string))))))))))))
 
 (defun eldev--eval-short-form-string (form)
   "Return a possibly shortened string representation of FORM."

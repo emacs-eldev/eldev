@@ -76,6 +76,18 @@
     (should (equal (eldev--test-line-list stdout) `("test-function" ,(if compile-first "t" "nil"))))
     (should (= exit-code 0))))
 
+(eldev-ert-defargtest eldev-eval-compilation-2 (compile-first)
+                      (nil t)
+  (eldev--test-run "trivial-project" ("eval" (if compile-first "--compile" "--as-is")
+                                      `(defmacro buggy () (error "This macro is buggy")) `(buggy))
+    (should     (string-match-p "This macro is buggy" stderr))
+    ;; Eldev would previously try to evaluate resulting functions even if byte-compilation
+    ;; failed.  This would catch the resulting error message.
+    (should-not (string-match-p "function definition is void: nil" stderr))
+    (when compile-first
+      (should   (string-match-p "Couldn.t byte-compile expression #2" stderr)))
+    (should     (= exit-code 1))))
+
 (eldev-ert-defargtest eldev-eval-macroexpansion-1 (macroexpand-first)
                       (nil t)
   (eldev--test-run "trivial-project" ("eval" (if macroexpand-first "--macroexpand" "--as-is")
