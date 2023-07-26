@@ -5040,7 +5040,11 @@ being that it doesn't print form results."
                                     (function         (byte-compile `(lambda (,@result-variables) (ignore ,@result-variables) ,(car form))))
                                     (result-arguments (when all-results
                                                         (cons (car (last all-results)) all-results))))
-                               (unless function
+                               ;; FIXME: Normally on failure `byte-compile' returns nil.  However, at least
+                               ;;        during CI on GitHub on Windows using Emacs 28.2, I have seen this
+                               ;;        return a string (the error message).  Maybe it could then return a
+                               ;;        function on failure in some circumstances?
+                               (unless (functionp function)
                                  ;; As an exception, fake-end the last named step, as its
                                  ;; text is nearly the same as the error message anyway.
                                  (pop eldev-ongoing-named-steps)
