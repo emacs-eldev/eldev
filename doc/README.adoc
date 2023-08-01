@@ -8,7 +8,7 @@
 :icons: font
 :empty:
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-:uri-search-github: https://github.com/search?q=filename%3AEldev+path%3A%2F
+:uri-search-github: https://github.com/search?q=path%3A%2F%5EEldev%24%2F&type=code
 :uri-git-hooks: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks#_git_hooks
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
