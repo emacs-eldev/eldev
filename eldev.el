@@ -3687,7 +3687,7 @@ At least one of options `--file' and `--open' is required."
 	                         (if xdg_runtime_dir
 	                             (format "%s/emacs" xdg_runtime_dir)
 	                           (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid)))))))
-        (form              `(progn (profiler-report-profile (profiler-read-profile ,filename)) t)))
+        (form              `(progn (require 'profiler) (profiler-report-profile (profiler-read-profile ,filename)) t)))
     (eldev-verbose "Trying to open the generated profile `%s' in your normal Emacs..." filename)
     ;; Ugly in that if something goes wrong with evaluating expression "there", no error
     ;; is signalled "here".  But what can we do other than rewriting all this crap?  At
