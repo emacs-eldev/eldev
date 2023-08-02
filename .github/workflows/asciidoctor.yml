@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        emacs_version: ['28.2']
+        emacs_version: ['29.1']
 
     steps:
     # We want to call it via Eldev, to reuse command line etc.  Certainly an overkill, but
