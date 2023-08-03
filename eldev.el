@@ -856,6 +856,7 @@ certain options relative to non-option parameters is important.
 Since 0.11.")
 
 (defvar backtrace-line-length)
+(defvar emacs-repository-branch)
 
 
 (defun eldev-start-up ()
@@ -910,7 +911,14 @@ Used by Eldev startup script."
                           ;; Since this is printed before `~/.config/eldev/config' is loaded,
                           ;; it can ignore some settings from that file, e.g. colorizing mode.
                           (eldev-trace "Started up on %s" (replace-regexp-in-string " +" " " (current-time-string)))
-                          (eldev-trace "Running on %s" (emacs-version))
+                          (eldev-trace "Running on %s" (replace-regexp-in-string "[ \t\n]+" " " (emacs-version)))
+                          (let ((revision emacs-repository-version)
+                                (branch   (when (boundp 'emacs-repository-branch) emacs-repository-branch)))
+                            (if revision
+                                (eldev-trace "Emacs source: rev. %s%s"
+                                             (if revision (substring revision 0 (min (length revision) 10)) "?")
+                                             (if branch (eldev-format-message " of branch `%s'" branch) ""))
+                              (eldev-trace "Emacs source is unknown")))
                           (eldev-trace "Project directory: `%s'" eldev-project-dir)
                           (condition-case error
                               (eldev--set-up)
