@@ -43,7 +43,7 @@
                       (nil t)
   (let ((profile-file (make-temp-file "eldev-profile")))
     (eldev--test-run "trivial-project" (:eval `("-d" "profile" "--file" ,profile-file
-                                                "exec" ,`(defun must-appear-in-profile (x) (dotimes (_ 100000) (setf x (1+ x))) x)
+                                                "exec" ,`(defun must-appear-in-profile (x) (dotimes (_ 100000) (setf x (+ x (random)))) x)
                                                 ,`(must-appear-in-profile 0) ,@(unless meaningful-is-last '(nil))))
       (should (string-match-p "must-appear-in-profile" (eldev--test-file-contents nil profile-file)))
       (should (= exit-code 0)))))
