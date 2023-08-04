@@ -635,14 +635,12 @@ If running interactively, let the user decide."
         (set-buffer-modified-p nil)
         (if (save-excursion (save-restriction (copyright-find-copyright)))
             (progn
-              ;; It has a really dumb interface: non-local variable `copyright-current-year',
-              ;; exists, but you cannot set it, because the value you provide just gets overwriten.
-              ;; The override below is ugly as fuck, but I don't see any other way around that.
-              ;;
-              ;; If this breaks with a future version, that should be caught by a regression test.
-              (eldev-advised ('format-time-string :around (lambda (original &rest arguments)
-                                                            (if (equal arguments '("%Y")) (format "%d" year) (apply original arguments))))
-                (copyright-update nil t))
+              ;; The standard feature has a really dumb interface: non-local variable
+              ;; `copyright-current-year', exists, but you cannot set it, because the
+              ;; value you provide just gets overwriten.  Emacs...  With native
+              ;; compilation it seems to impossible to advice it to behave sanely, so we
+              ;; have to roll our own now.
+              (eldev--maintainer-do-update-copyright (format "%d" year))
               (if (buffer-modified-p)
                   (progn (eldev-write-to-file file)
                          (eldev-verbose "Updated the copyright notice in file `%s'" file)
@@ -655,6 +653,33 @@ If running interactively, let the user decide."
             (eldev-print "Updated %s" (eldev-message-plural num-updated "copyright notice"))
           (eldev-print "All found copyright notices are up-to-date"))
       (eldev-print "No copyright notices found in the project files"))))
+
+(defun eldev--maintainer-do-update-copyright (year-string)
+  ;; Based on `copyright-update' + `copyright-update-year', see the caller for reasons to
+  ;; have this function here.  I dropped a lot of things not used in Eldev.
+  (save-excursion
+    (save-restriction
+      (when (copyright-find-copyright)
+        (goto-char (match-end 1))
+        (copyright-find-end)
+        (unless (string= (buffer-substring (- (match-end 3) 2) (match-end 3)) (substring year-string -2))
+	  (let ((size (save-excursion (skip-chars-backward "0-9"))))
+	    (if (and (eq (% (- (string-to-number year-string) (string-to-number (buffer-substring (+ (point) size) (point)))) 100) 1)
+		     (or (memq (char-after (+ (point) size -1)) '(?- ?–))
+			 (memq (char-after (+ (point) size -2)) '(?- ?–))))
+		;; This is a range so just replace the end part.
+		(delete-char size)
+	      ;; Insert a comma with the preferred number of spaces.
+	      (insert
+	       (save-excursion
+		 (if (re-search-backward "[0-9]\\( *, *\\)[0-9]" (line-beginning-position) t)
+		     (match-string 1)
+		   ", ")))
+	      ;; If people use the '91 '92 '93 scheme, do that as well.
+	      (if (eq (char-after (+ (point) size -3)) ?')
+		  (insert ?')))
+	    ;; Finally insert the new year.
+	    (insert (substring year-string size))))))))
 
 
 
