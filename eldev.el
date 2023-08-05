@@ -3581,24 +3581,6 @@ mode output is restricted to just the version."
          (when ,do-start
            (eldev--profile-do-stop))))))
 
-(defun eldev--profile-do-start ()
-  (let ((inhibit-message t))
-    (profiler-start eldev--effective-profile-mode)))
-
-(defun eldev--profile-do-stop ()
-  ;; Starting with Emacs 27 `profiler-stop' not only retrieves profiling information, but clears it
-  ;; completely, making it impossible to join with later profiles (see test `eldev-profile-joins-multiple').
-  ;; For this reason, we "stop" manually when we want to join with later profiles, e.g. when profiling
-  ;; multiple expressions.
-  (if eldev--profile-pause-on-stop
-      (progn
-        ;; Bare bones of `profiler-stop'.
-        (when (fboundp 'profiler-cpu-stop)
-          (profiler-cpu-stop))
-        (profiler-memory-stop))
-    (let ((inhibit-message t))
-      (profiler-stop))))
-
 (eldev-defcommand eldev-profile (&rest parameters)
   "Profile given Eldev command.  Particularly useful with
 commands `eval', `exec' and `test', since those run code from the
@@ -3683,6 +3665,24 @@ At least one of options `--file' and `--open' is required."
         (eldev--profile-open-on-server nil cpu-profile-file))
       (when memory-profile-file
         (eldev--profile-open-on-server nil memory-profile-file)))))
+
+(defun eldev--profile-do-start ()
+  (let ((inhibit-message t))
+    (profiler-start eldev--effective-profile-mode)))
+
+(defun eldev--profile-do-stop ()
+  ;; Starting with Emacs 27 `profiler-stop' not only retrieves profiling information, but clears it
+  ;; completely, making it impossible to join with later profiles (see test `eldev-profile-joins-multiple').
+  ;; For this reason, we "stop" manually when we want to join with later profiles, e.g. when profiling
+  ;; multiple expressions.
+  (if eldev--profile-pause-on-stop
+      (progn
+        ;; Bare bones of `profiler-stop'.
+        (when (fboundp 'profiler-cpu-stop)
+          (profiler-cpu-stop))
+        (profiler-memory-stop))
+    (let ((inhibit-message t))
+      (profiler-stop))))
 
 (defun eldev--profile-derive-memory-file (cpu-profile-file)
   (let* ((cpu-file-name    (file-name-nondirectory cpu-profile-file))
