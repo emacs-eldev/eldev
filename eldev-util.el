@@ -1802,7 +1802,7 @@ Since 1.2:
                             ;; resulted in parts of child process output getting lost otherwise.  Pretty sure
                             ;; no-one uses 25.1 anymore, but this also happens on GitHub when packing Eldev
                             ;; itself during continuous integration for testing, e.g.:
-                            ;; https://github.com/doublep/eldev/actions/runs/3726835847/jobs/6320581066.
+                            ;; https://github.com/emacs-eldev/eldev/actions/runs/3726835847/jobs/6320581066.
                             ;;
                             ;; The below is only a workaround, let's hope it is enough in practice.
                             (accept-process-output nil 0.5))
@@ -2521,7 +2521,7 @@ Since 1.2."
                                              ;; likely an error.
                                              (and current-value new-value
                                                   (or (eldev--smaller-list-prefix-p current-value new-value) (eldev--smaller-list-suffix-p current-value new-value)))))
-                                  (eldev-warn "Suspicious %s `%s' detected; please see https://doublep.github.io/eldev/#modifying-filesets"
+                                  (eldev-warn "Suspicious %s `%s' detected; please see https://emacs-eldev.github.io/eldev/#modifying-filesets"
                                               (if (eq operation 'set) "assignment to" "let-binding of")
                                               var new-value)
                                   (eldev-warn "This might result in misbehavior of code using this variable"))))))

@@ -5,7 +5,7 @@
 #
 # In your `.github/workflows/*.yml' add this:
 #
-#   run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+#   run: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
 
 set -e
 
@@ -16,5 +16,5 @@ ELDEV_BIN_DIR=~/.local/bin
 echo "$ELDEV_BIN_DIR" >> $GITHUB_PATH
 
 mkdir -p $ELDEV_BIN_DIR
-curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
+curl -fsSL https://raw.githubusercontent.com/emacs-eldev/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
 chmod a+x $ELDEV_BIN_DIR/eldev

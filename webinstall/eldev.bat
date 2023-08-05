@@ -3,7 +3,7 @@ rem This script downloads Eldev startup script as `%USERPROFILE%\.local\bin\elde
 rem
 rem To bootstrap, run as follows from a command prompt:
 rem
-rem curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
+rem curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev.bat | cmd /Q
 
 rem The usual way to check for the presence of an argument is to test
 rem if their argument reference %[1-9] has a value. Though when piping
@@ -13,7 +13,7 @@ set ARGS=0
 for %%x in (%*) do set /A ARGS+=1
 
 rem optionally pass download URL as parameter to allow testing in PRs
-set URL=https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev.bat
+set URL=https://raw.githubusercontent.com/emacs-eldev/eldev/master/bin/eldev.bat
 if %ARGS%==1 set URL=%1
 
 set ELDEV_BIN_DIR=%USERPROFILE%\.local\bin

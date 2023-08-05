@@ -1,7 +1,7 @@
 # NOTE: The following complications are for Eldev itself.  Projects
-# that _use_ Eldev can have it simpler.  Please see the homepage:
+# that _use_ Eldev can have it simpler.  Please see the documentation:
 #
-#     https://github.com/doublep/eldev#github-workflows
+#     https://emacs-eldev.github.io/eldev/#github-workflows
 
 name: CI
 
@@ -103,7 +103,7 @@ jobs:
         # because the test expects the onwer of the cache to match the
         # user name, but it is instead set to the administrators group
         # on the GH CI, see discussion in
-        # https://github.com/doublep/eldev/pull/88.
+        # https://github.com/emacs-eldev/eldev/pull/88.
         #
         # 2. The `--` is escaped with `"` for cross platform
         # compatibility because in PowerShell `--` is a special
@@ -155,7 +155,7 @@ jobs:
          echo eldev is already installed.
          exit 1
         else
-          curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+          curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
         fi
 
     - name: Test GitHub-specific installation on MS-Windows (1/2)
@@ -167,7 +167,7 @@ jobs:
         }
         else
         {
-          curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev.bat | cmd /Q
+          curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev.bat | cmd /Q
         }
 
     - name: Test GitHub-specific installation (2/2)

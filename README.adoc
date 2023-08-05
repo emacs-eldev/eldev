@@ -7,7 +7,7 @@ ifdef::env-github[]
 :tip-caption: :bulb:
 endif::[]
 :empty:
-:uri-documentation: https://doublep.github.io/eldev/
+:uri-documentation: https://emacs-eldev.github.io/eldev/
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
@@ -17,9 +17,9 @@ endif::[]
 = Eldev
 
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
-image:https://img.shields.io/github/release/doublep/eldev.svg[Latest release, link=https://github.com/doublep/eldev/releases]
+image:https://img.shields.io/github/release/emacs-eldev/eldev.svg[Latest release, link=https://github.com/emacs-eldev/eldev/releases]
 image:http://stable.melpa.org/packages/eldev-badge.svg[MELPA Stable, link=http://stable.melpa.org/#/eldev]
-image:https://github.com/doublep/eldev/workflows/CI/badge.svg[CI, link=https://github.com/doublep/eldev/actions?query=workflow%3ACI]
+image:https://github.com/emacs-eldev/eldev/workflows/CI/badge.svg[CI, link=https://github.com/emacs-eldev/eldev/actions?query=workflow%3ACI]
 
 Eldev (Elisp development tool) is an Emacs-based build tool, targeted
 solely at Elisp projects.  It is an alternative to Cask.  Unlike Cask,
@@ -96,7 +96,7 @@ proper dependencies in Eldev projects.
 The easiest and most common way to install Eldev on Linux, macOS,
 etc. is this shell oneliner:
 
-    $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
+    $ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev | sh
 
 This will install `eldev` script to `~/.local/bin`.  Usually,
 {uri-xdg}[this directory should already be in your `PATH`].  But if

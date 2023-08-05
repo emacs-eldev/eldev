@@ -16,7 +16,7 @@
       (should (= exit-code 1)))))
 
 
-;; https://github.com/doublep/eldev/issues/19
+;; https://github.com/emacs-eldev/eldev/issues/19
 ;;
 ;; `package-lint' (called by by `elisp-lint') would deem local dependencies uninstallable
 ;; if they were not available from "normal" archives.

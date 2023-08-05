@@ -8,7 +8,7 @@ set -e
 DIR=~/.local/bin
 
 mkdir -p $DIR
-curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $DIR/eldev
+curl -fsSL https://raw.githubusercontent.com/emacs-eldev/eldev/master/bin/eldev > $DIR/eldev
 chmod a+x $DIR/eldev
 
 ORIGINAL_IFS=$IFS

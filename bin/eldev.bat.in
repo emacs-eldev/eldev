@@ -4,7 +4,7 @@ REM
 REM Copyright (C) 2021-2023 Paul Pogonyshev
 REM
 REM Author:   Paul Pogonyshev <pogonyshev@gmail.com>
-REM Homepage: https://github.com/doublep/eldev
+REM Homepage: https://github.com/emacs-eldev/eldev
 
 setlocal
 

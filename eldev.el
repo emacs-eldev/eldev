@@ -6,7 +6,7 @@
 ;; Maintainer: Paul Pogonyshev <pogonyshev@gmail.com>
 ;; Version:    1.5.3snapshot
 ;; Keywords:   maint, tools
-;; Homepage:   https://github.com/doublep/eldev
+;; Homepage:   https://github.com/emacs-eldev/eldev
 ;; Package-Requires: ((emacs "24.4"))
 
 ;; This program is free software; you can redistribute it and/or
@@ -41,7 +41,7 @@
 ;;
 ;; 1. From this directory (e.g. `~/bin') execute:
 ;;
-;;      $ curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
+;;      $ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/bin/eldev > eldev && chmod a+x eldev
 ;;
 ;; No further steps necessary — Eldev will bootstrap itself as needed
 ;; on first invocation.
@@ -51,7 +51,7 @@
 ;;
 ;; 1. Run:
 ;;
-;;      $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
+;;      $ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev | sh
 ;;
 ;;    This will install eldev script to ~/.local/bin.
 ;;
@@ -64,7 +64,7 @@
 
 ;; For further help and more ways to install, please see the homepage:
 ;;
-;;   https://github.com/doublep/eldev
+;;   https://github.com/emacs-eldev/eldev
 
 
 ;;; Code:
@@ -5369,7 +5369,7 @@ be passed to Emacs, else it will most likely fail."
     (let* ((autoloads           (apply #'nconc (mapcar (lambda (file) `("--load" ,file)) eldev--loaded-autoloads-files)))
            (value-forwarding    (when forwarding `("--eval" ,(prin1-to-string `(setf ,@(nreverse forwarding))))))
            (effective-load-path (mapconcat #'identity load-path path-separator))
-           ;; See https://github.com/doublep/eldev/issues/89.  The idea here is to make
+           ;; See https://github.com/emacs-eldev/eldev/issues/89.  The idea here is to make
            ;; nested Emacs die on its own if run in terminal mode.  I also tried adding an
            ;; evalled call on its command line that'd invoke `kill-emacs' in that mode,
            ;; but this turned out not to quite work: it's called too late, when Emacs

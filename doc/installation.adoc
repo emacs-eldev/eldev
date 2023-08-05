@@ -10,7 +10,7 @@ There are several ways to install Eldev.
 . From this directory (e.g. `~/bin`) execute:
 +
 --
-    $ curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev > eldev && chmod a+x eldev
+    $ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/bin/eldev > eldev && chmod a+x eldev
 
 You can even do this from `/usr/local/bin` provided you have the
 necessary permissions.
@@ -20,7 +20,7 @@ necessary permissions.
 . From this directory (e.g. `%USERPROFILE%\bin`) execute:
 +
 --
-    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev.bat > eldev.bat
+    > curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/bin/eldev.bat > eldev.bat
 --
 
 No further steps necessary — Eldev will bootstrap itself as needed on
@@ -33,7 +33,7 @@ first invocation.
 . Execute:
 +
 --
-    $ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh
+    $ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev | sh
 
 This will install `eldev` script to `~/.local/bin`.
 --
@@ -47,7 +47,7 @@ This will install `eldev` script to `~/.local/bin`.
 . Execute:
 +
 --
-    > curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q
+    > curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev.bat | cmd /Q
 
 This will install `eldev.bat` script to `%USERPROFILE%\.local\bin`.
 --

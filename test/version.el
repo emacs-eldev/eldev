@@ -44,7 +44,7 @@
       (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))))
 
-;; https://github.com/doublep/eldev/issues/21
+;; https://github.com/emacs-eldev/eldev/issues/21
 ;;
 ;; In short: would fail previously if run in debug mode.  Placing test here as it doesn't
 ;; require anything external.
@@ -55,7 +55,7 @@
       (should (string= stdout (format "eldev %s\n" (eldev-message-version (eldev-find-package-descriptor 'eldev)))))
       (should (= exit-code 0)))))
 
-;; https://github.com/doublep/eldev/issues/21#issuecomment-688208274
+;; https://github.com/emacs-eldev/eldev/issues/21#issuecomment-688208274
 ;;
 ;; While `--version' is not advertised, we silently support it.  It is supposed not only
 ;; to work as `version' command, but also exit with success code, which it didn't.

@@ -61,7 +61,7 @@ jobs:
         version: ${{matrix.emacs_version}}
 
     - name: Install Eldev
-      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+      run: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
 
     - name: Check out the source code
       uses: actions/checkout@v3
@@ -109,7 +109,7 @@ env:
   - EVM_EMACS=emacs-26.3-travis
 
 install:
-  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
+  - curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
   - evm install $EVM_EMACS --use
 
 script:
@@ -136,7 +136,7 @@ env:
 
 install:
   - bash <(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
-  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev > x.sh && source ./x.sh
+  - curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/travis-eldev > x.sh && source ./x.sh
 
 script:
   - eldev -p -dtT test
@@ -160,7 +160,7 @@ in file `.circleci/config.yml`:
     ...
     - run:
         name: Install Eldev
-        command: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/circle-eldev > x.sh && source ./x.sh
+        command: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/circle-eldev > x.sh && source ./x.sh
 ....
 
 === Script commands

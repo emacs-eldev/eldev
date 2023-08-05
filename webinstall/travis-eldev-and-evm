@@ -5,7 +5,7 @@
 #
 # In your `.travis.yml' add this:
 #
-# - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
+# - curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/travis-eldev-and-evm > x.sh && source ./x.sh
 
 set -e
 
@@ -16,7 +16,7 @@ EVM_DIR=~/.evm
 export PATH="$ELDEV_BIN_DIR:$EVM_DIR/bin:$PATH"
 
 mkdir -p $ELDEV_BIN_DIR
-curl -fsSL https://raw.githubusercontent.com/doublep/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
+curl -fsSL https://raw.githubusercontent.com/emacs-eldev/eldev/master/bin/eldev > $ELDEV_BIN_DIR/eldev
 chmod a+x $ELDEV_BIN_DIR/eldev
 
 git clone --depth 1 https://github.com/rejeep/evm.git $EVM_DIR

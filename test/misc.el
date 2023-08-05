@@ -1,7 +1,7 @@
 (require 'test/common)
 
 
-;; https://github.com/doublep/eldev/issues/29
+;; https://github.com/emacs-eldev/eldev/issues/29
 ;;
 ;; Not about any particular command, but about initializing dependencies.  Eldev would
 ;; often report dependencies as required by wrong packages, if they were required by
@@ -12,7 +12,7 @@
     (should (= exit-code 1))))
 
 
-;; https://github.com/doublep/eldev/issues/32
+;; https://github.com/emacs-eldev/eldev/issues/32
 ;;
 ;; Eldev would fail to provide Org snapshot to a project that depends on Org version newer
 ;; than what is built into Emacs, even if appropriate package archive was configured.  It
@@ -49,7 +49,7 @@
       (should (= exit-code 0)))))
 
 
-;; https://github.com/doublep/eldev/issues/57
+;; https://github.com/emacs-eldev/eldev/issues/57
 ;;
 ;; `(message nil)' is a valid call in Emacs, so it must not fail under Eldev either.
 (ert-deftest eldev-message-nil ()
@@ -59,7 +59,7 @@
     (should (= exit-code 0))))
 
 
-;; https://github.com/doublep/eldev/issues/61
+;; https://github.com/emacs-eldev/eldev/issues/61
 ;;
 ;; `vc-responsible-backend' actually throws if there is no active backend, and not returns
 ;; nil.  Hard to notice when your home directory is Git-managed.

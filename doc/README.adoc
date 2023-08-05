@@ -76,7 +76,7 @@ Eldev is sort of a parallel to Gradle — its configuration is a
 _program_ on its own.
 
 image:https://img.shields.io/badge/license-GPL_3-green.svg[License: GPL 3, link=http://www.gnu.org/licenses/gpl-3.0.txt]
-image:https://img.shields.io/github/release/doublep/eldev.svg[Latest release, link=https://github.com/doublep/eldev/releases]
+image:https://img.shields.io/github/release/emacs-eldev/eldev.svg[Latest release, link=https://github.com/emacs-eldev/eldev/releases]
 
 
 include::overview.adoc[]
