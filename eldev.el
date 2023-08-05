@@ -3560,7 +3560,7 @@ mode output is restricted to just the version."
   "Whether to profile only project code.")
 
 (defvar eldev--effective-profile-mode nil)
-(defvar eldev--profile-ever-started nil)
+(defvar eldev--profile-pause-on-stop nil)
 
 
 ;; I had an idea of profiling in a thread (Emacs 26+) to shorten backtraces, but this
@@ -3575,14 +3575,29 @@ mode output is restricted to just the version."
                            (progn (eval-and-compile (require 'profiler))
                                   (not (profiler-running-p eldev--effective-profile-mode))))))
        (when ,do-start
-         (setf eldev--profile-ever-started t)
-         (let ((inhibit-message t))
-           (profiler-start eldev--effective-profile-mode)))
+         (eldev--profile-do-start))
        (unwind-protect
            (progn ,@body)
          (when ,do-start
-           (let ((inhibit-message t))
-             (profiler-stop)))))))
+           (eldev--profile-do-stop))))))
+
+(defun eldev--profile-do-start ()
+  (let ((inhibit-message t))
+    (profiler-start eldev--effective-profile-mode)))
+
+(defun eldev--profile-do-stop ()
+  ;; Starting with Emacs 27 `profiler-stop' not only retrieves profiling information, but clears it
+  ;; completely, making it impossible to join with later profiles (see test `eldev-profile-joins-multiple').
+  ;; For this reason, we "stop" manually when we want to join with later profiles, e.g. when profiling
+  ;; multiple expressions.
+  (if eldev--profile-pause-on-stop
+      (progn
+        ;; Bare bones of `profiler-stop'.
+        (when (fboundp 'profiler-cpu-stop)
+          (profiler-cpu-stop))
+        (profiler-memory-stop))
+    (let ((inhibit-message t))
+      (profiler-stop))))
 
 (eldev-defcommand eldev-profile (&rest parameters)
   "Profile given Eldev command.  Particularly useful with
@@ -3623,14 +3638,10 @@ At least one of options `--file' and `--open' is required."
          memory-profile-file)
     (if (and eldev-profile-only-project (eldev-get handler :profiling-self))
         (progn
-          ;; Starting with Emacs 27 these functions would get called on profiler stopping,
-          ;; retrieving the collected profiling information, but also clearing it and
-          ;; making unavailable for later joins (see test `eldev-profile-joins-multiple').
-          (eldev-advised ('profiler-cpu-log :override (lambda (&rest _)))
-            (eldev-advised ('profiler-memory-log :override (lambda (&rest _)))
-              (eldev--execute-command parameters)))
+          (let ((eldev--profile-pause-on-stop t))
+            (eldev--execute-command parameters))
           ;; See test `eldev-profile-no-op'.  For 27 and up this also retrieves "the
-          ;; final, everything joined data", see advises above.
+          ;; final, everything joined data", see use of `eldev--profile-pause-on-stop'.
           (eldev-profile-body))
       (eldev-profile-body
         (let ((eldev--effective-profile-mode nil))
