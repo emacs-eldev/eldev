@@ -35,7 +35,8 @@
 :uri-circle: https://circleci.com/
 :uri-docker: https://www.docker.com/
 :uri-coveralls: https://coveralls.io/
-:uri-setup-emacs: https://github.com/purcell/setup-emacs
+:uri-setup-emacs: https://github.com/jcs090218/setup-emacs
+:uri-setup-eldev: https://github.com/emacs-eldev/setup-eldev
 :uri-undercover: https://github.com/undercover-el/undercover.el
 :uri-extmap: https://github.com/doublep/extmap
 :uri-iter2: https://github.com/doublep/iter2

@@ -17,19 +17,20 @@ The easiest option for continuous integration for GitHub-hosted
 projects are {uri-github-wflows}[GitHub workflows], as this doesn’t
 involve using a 3rd-party service.  Probably most of Elisp projects
 can take advantage of this, since GitHub appears to be the most
-popular hosting for Elisp projects.
+popular hosting for Elisp projects.  Workflow definition files for
+GitHub are somewhat more verbose than for <<travis-ci,Travis CI>>, but
+ultimately not really more complicated.
 
-Workflow definition files for GitHub are somewhat more verbose than
-for <<travis-ci,Travis CI>>, but ultimately not really more
-complicated.  The easiest way to install Emacs binary of appropriate
-version is to use {uri-setup-emacs}[`purcell/setup-emacs`] action
-(which internally uses {uri-nix-emacs}[nix-emacs-ci]).  Since
-{uri-evm}[EVM] seems tuned to Ubuntu Trusty (i.e. what Travis CI
-provides), it is likely unsuitable for GitHub workflows.
+The easiest way to install Emacs binary of appropriate version is to
+use {uri-setup-emacs}[`jcs090218/setup-emacs`] action (which
+internally uses {uri-nix-emacs}[nix-emacs-ci]).  There are other
+`setup-emacs` actions around, but this one works across all operating
+systems.  Since {uri-evm}[EVM] seems tuned to Ubuntu Trusty (i.e. what
+Travis CI provides), it is likely unsuitable for GitHub workflows.
 
-There is a short shell script that installs Eldev itself for use on
-GitHub runners.  Modifying `PATH` there is a bit tricky, so you
-probably should just go with the script, as demonstrated below.
+There is a simple {uri-setup-eldev}[action called `setup-eldev`] too.
+It works on all GitHub-supported operating systems — Linux, macOS and
+Windows — as well.
 
 A basic workflow file (you can e.g. name it
 `.github/workflows/test.yml`) would look something like this:
@@ -56,12 +57,12 @@ jobs:
 
     steps:
     - name: Set up Emacs
-      uses: purcell/setup-emacs@master
+      uses: jcs090218/setup-emacs@master
       with:
         version: ${{matrix.emacs_version}}
 
     - name: Install Eldev
-      run: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
+      uses: emacs-eldev/setup-eldev@v1
 
     - name: Check out the source code
       uses: actions/checkout@v3

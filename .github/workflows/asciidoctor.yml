@@ -18,7 +18,7 @@ jobs:
     # We want to call it via Eldev, to reuse command line etc.  Certainly an overkill, but
     # hardly important, our regression testing action is magnitudes more costly anyway.
     - name: Set up Emacs
-      uses: purcell/setup-emacs@master
+      uses: jcs090218/setup-emacs@master
       with:
         version: ${{matrix.emacs_version}}
 
