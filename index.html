@@ -3281,21 +3281,22 @@ reliable</a>.</p>
 projects are <a href="https://help.github.com/en/actions">GitHub workflows</a>, as this doesn’t
 involve using a 3rd-party service.  Probably most of Elisp projects
 can take advantage of this, since GitHub appears to be the most
-popular hosting for Elisp projects.</p>
+popular hosting for Elisp projects.  Workflow definition files for
+GitHub are somewhat more verbose than for <a href="#travis-ci">Travis CI</a>, but
+ultimately not really more complicated.</p>
 </div>
 <div class="paragraph">
-<p>Workflow definition files for GitHub are somewhat more verbose than
-for <a href="#travis-ci">Travis CI</a>, but ultimately not really more
-complicated.  The easiest way to install Emacs binary of appropriate
-version is to use <a href="https://github.com/purcell/setup-emacs"><code>purcell/setup-emacs</code></a> action
-(which internally uses <a href="https://github.com/purcell/nix-emacs-ci">nix-emacs-ci</a>).  Since
-<a href="https://github.com/rejeep/evm">EVM</a> seems tuned to Ubuntu Trusty (i.e. what Travis CI
-provides), it is likely unsuitable for GitHub workflows.</p>
+<p>The easiest way to install Emacs binary of appropriate version is to
+use <a href="https://github.com/jcs090218/setup-emacs"><code>jcs090218/setup-emacs</code></a> action (which
+internally uses <a href="https://github.com/purcell/nix-emacs-ci">nix-emacs-ci</a>).  There are other
+<code>setup-emacs</code> actions around, but this one works across all operating
+systems.  Since <a href="https://github.com/rejeep/evm">EVM</a> seems tuned to Ubuntu Trusty (i.e. what
+Travis CI provides), it is likely unsuitable for GitHub workflows.</p>
 </div>
 <div class="paragraph">
-<p>There is a short shell script that installs Eldev itself for use on
-GitHub runners.  Modifying <code>PATH</code> there is a bit tricky, so you
-probably should just go with the script, as demonstrated below.</p>
+<p>There is a simple <a href="https://github.com/emacs-eldev/setup-eldev">action called <code>setup-eldev</code></a> too.
+It works on all GitHub-supported operating systems — Linux, macOS and
+Windows — as well.</p>
 </div>
 <div class="paragraph">
 <p>A basic workflow file (you can e.g. name it
@@ -3324,12 +3325,12 @@ jobs:
 
     steps:
     - name: Set up Emacs
-      uses: purcell/setup-emacs@master
+      uses: jcs090218/setup-emacs@master
       with:
         version: ${{matrix.emacs_version}}
 
     - name: Install Eldev
-      run: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
+      uses: emacs-eldev/setup-eldev@v1
 
     - name: Check out the source code
       uses: actions/checkout@v3
@@ -4932,7 +4933,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-08-05 16:42:33 UTC
+Last updated 2023-08-05 18:34:53 UTC
 </div>
 </div>
 </body>
