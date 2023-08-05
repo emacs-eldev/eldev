@@ -576,7 +576,7 @@ Eldev is sort of a parallel to Gradle — its configuration is a
 </div>
 <div class="paragraph">
 <p><span class="image"><a class="image" href="http://www.gnu.org/licenses/gpl-3.0.txt"><img src="https://img.shields.io/badge/license-GPL_3-green.svg" alt="License: GPL 3"></a></span>
-<span class="image"><a class="image" href="https://github.com/doublep/eldev/releases"><img src="https://img.shields.io/github/release/doublep/eldev.svg" alt="Latest release"></a></span></p>
+<span class="image"><a class="image" href="https://github.com/emacs-eldev/eldev/releases"><img src="https://img.shields.io/github/release/emacs-eldev/eldev.svg" alt="Latest release"></a></span></p>
 </div>
 </div>
 </div>
@@ -781,7 +781,7 @@ problems.</p>
 <div class="content">
 <div class="literalblock">
 <div class="content">
-<pre>$ curl -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev &gt; eldev &amp;&amp; chmod a+x eldev</pre>
+<pre>$ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/bin/eldev &gt; eldev &amp;&amp; chmod a+x eldev</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -804,7 +804,7 @@ necessary permissions.</p>
 <div class="content">
 <div class="literalblock">
 <div class="content">
-<pre>&gt; curl.exe -fsSL https://raw.github.com/doublep/eldev/master/bin/eldev.bat &gt; eldev.bat</pre>
+<pre>&gt; curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/bin/eldev.bat &gt; eldev.bat</pre>
 </div>
 </div>
 </div>
@@ -832,7 +832,7 @@ first invocation.</p>
 <div class="content">
 <div class="literalblock">
 <div class="content">
-<pre>$ curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev | sh</pre>
+<pre>$ curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev | sh</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -863,7 +863,7 @@ first invocation.</p>
 <div class="content">
 <div class="literalblock">
 <div class="content">
-<pre>&gt; curl.exe -fsSL https://raw.github.com/doublep/eldev/master/webinstall/eldev.bat | cmd /Q</pre>
+<pre>&gt; curl.exe -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/eldev.bat | cmd /Q</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -3329,7 +3329,7 @@ jobs:
         version: ${{matrix.emacs_version}}
 
     - name: Install Eldev
-      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+      run: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/github-eldev | sh
 
     - name: Check out the source code
       uses: actions/checkout@v3
@@ -3381,7 +3381,7 @@ env:
   - EVM_EMACS=emacs-26.3-travis
 
 install:
-  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev-and-evm &gt; x.sh &amp;&amp; source ./x.sh
+  - curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/travis-eldev-and-evm &gt; x.sh &amp;&amp; source ./x.sh
   - evm install $EVM_EMACS --use
 
 script:
@@ -3412,7 +3412,7 @@ env:
 
 install:
   - bash &lt;(curl https://raw.githubusercontent.com/purcell/nix-emacs-ci/master/travis-install)
-  - curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/travis-eldev &gt; x.sh &amp;&amp; source ./x.sh
+  - curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/travis-eldev &gt; x.sh &amp;&amp; source ./x.sh
 
 script:
   - eldev -p -dtT test</pre>
@@ -3440,7 +3440,7 @@ in file <code>.circleci/config.yml</code>:</p>
 <pre>    ...
     - run:
         name: Install Eldev
-        command: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/circle-eldev &gt; x.sh &amp;&amp; source ./x.sh</pre>
+        command: curl -fsSL https://raw.github.com/emacs-eldev/eldev/master/webinstall/circle-eldev &gt; x.sh &amp;&amp; source ./x.sh</pre>
 </div>
 </div>
 </div>
@@ -4932,7 +4932,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-08-01 18:56:36 UTC
+Last updated 2023-08-05 16:42:33 UTC
 </div>
 </div>
 </body>
