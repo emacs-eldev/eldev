@@ -816,13 +816,17 @@ Since 0.2."
               (setf replaced-up-to next-change)))))
       (pcase special-destination
         (`stderr
-         (let ((inhibit-message           nil)
-               (eldev--real-stderr-output t))
-           ;; FIXME: Is there a way to support both `:stderr' and `:nolf' in one call?
-           ;;        Mixing up `(princ ... t)' and `message' gives bad results.  Testcase:
-           ;;
-           ;;            $ eldev exec "(princ 1 t) (message \"2\")"
-           (message "%s" message)))
+         (if noninteractive
+             ;; Starting with 1.6 we do it like this for non-interactive (i.e. the
+             ;; "normal") usecase.  This allows us to process `:nolf' also here, but
+             ;; otherwise there should be no detectable differences compared to using
+             ;; `message' (except fewer newlines).  Despite how it may look from the last
+             ;; `pcase' branch, `debugging-output' as the destination is still
+             ;; substantially different: for that indentation and faces are applied above.
+             (princ (if nolf message (concat message "\n")) #'external-debugging-output)
+           (let ((inhibit-message           nil)
+                 (eldev--real-stderr-output t))
+             (message "%s" message))))
         (`display-warning
          (let ((scan 0)
                probably-error)
