@@ -4377,9 +4377,13 @@ various options to command `test' and global option `-b'
 (variable `eldev-backtrace-style') are still respected if
 possible."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'standard
-           (pcase framework
-             ;; For Buttercup we still pass through our color setting.
-             (`buttercup `((buttercup-color . ,(eldev-output-colorized-p)))))))
+           (eldev-test-runner-standard-environment framework)))
+
+(defun eldev-test-runner-standard-environment (framework)
+  ;; Other frameworks are just invoked with empty environment.
+  (pcase framework
+    ;; For Buttercup we still pass through our color setting.
+    (`buttercup `((buttercup-color . ,(eldev-output-colorized-p))))))
 
 (eldev-deftestrunner eldev-test-runner-simple (framework selectors files)
   "Simple test runner with a few tweaks to the defaults.
@@ -4396,16 +4400,47 @@ Backtraces are formatted according to `eldev-test-print-backtraces'
 and `eldev-backtrace-style'.  For Buttercup, any truncation results
 in `crop' stack frame style."
   (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'simple
-             ;; Other frameworks are just invoked with empty environment.
-             (pcase framework
-               (`ert
-                `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
-                  (eldev--test-ert-short-backtraces . t)))
-               (`buttercup
-                `((buttercup-color                         . ,(eldev-output-colorized-p))
-                  (buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))))
-               (`ecukes
-                `((ecukes-verbose . (not (eldev-unless-quiet t))))))))
+           (eldev-test-runner-simple-environment framework)))
+
+(defun eldev-test-runner-simple-environment (framework)
+  (nconc (pcase framework
+           (`ert
+            `((ert-quiet                        . ,(not (eldev-unless-quiet t)))
+              (eldev--test-ert-short-backtraces . t)))
+           (`buttercup
+            `((buttercup-reporter-batch-quiet-statuses . ,`(skipped disabled ,@(unless (eldev-unless-quiet t) '(pending passed))))))
+           (`ecukes
+            `((ecukes-verbose . (not (eldev-unless-quiet t))))))
+         (eldev-test-runner-standard-environment framework)))
+
+(defvar eldev--test-runner-concise-num-total 0)
+(defvar eldev--test-runner-concise-num-reported 0)
+
+(eldev-deftestrunner eldev-test-runner-concise (framework selectors files)
+  "DONOTRELEASE: Document"
+  (let ((eldev--test-runner-concise-num-total    0)
+        (eldev--test-runner-concise-num-reported 0))
+    (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'concise
+             (eldev-test-runner-concise-environment framework))))
+
+(defun eldev-test-runner-concise-environment (framework)
+  (nconc (pcase framework
+           (`ert
+            `((ert-quiet                        . t)
+              (eldev--test-ert-concise-expected . t))))
+         (eldev-test-runner-standard-environment framework)))
+
+(defun eldev-test-runner-concise-tick (force-number &optional num-tests)
+  (unless num-tests
+    (setf num-tests (1+ eldev--test-runner-concise-num-total)))
+  (let* ((num-new  (- num-tests eldev--test-runner-concise-num-total))
+         (progress (make-string num-new ?.)))
+    (if (and (not force-number) (< num-tests (+ eldev--test-runner-concise-num-reported 50)))
+        (eldev-print :stderr :nolf progress)
+      (eldev-print :stderr "%s %d" progress num-tests)
+      (setf eldev--test-runner-concise-num-reported num-tests))
+    (setf eldev--test-runner-concise-num-total num-tests)))
+
 
 (eldev-defoption eldev-test-files (pattern)
   "Load only tests in given file(s)"

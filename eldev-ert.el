@@ -31,6 +31,7 @@
 ;; `ert' feature.
 
 (defvar eldev--test-ert-short-backtraces nil)
+(defvar eldev--test-ert-concise-expected nil)
 (defvar eldev--test-ert-results nil)
 
 (defvar-local eldev--ert-backtrace-buffer nil)
@@ -78,7 +79,7 @@ This is a wrapper around `ert-run-tests-batch' that handles
 `eldev-test-stop-on-unexpected'.  Test runners should generally
 use this for ERT framework, unless they can do better."
   ;; Since ERT doesn't support features we want out-of-the-box, we have to hack.
-  (eldev-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin eldev--test-ert-short-backtraces)
+  (eldev-bind-from-environment environment (ert-quiet ert-batch-backtrace-right-margin eldev--test-ert-short-backtraces eldev--test-ert-concise-expected)
     (let ((width (eldev-shrink-screen-width-as-needed eldev-test-print-backtraces)))
       (if (integerp width)
           (setf ert-batch-backtrace-right-margin (when (> width 0) (max (1- width) 1)))
@@ -99,6 +100,14 @@ use this for ERT framework, unless they can do better."
                       :around (lambda (original selector listener &rest rest)
                                 (apply original selector
                                        (lambda (event-type &rest arguments)
+                                         (when (and eldev--test-ert-concise-expected (eq event-type 'test-ended))
+                                           (let* ((stats         (nth 0 arguments))
+                                                  (test          (nth 1 arguments))
+                                                  (result        (nth 2 arguments))
+                                                  (num-completed (ert-stats-completed stats)))
+                                             (eldev-test-runner-concise-tick (or (not (ert-test-result-expected-p test result))
+                                                                                 (= (ert-stats-total stats) num-completed))
+                                                                             num-completed)))
                                          ;; Older ERT versions have `ert--print-backtrace',
                                          ;; newer use `backtrace-to-string'.  Not using
                                          ;; function-quoting to avoid warnings.
@@ -118,7 +127,15 @@ use this for ERT framework, unless they can do better."
                                                     (eldev-advised ('buffer-substring-no-properties
                                                                     :around (lambda (original &rest arguments)
                                                                               (apply (if eldev--ert-backtrace-buffer #'buffer-substring original) arguments)))
-                                                      (apply listener event-type arguments))))
+                                                      (if (and eldev--test-ert-concise-expected
+                                                               (eq event-type 'test-ended)
+                                                               (let ((test   (nth 1 arguments))
+                                                                     (result (nth 2 arguments)))
+                                                                 (ert-test-result-expected-p test result)))
+                                                          (eldev-output-reroute-messages
+                                                            (let ((eldev-message-rerouting-wrapper #'ignore))
+                                                              (apply listener event-type arguments)))
+                                                        (apply listener event-type arguments)))))
                                            (pcase event-type
                                              (`run-started
                                               (eldev-test-validate-amount (ert-stats-total (nth 0 arguments))))
