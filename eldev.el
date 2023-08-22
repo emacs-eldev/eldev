@@ -4428,7 +4428,7 @@ in `crop' stack frame style."
            (`ert
             `((ert-quiet                        . t)
               (eldev--test-ert-concise-expected . t))))
-         (eldev-test-runner-standard-environment framework)))
+         (eldev-test-runner-simple-environment framework)))
 
 (defun eldev-test-runner-concise-tick (force-number &optional num-tests)
   (unless num-tests
