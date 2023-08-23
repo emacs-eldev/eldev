@@ -627,7 +627,6 @@ This shouldn't be set directly, instead use macro
 
 Since 1.4.")
 
-(defvar eldev--output-rerouted nil)
 (defvar eldev--real-stderr-output nil)
 
 
@@ -1117,18 +1116,17 @@ disabled by setting `eldev-disable-message-rerouting' inside
 BODY."
   (declare (indent 0) (debug (body)))
   `(eldev-advised (#'message :around
-                             (unless eldev--output-rerouted
-                               (lambda (original &rest args)
-                                 (unless (and (boundp 'inhibit-message) inhibit-message)
-                                   (cond ((or eldev--real-stderr-output eldev-disable-message-rerouting)
-                                          (apply original args))
-                                         (eldev-message-rerouting-wrapper
-                                          (if (functionp eldev-message-rerouting-wrapper)
-                                              (apply eldev-message-rerouting-wrapper args)
-                                            ;; Assume a macro (`eldev-warn' or something like that).
-                                            (eval `(,eldev-message-rerouting-wrapper ,@(mapcar #'eldev-macroexp-quote args)) t)))
-                                         (t
-                                          (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args)))))))
+                             (lambda (original &rest args)
+                               (unless (and (boundp 'inhibit-message) inhibit-message)
+                                 (cond ((or eldev--real-stderr-output eldev-disable-message-rerouting)
+                                        (apply original args))
+                                       (eldev-message-rerouting-wrapper
+                                        (if (functionp eldev-message-rerouting-wrapper)
+                                            (apply eldev-message-rerouting-wrapper args)
+                                          ;; Assume a macro (`eldev-warn' or something like that).
+                                          (eval `(,eldev-message-rerouting-wrapper ,@(mapcar #'eldev-macroexp-quote args)) t)))
+                                       (t
+                                        (apply #'eldev-output (or eldev-message-rerouting-destination :stderr) args))))))
      ,@body))
 
 
@@ -1424,7 +1422,7 @@ Since 0.8."
 (defun eldev--do-highlight-backtrace ()
   (save-excursion
     (goto-char 1)
-    (while (re-search-forward (rx bol (0+ " ") (group (1+ (not (any "("))))) nil t)
+    (while (re-search-forward (rx bol (0+ " ") (group (1+ (not (any "( "))))) nil t)
       (add-face-text-property (match-beginning 1) (match-end 1) 'name))))
 
 ;; Also handle standard backtraces printed by Emacs debugger.
