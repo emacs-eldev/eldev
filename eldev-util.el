@@ -164,7 +164,10 @@ conditionally.
         (fn       (make-symbol "$fn")))
     `(let ((,fn ,function))
        (when ,fn
-         (advice-add ,symbol ,where ,fn ,@props))
+         ;; See test `eldev-advised-3' for an example why this is important.
+         (if (advice-member-p ,fn ,symbol)
+             (setf ,fn nil)
+           (advice-add ,symbol ,where ,fn ,@props)))
        (unwind-protect
            ,(macroexp-progn body)
          (when ,fn
