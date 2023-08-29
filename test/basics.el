@@ -130,4 +130,12 @@
     (should (= exit-code 1))))
 
 
+(ert-deftest eldev-timestamp-output-1 ()
+  (eldev--test-run "trivial-project" ("--time" "exec" `(eldev-print :nolf "abc") `(eldev-print :nolf "de\nfg\nhij") `(eldev-print "!"))
+    ;; "[" (= 9 anything) "]" matches timestamp.  There should be no timestamp on the last
+    ;; line, since it is started together with line 2.
+    (should (string-match-p (rx bos "[" (= 9 anything) "]  abcde\n" "[" (= 9 anything) "]  fg\n" "             hij!\n" eos) stdout))
+    (should (= exit-code 0))))
+
+
 (provide 'test/basics)

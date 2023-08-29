@@ -580,6 +580,10 @@ If not specified, Eldev will try to pick the best-suited one.")
 (defvar eldev-output-time-diffs nil
   "Whether to prepend all output lines with elapsed time.")
 
+(defvar eldev-output-newline-pending nil
+  "If the last printed line is not terminated yet.
+Only output coming through `eldev-output' counts.  Since 1.6.")
+
 (defvar eldev--time-diff-base (float-time))
 
 (defvar eldev-disable-message-rerouting nil
@@ -770,13 +774,26 @@ Since 0.2."
       (when colors
         (setf message (apply #'eldev-colorize message colors)))
       (when eldev-output-time-diffs
-        (let* ((elapsed         (- (float-time) eldev--time-diff-base))
-               (elapsed-min     (floor (/ elapsed 60)))
-               (elapsed-sec-raw (- elapsed (* elapsed-min 60)))
-               (elapsed-sec     (floor elapsed-sec-raw))
-               (elapsed-millis  (floor (* (- elapsed-sec-raw elapsed-sec) 1000))))
-          (setf message (concat (eldev-colorize (format "[%02d:%02d.%03d]" elapsed-min elapsed-sec elapsed-millis) 'timestamp)
-                                "  " (replace-regexp-in-string "\n" "\n             " message t t)))))
+        (let (part1
+              part2)
+          (if eldev-output-newline-pending
+              (let ((newline-at (string-match-p "\n" message)))
+                (when newline-at
+                  (setf part1 (substring message 0 (1+ newline-at))
+                        part2 (substring message (1+ newline-at)))))
+            (setf part1 ""
+                  part2 message))
+          ;; Only insert timestamp when last output ended with newline, or `message' contains one.
+          (when part1
+            (let* ((elapsed         (- (float-time) eldev--time-diff-base))
+                   (elapsed-min     (floor (/ elapsed 60)))
+                   (elapsed-sec-raw (- elapsed (* elapsed-min 60)))
+                   (elapsed-sec     (floor elapsed-sec-raw))
+                   (elapsed-millis  (floor (* (- elapsed-sec-raw elapsed-sec) 1000))))
+              (setf message (concat part1
+                                    (eldev-colorize (format "[%02d:%02d.%03d]" elapsed-min elapsed-sec elapsed-millis) 'timestamp)
+                                    "  " (replace-regexp-in-string "\n" "\n             " part2 t t)))))))
+      (setf eldev-output-newline-pending (and nolf (not (string-match-p (rx "\n" eos) message))))
       (if (or noninteractive (eq special-destination 'debugging-output))
           (when (and (not nocolor) (eldev-output-colorized-p))
             (let ((colorizing-scheme (eldev--get-colorizing-scheme))

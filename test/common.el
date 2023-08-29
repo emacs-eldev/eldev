@@ -339,9 +339,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 (defmacro eldev--test-capture-output (&rest body)
   `(with-temp-buffer
-     (let ((standard-output         (current-buffer))
-           (eldev-output-time-diffs nil)
-           (eldev-coloring-mode     nil))
+     (let ((standard-output              (current-buffer))
+           (eldev-output-time-diffs      nil)
+           (eldev-output-newline-pending nil)
+           (eldev-coloring-mode          nil))
        ,@body
        (buffer-string))))
 
