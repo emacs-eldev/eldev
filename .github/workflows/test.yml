@@ -51,7 +51,7 @@ jobs:
         # stacktrace was too long.  Just set it to a large number in
         # `Eldev-local' and thus have if for the following steps too.
         echo "(setf debugger-batch-max-lines 10000)" >> Eldev-local
-        ./bin/eldev -p -dtTC test --omit-backtraces --expect 400
+        ./bin/eldev -p -dtQTC test --omit-backtraces --expect 400
       env:
         ELDEV_LOCAL: "."
 
@@ -60,7 +60,7 @@ jobs:
         # Robust mode is automatic by default.  Make sure that this
         # resolves to "yes" on GitHub at least.  See comments in the
         # function for reason of this weirdness.
-        ./bin/eldev -p -dtTC exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error (list (eldev--list-to-string '(Must default to robust mode on GitHub)))))"
+        ./bin/eldev -p -dtQTC exec "(unless (eldev-retry-on-errors-p) (signal 'eldev-error (list (eldev--list-to-string '(Must default to robust mode on GitHub)))))"
       env:
         ELDEV_LOCAL: "."
 
@@ -79,7 +79,7 @@ jobs:
         # Ensure that our tests can be compiled cleanly: warnings
         # might indicate something is wrong with the test.  Here we
         # can already use Eldev.
-        ./bin/eldev -p -dtTC compile --set test --warnings-as-errors
+        ./bin/eldev -p -dtQTC compile --set test --warnings-as-errors
       env:
         ELDEV_LOCAL: "."
 
@@ -87,7 +87,7 @@ jobs:
       run: |
         # Run `relint' on Eldev's source code, more as a test of
         # Eldev--relint integration, because we use `rx' macro.
-        ./bin/eldev -p -dtTC lint re
+        ./bin/eldev -p -dtQTC lint re
       env:
         ELDEV_LOCAL: "."
 
@@ -108,7 +108,7 @@ jobs:
         # 2. The `--` is escaped with `"` for cross platform
         # compatibility because in PowerShell `--` is a special
         # operator.
-        ./bin/eldev -S "(when (eq system-type 'windows-nt) (push 'eldev-file-owners eldev-doctor-disabled-tests))" -p -dtTC doctor "--" -githooks -recent-stable-releases
+        ./bin/eldev -S "(when (eq system-type 'windows-nt) (push 'eldev-file-owners eldev-doctor-disabled-tests))" -p -dtQTC doctor "--" -githooks -recent-stable-releases
       env:
         ELDEV_LOCAL: "."
 
