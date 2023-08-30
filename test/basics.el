@@ -131,7 +131,11 @@
 
 
 (ert-deftest eldev-timestamp-output-1 ()
-  (eldev--test-run "trivial-project" ("--time" "exec" `(eldev-print :nolf "abc") `(eldev-print :nolf "de\nfg\nhij") `(eldev-print "!"))
+  ;; Apparently `\n' in command line is not passed through correctly on Windows (seems
+  ;; unrelated to `\r\n' as EOL sequence).  I don't know if it breaks in `make-process' or
+  ;; in OS itself, but according to some investigations not in Eldev itself.  Oh well,
+  ;; let's rewrite the test.
+  (eldev--test-run "trivial-project" ("--time" "exec" `(eldev-print :nolf "abc") `(let ((lf (make-string 1 10))) (eldev-print :nolf (concat "de" lf "fg" lf "hij"))) `(eldev-print "!"))
     ;; "[" (= 9 anything) "]" matches timestamp.  There should be no timestamp on the last
     ;; line, since it is started together with line 2.
     (should (string-match-p (rx bos "[" (= 9 anything) "]  abcde\n" "[" (= 9 anything) "]  fg\n" "             hij!\n" eos) stdout))
