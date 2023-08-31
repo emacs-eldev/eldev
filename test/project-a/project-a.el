@@ -1,5 +1,7 @@
 ;;; project-a.el --- Test project with one dependency
 
+;;; Copyright (C) 2999 John Doe
+
 ;; Version: 1.0
 ;; Homepage: https://example.com/
 ;; Package-Requires: ((emacs "24") (dependency-a "0.9"))

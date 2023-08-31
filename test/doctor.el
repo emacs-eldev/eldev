@@ -47,6 +47,15 @@
       (should (string-match-p "no commits after 1.0" stdout))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-doctor-up-to-date-copyright-1 ()
+  (eldev--test-run "project-a" ("doctor" "up-to-date-copyright")
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-doctor-up-to-date-copyright-2 ()
+  (eldev--test-run "project-b" ("doctor" "up-to-date-copyright")
+    (should (string-match-p "project-b\\.el.+mentions 2000, last changed in" stdout))
+    (should (= exit-code 1))))
+
 
 (ert-deftest eldev-doctor-disabling-doctests ()
   ;; Pretend that the project has disabled it in its `Eldev'.

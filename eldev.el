@@ -4956,15 +4956,16 @@ By default, only failed doctests are printed.")
 (declare-function eldev--doctor-list-tests 'eldev-doctor)
 
 (eldev-defcommand eldev-doctor (&rest parameters)
-  "Check your project for potential problems.  Unlike linters, this
+  "Check your project for potential problems.  Unlike linters,
 these tests are not targeted at Elisp code, but rather at project
-infrastructure, including the way it uses Eldev.  Things reported
-should be seen as suggestions, not as warnings.  Depending on
-your project needs and other circumstances, it may be perfectly
-valid to implement something against doctor's recommendations.
+infrastructure, including the way it uses Eldev.
 
-Projects may also disable certain tests by modifying variable
-`eldev-doctor-disabled-tests' in their file `Eldev'."
+Issues reported should be seen as suggestions, not as warnings.
+Depending on your project needs and other circumstances, it may
+be perfectly valid to implement something against doctor's
+recommendations.  Projects can even disable certain tests by
+modifying variable `eldev-doctor-disabled-tests' in their file
+`Eldev'."
   :parameters     "[SELECTOR...]"
   :category       testing
   (require 'eldev-doctor)
