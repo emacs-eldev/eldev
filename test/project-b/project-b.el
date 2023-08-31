@@ -1,6 +1,6 @@
 ;;; project-b.el --- Test project with one dependency that has its own dependency in turn; also with "manual"!
 
-;;; Copyright (C) 2000 John Doe
+;;; Copyright (C) 2999 John Doe
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-b)
