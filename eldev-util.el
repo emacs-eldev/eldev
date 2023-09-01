@@ -744,6 +744,9 @@ PROMPT.  More can be added later (preserving semantics).  Since
 Since 0.2."
   (if (eq eldev-coloring-mode 'auto) eldev--tty eldev-coloring-mode))
 
+;; Only from Emacs 29.
+(declare-function flush-standard-output nil)
+
 (defun eldev-output (format-string &rest arguments)
   "Unconditionally format and print given message."
   (let (special-destination
@@ -853,7 +856,12 @@ Since 0.2."
              (setf scan (next-single-property-change scan 'face message)))
            (display-warning 'eldev message (if probably-error :error :warning))))
         (_
-         (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output))))))
+         (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output))
+         (unless special-destination
+           (if (fboundp 'flush-standard-output)
+               (flush-standard-output)
+             ;; "As a side effect, this function flushes any pending STREAM’s data."
+             (set-binary-mode 'stdout nil)))))))
   ;; To make e.g. calling from M-: give nicer results.
   nil)
 
