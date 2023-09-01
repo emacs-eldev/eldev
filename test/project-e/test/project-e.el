@@ -5,7 +5,7 @@
 
 (defvar eldev--buttercup-do-fail nil)
 
-(describe "Project D tests"
+(describe "Project E tests"
   (it "has a dummy passing test"
     (expect t :to-be t))
 

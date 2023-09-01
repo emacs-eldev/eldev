@@ -21,17 +21,22 @@
 
 
 (defvar buttercup-suites)
+(defvar buttercup-reporter)
 (defvar buttercup-reporter-batch-quiet-statuses)
 (defvar buttercup-color)
 (defvar buttercup-stack-frame-style)
 
 (declare-function buttercup-mark-skipped "buttercup")
 (declare-function buttercup-spec-full-name "buttercup")
+(declare-function buttercup-spec-status "buttercup")
 (declare-function buttercup-run "buttercup")
 (declare-function buttercup-suites-total-specs-defined "buttercup")
 (declare-function buttercup-suites-total-specs-failed "buttercup")
 (declare-function buttercup-suites-total-specs-pending "buttercup")
 (declare-function buttercup-suites-total-specs-status "buttercup")
+
+
+(defvar eldev--test-buttercup-concise-expected nil)
 
 
 (defun eldev-test-buttercup-preprocess-selectors (selectors)
@@ -45,7 +50,7 @@
   "Run Buttercup tests according to given SELECTORS (patterns)."
   (when eldev-test-stop-on-unexpected
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Buttercup framework"))
-  (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color)
+  (eldev-bind-from-environment environment (buttercup-reporter-batch-quiet-statuses buttercup-stack-frame-style buttercup-color eldev--test-buttercup-concise-expected)
     (pcase (eldev-shrink-screen-width-as-needed eldev-test-print-backtraces)
       (`nil                        (setf buttercup-stack-frame-style 'omit))
       ;; Just always use `crop' for now: Buttercup doesn't support varying width yet.
@@ -57,13 +62,30 @@
     (when selectors
       (buttercup-mark-skipped selectors t))
     ;; Inject profiling support if wanted.
-    (let* ((result     (eldev-advised ('buttercup--run-spec :around (when eldev--effective-profile-mode
+    (let* (num-total
+           (original-reporter buttercup-reporter)
+           (result     (eldev-advised ('buttercup--run-spec :around (when eldev--effective-profile-mode
                                                                       (lambda (original &rest args)
                                                                         (eldev-backtrace-notch 'eldev
                                                                           (eldev-profile-body
                                                                             (apply original args))))))
-                         ;; Not trying to highlight the summary, Buttercup already does that itself.
-                         (buttercup-run t)))
+                         (eldev-advised ('buttercup-reporter-batch :around
+                                                                   (when eldev--test-buttercup-concise-expected
+                                                                     (lambda (original event arg &rest etc)
+                                                                       ;; At least when testing in Buttercup project itself, there
+                                                                       ;; can be nested invocations.  Ignore them.  There appears
+                                                                       ;; to be no better way to find them.
+                                                                       (when (eq buttercup-reporter original-reporter)
+                                                                         (pcase event
+                                                                           (`buttercup-started
+                                                                            (setf num-total (buttercup-suites-total-specs-defined arg)))
+                                                                           (`spec-done
+                                                                            (eldev-test-runner-concise-tick (not (memq (buttercup-spec-status arg)
+                                                                                                                       buttercup-reporter-batch-quiet-statuses))
+                                                                                                            nil num-total))))
+                                                                       (apply original event arg etc))))
+                           ;; Not trying to highlight the summary, Buttercup already does that itself.
+                           (buttercup-run t))))
            (num-failed (buttercup-suites-total-specs-failed buttercup-suites)))
       (setf eldev-test-num-passed  (+ eldev-test-num-passed  (buttercup-suites-total-specs-status buttercup-suites 'passed))
             eldev-test-num-failed  (+ eldev-test-num-failed  num-failed)

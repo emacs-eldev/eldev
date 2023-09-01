@@ -4,16 +4,21 @@
 (ert-deftest eldev-test-project-a-1 ()
   ;; Two tests, all pass.
   (eldev--test-run "project-a" ("test")
+    (should (string-match-p "passed.+project-a-test-hello" stdout))
+    (should (string-match-p "passed.+project-a-test-triviality" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-1 ()
   ;; Two tests, one of them fails.
   (eldev--test-run "project-b" ("test")
+    (should (string-match-p "passed.+project-b-test-hello" stdout))
+    (should (string-match-p "FAILED.+project-b-test-triviality-failing" stdout))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-test-project-b-2 ()
   ;; Only one passing test.
   (eldev--test-run "project-b" ("test" "hello")
+    (should (string-match-p "passed.+project-b-test-hello" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-3 ()
@@ -36,11 +41,14 @@
 (ert-deftest eldev-test-project-c-1 ()
   ;; Two tests, all pass.
   (eldev--test-run "project-c" ("test")
+    (should (string-match-p "passed.+project-c-test-hello" stdout))
+    (should (string-match-p "passed.+project-c-test-triviality" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-g-1 ()
   ;; One passing test.  This project uses a loading root for its tests.
   (eldev--test-run "project-g" ("test")
+    (should (string-match-p "passed.+project-g-1" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-missing-dependency-1 ()
@@ -70,6 +78,8 @@
   ;; Pre-0.8 Eldev would fail to test projects loaded in packaged mode if they had any
   ;; test utility files (subject to file ordering, so we specify target file explicitly).
   (eldev--test-run "project-c" ("--packaged" "test" "project-c.el")
+    (should (string-match-p "passed.+project-c-test-hello" stdout))
+    (should (string-match-p "passed.+project-c-test-triviality" stdout))
     (should (= exit-code 0))))
 
 
@@ -77,6 +87,8 @@
   ;; Using `test-ert' here to also indirectly make sure that the command understands the
   ;; option, just like `test'.
   (eldev--test-run "project-a" ("test-ert" "--expect" 2)
+    (should (string-match-p "passed.+project-a-test-hello" stdout))
+    (should (string-match-p "passed.+project-a-test-triviality" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-expect-2 ()
@@ -104,6 +116,13 @@
       (should (= exit-code 1)))
     (eldev--test-run nil (:eval `(,@test-injection "test-ert" :failed))
       (should (= exit-code 1)))))
+
+
+(ert-deftest eldev-test-project-a-concise ()
+  (eldev--test-run "project-a" ("test" "--runner" "concise")
+    (should-not (string-match-p "project-a-test-hello" stdout))
+    (should     (string-match-p (rx ".. 2") stdout))
+    (should     (= exit-code 0))))
 
 
 (provide 'test/test)

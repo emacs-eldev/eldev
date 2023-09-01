@@ -4413,12 +4413,12 @@ in `crop' stack frame style."
             `((ecukes-verbose . (not (eldev-unless-quiet t))))))
          (eldev-test-runner-standard-environment framework)))
 
-(defvar eldev--test-runner-concise-num-total 0)
+(defvar eldev--test-runner-concise-num-executed 0)
 (defvar eldev--test-runner-concise-num-reported 0)
 
 (eldev-deftestrunner eldev-test-runner-concise (framework selectors files)
   "DONOTRELEASE: Document"
-  (let ((eldev--test-runner-concise-num-total    0)
+  (let ((eldev--test-runner-concise-num-executed 0)
         (eldev--test-runner-concise-num-reported 0))
     (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'concise
              (eldev-test-runner-concise-environment framework))))
@@ -4427,19 +4427,23 @@ in `crop' stack frame style."
   (nconc (pcase framework
            (`ert
             `((ert-quiet                        . t)
-              (eldev--test-ert-concise-expected . t))))
+              (eldev--test-ert-concise-expected . t)))
+           (`buttercup
+            `((buttercup-reporter-batch-quiet-statuses . (skipped disabled pending passed))
+              (eldev--test-buttercup-concise-expected  . t))))
          (eldev-test-runner-simple-environment framework)))
 
-(defun eldev-test-runner-concise-tick (force-number &optional num-tests)
-  (unless num-tests
-    (setf num-tests (1+ eldev--test-runner-concise-num-total)))
-  (let* ((num-new  (- num-tests eldev--test-runner-concise-num-total))
+(defun eldev-test-runner-concise-tick (force-number &optional num-executed num-planned)
+  (unless num-executed
+    (setf num-executed (1+ eldev--test-runner-concise-num-executed)))
+  (let* ((num-new  (- num-executed eldev--test-runner-concise-num-executed))
          (progress (make-string num-new ?.)))
-    (if (and (not force-number) (< num-tests (+ eldev--test-runner-concise-num-reported 50)))
-        (eldev-print :stderr :nolf progress)
-      (eldev-print :stderr "%s %d" progress num-tests)
-      (setf eldev--test-runner-concise-num-reported num-tests))
-    (setf eldev--test-runner-concise-num-total num-tests)))
+    ;; Since normally test frameworks print progress to stderr, so do we here.
+    (if (and (not force-number) (< num-executed (+ eldev--test-runner-concise-num-reported 50)) (not (and num-planned (= num-executed num-planned))))
+        (eldev-print :nolf progress)
+      (eldev-print "%s %d" progress num-executed)
+      (setf eldev--test-runner-concise-num-reported num-executed))
+    (setf eldev--test-runner-concise-num-executed num-executed)))
 
 
 (eldev-defoption eldev-test-files (pattern)

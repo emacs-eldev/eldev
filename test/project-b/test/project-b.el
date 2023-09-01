@@ -6,5 +6,5 @@
 (ert-deftest project-b-test-hello ()
   (should (string= (project-b-hello) "Hello")))
 
-(ert-deftest project-a-test-triviality-failing ()
+(ert-deftest project-b-test-triviality-failing ()
   (should nil))

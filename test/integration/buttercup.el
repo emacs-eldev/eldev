@@ -4,6 +4,9 @@
 (ert-deftest eldev-test-buttercup-project-e-1 ()
   ;; Two tests, all pass.
   (eldev--test-run "project-e" ("test")
+    (should (string-match-p "Project E tests" stdout))
+    (should (string-match-p "has a dummy passing test" stdout))
+    (should (string-match-p "eldev--buttercup-do-fail. to be nil" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-buttercup-project-e-2 ()
@@ -76,6 +79,15 @@
     ;; signature changes in the future.
     (should (not (string-match-p (rx "eldev-test\\(") stdout)))
     (should (= exit-code 1))))
+
+
+(ert-deftest eldev-test-buttercup-project-e-concise ()
+  (eldev--test-run "project-e" ("test" "--runner" "concise")
+    (should-not (string-match-p "Project E tests" stdout))
+    (should-not (string-match-p "has a dummy passing test" stdout))
+    (should-not (string-match-p "eldev--buttercup-do-fail. to be nil" stdout))
+    (should     (string-match-p (rx ".. 2") stdout))
+    (should     (= exit-code 0))))
 
 
 (provide 'test/integration/buttercup)

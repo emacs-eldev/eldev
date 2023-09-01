@@ -105,9 +105,8 @@ use this for ERT framework, unless they can do better."
                                                   (test          (nth 1 arguments))
                                                   (result        (nth 2 arguments))
                                                   (num-completed (ert-stats-completed stats)))
-                                             (eldev-test-runner-concise-tick (or (not (ert-test-result-expected-p test result))
-                                                                                 (= (ert-stats-total stats) num-completed))
-                                                                             num-completed)))
+                                             (eldev-test-runner-concise-tick (not (ert-test-result-expected-p test result))
+                                                                             num-completed (ert-stats-total stats))))
                                          ;; Older ERT versions have `ert--print-backtrace',
                                          ;; newer use `backtrace-to-string'.  Not using
                                          ;; function-quoting to avoid warnings.
