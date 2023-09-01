@@ -746,6 +746,8 @@ Since 0.2."
 
 ;; Only from Emacs 29.
 (declare-function flush-standard-output nil)
+;; From Emacs 25.
+(declare-function set-binary-mode nil)
 
 (defun eldev-output (format-string &rest arguments)
   "Unconditionally format and print given message."
@@ -858,10 +860,12 @@ Since 0.2."
         (_
          (princ (if nolf message (concat message "\n")) (when special-destination #'external-debugging-output))
          (unless special-destination
-           (if (fboundp 'flush-standard-output)
-               (flush-standard-output)
-             ;; "As a side effect, this function flushes any pending STREAM’s data."
-             (set-binary-mode 'stdout nil)))))))
+           ;; On Emacs 24 stdout is not flushed.  It's OK, likely no-one uses it anymore.
+           (cond ((fboundp 'flush-standard-output)
+                  (flush-standard-output))
+                 ((fboundp 'set-binary-mode)
+                  ;; "As a side effect, this function flushes any pending STREAM’s data."
+                  (set-binary-mode 'stdout nil))))))))
   ;; To make e.g. calling from M-: give nicer results.
   nil)
 
