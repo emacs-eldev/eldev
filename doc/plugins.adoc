@@ -100,6 +100,7 @@ actually recommended to set them in file `Eldev`, so that if the
 plugin _is_ activated, project-specific configuration is already
 present.
 
+[#release]
 ==== Command `release`
 
 The main plugin’s command is called `release`:
@@ -169,6 +170,7 @@ are not available from the command line.  Instead, they should be
 customized in file `Eldev` on a per-project basis; see the next
 section.
 
+[#update-copyright]
 ==== Command `update-copyright`
 
 {since-1-3} The plugin provides a very simple command to update

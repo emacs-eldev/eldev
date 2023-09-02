@@ -73,3 +73,38 @@ the warnings come with quite verbose explanations, detailing what the
 doctor thinks is wrong, why and how to fix that.  However, it’s up to
 you to decide what and if anything at all should be done — the doctor
 doesn’t, and actually cannot, fix anything itself.
+
+Here is the current list of available checks, to give an idea of what
+it verifies:
+
+`eldev-presence`:: Checks if file `Eldev` is present.  It is possible
+to run Eldev on projects that don’t have it, but some external tools
+will then not recognize the project as using Eldev.
+`eldev-byte-compilable`:: Earlier examples would add `no-byte-compile`
+to file `Eldev`, which is now not recommended.  E.g. it would prevent
+{uri-flycheck-eldev}[flycheck-eldev] from checking the file.
+`explicit-main-file`:: Some projects have package headers in multiple
+files, which could confuse Emacs packaging system.  If you have such
+headers only in one file, this test won’t complain.
+`explicit-emacs-version`:: A project should always explicitly state
+which Emacs version they need.  Otherwise users could install it only
+to find it not working correctly in unpredictable way.
+`stable/unstable-archives`:: It is generally recommended to use
+<<dependencies,package archives>> `gnu-elpa`, `nongnu-elpa` or `melpa`
+instead of hardcoding stable or unstable variant.  In this case you
+can switch easily using command line options.
+`recent-stable-releases`:: Checks if there is a recent enough
+<<release,stable release>> of the project.  Otherwise users who prefer
+stable releases will never see that your project has new features.
+However, this test will never complain if you don’t have any stable
+releases at all (i.e. if you follow “rolling release” model).
+`githooks`:: Checks if project-recommended <<githooks,Git hooks>> are
+activated in the working tree.  Won’t complain if there are no Git
+hooks in the project.
+`up-to-date-copyright`:: {since-1-6} Checks if the copyright notices
+in the project’s files appear <<update-copyright,up-to-date>> with the
+changes (it is a common mistake to forget updating those — I’ve seen
+that not only I’m prone to that).
+`eldev-file-owners`:: {since-1-4-1} Targeted at some internal bug
+related to use of old Eldev versions and/or Docker.  Hopefully you’ll
+never see this complain.
