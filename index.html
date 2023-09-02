@@ -2382,10 +2382,34 @@ variable <code>eldev-test-print-backtraces</code> in file
 dislike the default behavior of Eldev, you can choose a different test
 runner using <code>--runner</code> (<code>-r</code>) option of <code>test</code> command; see the list
 of available test runners with their descriptions using
-<code>--list-runners</code> option.  If you always use a different test runner,
-it is a good idea to set it as the default in file
-<code>~/.config/eldev/config</code>.  Finally, you can even write your own
-runner.</p>
+<code>--list-runners</code> option.  Currently they are:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1"><code>standard</code></dt>
+<dd>
+<p>Invokes test framework trying not to change anything.
+Some tweaks might still be activated as needed to make the options to
+command <code>test</code> work.</p>
+</dd>
+<dt class="hdlist1"><code>simple</code></dt>
+<dd>
+<p>Like <code>standard</code> with a few Eldev-specific tweaks that I
+feel are useful (see <code>--list-runners</code> output for details).  This is
+the default runner.</p>
+</dd>
+<dt class="hdlist1"><code>concise</code></dt>
+<dd>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.6-8be" alt="Since 1.6"></span> Like <code>simple</code>, but progress output for ERT and
+Buttercup is replaced by a single dot per passing test.  Give it a try
+to decide if you like that or not.</p>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>If you always use a different test runner, it is a good idea to set it
+as the default in file <code>~/.config/eldev/config</code>.  Finally, you can
+even write your own runner.</p>
 </div>
 <div class="sect2">
 <h3 id="frameworks">Frameworks</h3>
@@ -2837,6 +2861,72 @@ the warnings come with quite verbose explanations, detailing what the
 doctor thinks is wrong, why and how to fix that.  However, it’s up to
 you to decide what and if anything at all should be done — the doctor
 doesn’t, and actually cannot, fix anything itself.</p>
+</div>
+<div class="paragraph">
+<p>Here is the current list of available checks, to give an idea of what
+it verifies:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1"><code>eldev-presence</code></dt>
+<dd>
+<p>Checks if file <code>Eldev</code> is present.  It is possible
+to run Eldev on projects that don’t have it, but some external tools
+will then not recognize the project as using Eldev.</p>
+</dd>
+<dt class="hdlist1"><code>eldev-byte-compilable</code></dt>
+<dd>
+<p>Earlier examples would add <code>no-byte-compile</code>
+to file <code>Eldev</code>, which is now not recommended.  E.g. it would prevent
+<a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a> from checking the file.</p>
+</dd>
+<dt class="hdlist1"><code>explicit-main-file</code></dt>
+<dd>
+<p>Some projects have package headers in multiple
+files, which could confuse Emacs packaging system.  If you have such
+headers only in one file, this test won’t complain.</p>
+</dd>
+<dt class="hdlist1"><code>explicit-emacs-version</code></dt>
+<dd>
+<p>A project should always explicitly state
+which Emacs version they need.  Otherwise users could install it only
+to find it not working correctly in unpredictable way.</p>
+</dd>
+<dt class="hdlist1"><code>stable/unstable-archives</code></dt>
+<dd>
+<p>It is generally recommended to use
+<a href="#dependencies">package archives</a> <code>gnu-elpa</code>, <code>nongnu-elpa</code> or <code>melpa</code>
+instead of hardcoding stable or unstable variant.  In this case you
+can switch easily using command line options.</p>
+</dd>
+<dt class="hdlist1"><code>recent-stable-releases</code></dt>
+<dd>
+<p>Checks if there is a recent enough
+<a href="#release">stable release</a> of the project.  Otherwise users who prefer
+stable releases will never see that your project has new features.
+However, this test will never complain if you don’t have any stable
+releases at all (i.e. if you follow “rolling release” model).</p>
+</dd>
+<dt class="hdlist1"><code>githooks</code></dt>
+<dd>
+<p>Checks if project-recommended <a href="#githooks">Git hooks</a> are
+activated in the working tree.  Won’t complain if there are no Git
+hooks in the project.</p>
+</dd>
+<dt class="hdlist1"><code>up-to-date-copyright</code></dt>
+<dd>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.6-8be" alt="Since 1.6"></span> Checks if the copyright notices
+in the project’s files appear <a href="#update-copyright">up-to-date</a> with the
+changes (it is a common mistake to forget updating those — I’ve seen
+that not only I’m prone to that).</p>
+</dd>
+<dt class="hdlist1"><code>eldev-file-owners</code></dt>
+<dd>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.4.1-8be" alt="Since 1.4.1"></span> Targeted at some internal bug
+related to use of old Eldev versions and/or Docker.  Hopefully you’ll
+never see this complain.</p>
+</dd>
+</dl>
 </div>
 </div>
 </div>
@@ -3884,7 +3974,7 @@ plugin <em>is</em> activated, project-specific configuration is already
 present.</p>
 </div>
 <div class="sect3">
-<h4 id="_command_release">Command <code>release</code></h4>
+<h4 id="release">Command <code>release</code></h4>
 <div class="paragraph">
 <p>The main plugin’s command is called <code>release</code>:</p>
 </div>
@@ -3972,7 +4062,7 @@ section.</p>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_command_update_copyright">Command <code>update-copyright</code></h4>
+<h4 id="update-copyright">Command <code>update-copyright</code></h4>
 <div class="paragraph">
 <p><span class="image right"><img src="https://img.shields.io/badge/since-1.3-8be" alt="Since 1.3"></span> The plugin provides a very simple command to update
 copyright notices, based on Emacs’ built-in feature <code>copyright</code>.  You
@@ -4933,7 +5023,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-08-05 18:34:53 UTC
+Last updated 2023-09-02 16:38:55 UTC
 </div>
 </div>
 </body>
