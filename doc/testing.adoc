@@ -65,10 +65,21 @@ How exactly tests are executed depends on _test runner_.  If you
 dislike the default behavior of Eldev, you can choose a different test
 runner using `--runner` (`-r`) option of `test` command; see the list
 of available test runners with their descriptions using
-`--list-runners` option.  If you always use a different test runner,
-it is a good idea to set it as the default in file
-`~/.config/eldev/config`.  Finally, you can even write your own
-runner.
+`--list-runners` option.  Currently they are:
+
+`standard`:: Invokes test framework trying not to change anything.
+Some tweaks might still be activated as needed to make the options to
+command `test` work.
+`simple`:: Like `standard` with a few Eldev-specific tweaks that I
+feel are useful (see `--list-runners` output for details).  This is
+the default runner.
+`concise`:: {since-1-6} Like `simple`, but progress output for ERT and
+Buttercup is replaced by a single dot per passing test.  Give it a try
+to decide if you like that or not.
+
+If you always use a different test runner, it is a good idea to set it
+as the default in file `~/.config/eldev/config`.  Finally, you can
+even write your own runner.
 
 [#frameworks]
 === Frameworks

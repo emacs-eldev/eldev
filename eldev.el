@@ -4417,7 +4417,18 @@ in `crop' stack frame style."
 (defvar eldev--test-runner-concise-num-reported 0)
 
 (eldev-deftestrunner eldev-test-runner-concise (framework selectors files)
-  "DONOTRELEASE: Document"
+  "Test runner that alters how progress is represented.  Normally
+both ERT and Buttercup are verbose, printing out full name or
+description even for passing tests.  However, with this runner
+only a single dot is printed for each \"expected result\" test
+instead.  This lets you see that something is being done (which
+is important for slower tests or a huge amount of them), yet
+doesn't spam the output with not-so-important information.
+
+In all other respects (also for not-really-supported Ecukes) this
+is the same as the test runner `simple'.  In particular, if Eldev
+is in quiet mode, even the progress output described above will
+be silenced."
   (let ((eldev--test-runner-concise-num-executed 0)
         (eldev--test-runner-concise-num-reported 0))
     (funcall (eldev-test-get-framework-entry framework 'run-tests t) selectors files 'concise
