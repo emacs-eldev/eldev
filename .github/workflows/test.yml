@@ -42,7 +42,7 @@ jobs:
       run: brew install texinfo mercurial subversion
 
     - name: Check out the source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Test the project
       run: |
