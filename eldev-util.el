@@ -1573,7 +1573,8 @@ See also variable `eldev-git-executable'."
 
 (defvar vc-git-program)
 (with-eval-after-load 'vc-git
-  (setf vc-git-program (eldev-git-executable t)))
+  (when (eldev-git-executable t)
+    (setf vc-git-program (eldev-git-executable t))))
 
 (defun eldev-hg-executable (&optional not-required)
   "Find `hg' executable.
@@ -1584,7 +1585,8 @@ See also variable `eldev-hg-executable'."
 
 (defvar vc-hg-program)
 (with-eval-after-load 'vc-hg
-  (setf vc-hg-program (eldev-hg-executable t)))
+  (when (eldev-hg-executable t)
+    (setf vc-hg-program (eldev-hg-executable t))))
 
 (defun eldev-svn-executable (&optional not-required)
   "Find `svn' executable.
@@ -1602,7 +1604,8 @@ See also variable `eldev-svnadmin-executable'."
 
 (defvar vc-svn-program)
 (with-eval-after-load 'vc-svn
-  (setf vc-svn-program (eldev-svn-executable t)))
+  (when (eldev-svn-executable t)
+    (setf vc-svn-program (eldev-svn-executable t))))
 
 (defun eldev-docker-executable (&optional not-required)
   "Find `docker' executable.
