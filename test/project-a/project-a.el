@@ -1,4 +1,4 @@
-;;; project-a.el --- Test project with one dependency
+;;; project-a.el --- Test project with one dependency  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

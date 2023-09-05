@@ -1,8 +1,8 @@
-;;; missing-dependency-a.el --- Test project with an unavailable dependency
+;;; missing-dependency-a.el --- Test project with an unavailable dependency  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/
-;; Package-Requires: ((dependency-a "0.1"))
+;; Package-Requires: ((emacs "24.1") (dependency-a "0.1"))
 
 ;;; Commentary:
 
