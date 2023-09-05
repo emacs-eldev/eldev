@@ -357,39 +357,40 @@ Consider installing %s by running:
       (`nil
        '(result unknown short-answer "can't tell without VC"))
       (`Git
-       ;; Shares some similarities with `eldev--maintainer-update-copyright'.
-       (let (outdated
-             anything-checked)
-         (dolist (file (eldev-find-and-trace-files `(:and (eldev-standard-fileset 'all) ,eldev-update-copyright-fileset) "file%s to check for copyright notice in"))
-           (eldev-trace "Checking file `%s' for a copyright notice..." file)
-           (with-temp-buffer
-             (insert-file-contents file)
-             (if (save-excursion (save-restriction (copyright-find-copyright)))
-                 ;; Let's assume they won't change group number.
-                 (let ((copyright-years (match-string 3)))
-                   (when (string-match "[0-9]+\\'" copyright-years)
-                     (let ((copyright-year (match-string 0 copyright-years)))
-                       (setf copyright-year (when (or (= (length copyright-year) 4) (when (= (length copyright-year) 2) (setf copyright-year (concat "20" copyright-year))))
-                                              (string-to-number copyright-year)))
-                       (if copyright-year
-                           (let (last-change-year)
-                             (eldev-trace "Asking Git when file `%s' was last changed..." file)
-                             (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "--follow" "--no-decorate" "-1" "--format=%cs" ,file)
-                               :trace-command-line t
-                               :destination  '(t nil)
-                               :discard-ansi t
-                               :die-on-error t
-                               (when (looking-at (rx (group (= 4 num)) "-" (group (= 2 num)) "-" (group (= 2 num))))
-                                 (setf last-change-year (string-to-number (match-string 1)))))
-                             (if last-change-year
-                                 (progn (setf anything-checked t)
-                                        (when (< copyright-year last-change-year)
-                                          (push (list file copyright-year last-change-year) outdated)))
-                               (eldev-warn "Unable to determine the year of the last Git change of file `%s'" file)))
-                         (eldev-warn "Unable to determine the year from the copyright notice in file `%s'" file)))))
-               (eldev-trace "No such notice found, skipping this file"))))
-         (if outdated
-             `(result nil warnings ,(eldev-format-message "\
+       (when (eldev-git-executable t)
+         ;; Shares some similarities with `eldev--maintainer-update-copyright'.
+         (let (outdated
+               anything-checked)
+           (dolist (file (eldev-find-and-trace-files `(:and (eldev-standard-fileset 'all) ,eldev-update-copyright-fileset) "file%s to check for copyright notice in"))
+             (eldev-trace "Checking file `%s' for a copyright notice..." file)
+             (with-temp-buffer
+               (insert-file-contents file)
+               (if (save-excursion (save-restriction (copyright-find-copyright)))
+                   ;; Let's assume they won't change group number.
+                   (let ((copyright-years (match-string 3)))
+                     (when (string-match "[0-9]+\\'" copyright-years)
+                       (let ((copyright-year (match-string 0 copyright-years)))
+                         (setf copyright-year (when (or (= (length copyright-year) 4) (when (= (length copyright-year) 2) (setf copyright-year (concat "20" copyright-year))))
+                                                (string-to-number copyright-year)))
+                         (if copyright-year
+                             (let (last-change-year)
+                               (eldev-trace "Asking Git when file `%s' was last changed..." file)
+                               (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "--follow" "--no-decorate" "-1" "--format=%cs" ,file)
+                                 :trace-command-line t
+                                 :destination  '(t nil)
+                                 :discard-ansi t
+                                 :die-on-error t
+                                 (when (looking-at (rx (group (= 4 num)) "-" (group (= 2 num)) "-" (group (= 2 num))))
+                                   (setf last-change-year (string-to-number (match-string 1)))))
+                               (if last-change-year
+                                   (progn (setf anything-checked t)
+                                          (when (< copyright-year last-change-year)
+                                            (push (list file copyright-year last-change-year) outdated)))
+                                 (eldev-warn "Unable to determine the year of the last Git change of file `%s'" file)))
+                           (eldev-warn "Unable to determine the year from the copyright notice in file `%s'" file)))))
+                 (eldev-trace "No such notice found, skipping this file"))))
+           (if outdated
+               `(result nil warnings ,(eldev-format-message "\
 Copyright notices in the following file(s) appear to be outdated:
 
 %s
@@ -399,10 +400,10 @@ Consider executing (you may need to enable plugin `maintainer' first):
     $ eldev update-copyright" (mapconcat (lambda (entry)
                                            (format "%s (mentions %s, last changed in %s)" (nth 0 entry) (nth 1 entry) (nth 2 entry)))
                                          (nreverse outdated) "\n"))
-                      dont-reformat-warnings t)
-           (if anything-checked
-               `(result t)
-             `(result t short-answer "YES (no copyright notices?)")))))
+                        dont-reformat-warnings t)
+             (if anything-checked
+                 `(result t)
+               `(result t short-answer "YES (no copyright notices?)"))))))
       (backend
        `(result unknown short-answer ,(eldev-format-message "can't tell for %s" (eldev-vc-full-name backend)))))))
 

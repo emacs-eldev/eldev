@@ -48,10 +48,14 @@
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-doctor-up-to-date-copyright-1 ()
+  (unless (eldev-git-executable t)
+    (ert-skip (eldev-format-message "%s couldn't be found" "Git")))
   (eldev--test-run "project-b" ("doctor" "up-to-date-copyright")
     (should (= exit-code 0))))
 
 (ert-deftest eldev-doctor-up-to-date-copyright-2 ()
+  (unless (eldev-git-executable t)
+    (ert-skip (eldev-format-message "%s couldn't be found" "Git")))
   (eldev--test-run "project-c" ("doctor" "up-to-date-copyright")
     (should (string-match-p "project-c\\.el.+mentions 2000, last changed in" stdout))
     (should (= exit-code 1))))
