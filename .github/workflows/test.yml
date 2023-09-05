@@ -43,6 +43,9 @@ jobs:
 
     - name: Check out the source code
       uses: actions/checkout@v4
+      with:
+        # To make automated copyright notice check below work.  Can this be optimized?
+        fetch-depth: 0
 
     - name: Test the project
       run: |
