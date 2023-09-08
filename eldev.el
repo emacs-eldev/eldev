@@ -847,13 +847,19 @@ modify this directly, use macro `eldev-named-step' instead.
 Since 1.0.")
 
 (defvar eldev-preprocessed-command-line nil
-  "Command line to be returned from `eldev-parse-options'.
+  "Non-options to be returned from `eldev-parse-command-line'.
 The value is a reversed list of non-option parameters encountered
 so far.  Option handlers (i.e. bodies of `eldev-defoption') may
 access it and modify freely.  This is useful if precise order of
 certain options relative to non-option parameters is important.
 
 Since 0.11.")
+
+(defvar eldev-preprocessed-command-line-options nil
+  "Options to be returned from `eldev-parse-command-line'.
+See `eldev-preprocessed-command-line' for details.
+
+Since 1.7.")
 
 (defvar backtrace-line-length)
 (defvar emacs-repository-branch)
@@ -1172,17 +1178,56 @@ Since 1.2."
              (expand-file-name eldev-shell-command eldev-project-dir)))
       eldev-shell-command))
 
-(defun eldev-parse-options (command-line &optional command stop-on-non-option allow-unknown)
-  "Parse global or command-specific options.
-Returns COMMAND-LINE with options removed."
-  (save-match-data
-    (let (eldev-preprocessed-command-line)
+(defun eldev-parse-command-line (command-line &rest options)
+  "Parse global or command-specific options in COMMAND-LINE.
+OPTIONS may contain following keywords (unknown are ignored for
+future extensibility):
+
+    :command SYMBOL
+
+        Accept options for given command.  If not specified,
+        global options are accepted instead.
+
+    :stop-on-non-option BOOLEAN
+
+        Stop parsing upon encountering anything that is not an
+        option.  By default options can be intermixed with other
+        command line elements.
+
+    :allow-unknown BOOLEAN
+
+        Don't die if encountering an unknown option (by default
+        those trigger an error).
+
+    :dry-run BOOLEAN
+
+        Don't execute option handlers, just parse the command
+        line.  By default, options automatically trigger their
+        corresponding handlers.  If this is set, handlers won't
+        be able to modify `eldev-preprocessed-command-line' and
+        `eldev-preprocessed-command-line-options' either.
+
+Returns a plist with at least the following keys: `:full' (the
+full command line), `:without-options' (command line after
+options are removed) and `:all-options' (all options specified on
+the command line), in any order.
+
+Since 1.7.  See also older `eldev-parse-options' with less
+functionality."
+  (let ((command            (plist-get options :command))
+        (stop-on-non-option (plist-get options :stop-on-non-option))
+        (dry-run            (plist-get options :dry-run))
+        (full-command-line  command-line)
+        eldev-preprocessed-command-line
+        eldev-preprocessed-command-line-options)
+    (save-match-data
       (while command-line
         (let* ((term     (pop command-line))
                (stop-now (string= term "--")))
           (if (and (string-prefix-p "-" term) (not stop-now) (not (string= term "-")))
               (let ((long-option (string-prefix-p "--" term))
                     rest)
+                (push term eldev-preprocessed-command-line-options)
                 (if long-option
                     (when (string-match (rx bol (group (1+ (not (any "=")))) "=" (group (0+ anything)) eol) term)
                       (setf rest (match-string 2 term)
@@ -1191,35 +1236,40 @@ Returns COMMAND-LINE with options removed."
                         term (substring term 0 (length "--"))))
                 (while term
                   (let ((handler (cdr (assq (intern term) (cdr (assq command eldev--options))))))
-                    (if handler
-                        (condition-case error
-                            (let ((value-mode (eldev-get handler :option-value)))
-                              (if (and value-mode (or rest (cdr value-mode)))
-                                  (progn
-                                    (funcall handler (or rest (if command-line
-                                                                  (pop command-line)
-                                                                (if command
-                                                                    (signal 'eldev-wrong-command-usage `(t "Option `%s' for command `%s' requires an argument" ,term ,command))
-                                                                  (signal 'eldev-wrong-command-usage `(t "Option `%s' requires an argument" ,term))))))
-                                    (setf rest nil))
-                                (funcall handler)))
-                          (eldev-wrong-option-usage (signal 'eldev-error `(:command ,command "For option `%s': %s" ,term ,(apply #'eldev-format-message (cdr error))))))
-                      (if allow-unknown
-                          (setf term nil)
-                        ;; The following options are special-cased.  They are not
-                        ;; advertised, since normally commands `help' and `version' should
-                        ;; be used instead, but still handled as too common.
-                        (when (string= term "--help")
-                          (when (and (null command) command-line (assq (intern (car command-line)) eldev--commands))
-                            (setf command (intern (car command-line))))
-                          (if command
-                              (eldev-help (symbol-name command))
-                            (eldev-help))
-                          (signal 'eldev-quit 0))
-                        (when (and (null command) (string= term "--version"))
-                          (apply #'eldev-version command-line)
-                          (signal 'eldev-quit 0))
-                        (signal 'eldev-wrong-command-usage `(t "Unknown option `%s'" ,term)))))
+                    (cond (handler
+                           (condition-case error
+                               (let ((value-mode (eldev-get handler :option-value)))
+                                 (when dry-run
+                                   (setf handler #'ignore))
+                                 (if (and value-mode (or rest (cdr value-mode)))
+                                     (progn
+                                       (funcall handler (or rest (if command-line
+                                                                     (let ((value (pop command-line)))
+                                                                       (push value eldev-preprocessed-command-line-options)
+                                                                       value)
+                                                                   (if command
+                                                                       (signal 'eldev-wrong-command-usage `(t "Option `%s' for command `%s' requires an argument" ,term ,command))
+                                                                     (signal 'eldev-wrong-command-usage `(t "Option `%s' requires an argument" ,term))))))
+                                       (setf rest nil))
+                                   (funcall handler)))
+                             (eldev-wrong-option-usage (signal 'eldev-error `(:command ,command "For option `%s': %s" ,term ,(apply #'eldev-format-message (cdr error)))))))
+                          ;; The following options are special-cased.  They are not
+                          ;; advertised, since normally commands `help' and `version'
+                          ;; should be used instead, but still handled as too common.
+                          ((string= term "--help")
+                           (when (and (null command) command-line (assq (intern (car command-line)) eldev--commands))
+                             (setf command (intern (car command-line))))
+                           (if command
+                               (eldev-help (symbol-name command))
+                             (eldev-help))
+                           (signal 'eldev-quit 0))
+                          ((and (null command) (string= term "--version"))
+                           (apply #'eldev-version command-line)
+                           (signal 'eldev-quit 0))
+                          ((plist-get options :allow-unknown)
+                           (setf term nil))
+                          (t
+                           (signal 'eldev-wrong-command-usage `(t "Unknown option `%s'" ,term)))))
                   (if long-option
                       (setf term nil)
                     (setf term (when rest (format "-%c" (aref rest 0)))
@@ -1229,7 +1279,16 @@ Returns COMMAND-LINE with options removed."
             (when (or stop-now stop-on-non-option)
               (while command-line
                 (push (pop command-line) eldev-preprocessed-command-line))))))
-      (nreverse eldev-preprocessed-command-line))))
+      `(:full            ,full-command-line
+        :all-options     ,(nreverse eldev-preprocessed-command-line-options)
+        :without-options ,(nreverse eldev-preprocessed-command-line)))))
+
+(defun eldev-parse-options (command-line &optional command stop-on-non-option allow-unknown)
+  "Parse global or command-specific options.
+Returns COMMAND-LINE with options removed.  See also
+`eldev-parse-command-options'."
+  (plist-get (eldev-parse-command-line command-line :command command :stop-on-non-option stop-on-non-option :allow-unknown allow-unknown)
+             :without-options))
 
 (defun eldev-global-cache-dir (&optional ensure-exists)
   "Return `eldev-dir', possibly ensuring that it exists.
