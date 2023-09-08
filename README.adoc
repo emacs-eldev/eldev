@@ -163,33 +163,3 @@ discussed later.
 Eldev mostly follows GNU conventions in its command line.  Perhaps the
 only exception is that global options must be specified before command
 name and command-specific options — after it.
-
-
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-{empty} +
-
-// Preserved here since older versions print a link to this page.
-[discrete]
-[#modifying-filesets]
-=== Modifying filesets
-
-IMPORTANT: Please refer to the
-{uri-documentation}#modifying-filesets[full documentation] for the
-reasons of the warning that sent you here.  If you are here not
-because of a warning, just ignore this message.
