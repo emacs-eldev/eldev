@@ -56,15 +56,19 @@
     (let (results)
       (mapatoms (lambda (symbol)
                   (when (ert-test-boundp symbol)
-                    ;; Of course we cannot print-read the backtraces (and probably
-                    ;; something else) directly.  Lisp...
                     (let ((result (ert-test-most-recent-result (ert-get-test symbol))))
                       (when result
                         (setf result (copy-sequence result))
-                        (unless (or (ert-test-passed-p result) (ert-test-aborted-with-non-local-exit-p result))
-                          (setf (ert-test-result-with-condition-condition result) '(...)
-                                (ert-test-result-with-condition-backtrace result) '(...)
-                                (ert-test-result-with-condition-infos     result) '(...))))
+                        (cond ((ert-test-passed-p result)
+                               ;; These can be huge in some tests that contain `(should ...)' forms in a loop
+                               ;; and apparently serve no purpose.  Remove them to reduce file size.
+                               (setf (ert-test-result-should-forms result) '(...)))
+                              ((not (ert-test-aborted-with-non-local-exit-p result))
+                               ;; Of course we cannot print-read the backtraces (and probably something else)
+                               ;; directly.  Lisp...
+                               (setf (ert-test-result-with-condition-condition result) '(...)
+                                     (ert-test-result-with-condition-backtrace result) '(...)
+                                     (ert-test-result-with-condition-infos     result) '(...)))))
                       (push `(,symbol . ,result) results)))))
       ;; Use `eldev--test-ert-results' to not forget results of tests that were not loaded
       ;; this time.
