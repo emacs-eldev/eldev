@@ -8,8 +8,7 @@
   :command        test-integration
   :custom-parsing t
   :category       testing
-  (let* ((parsed       (eldev-parse-command-line parameters :command 'test-integration))
-         (command-line (plist-get parsed :all-options)))
+  (let ((parsed (eldev-parse-command-line parameters :command 'test-integration)))
     (when (plist-get parsed :without-options)
       (signal 'eldev-wrong-command-usage `(t "Too many command parameters")))
     (eldev-test "test-g-integration.el")))
