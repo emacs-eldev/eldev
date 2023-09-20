@@ -66,9 +66,9 @@
 
 (ert-deftest eldev-compile-test-files-2 ()
   ;; This project has an additional loading root for tests.
-  (eldev--test-without-files "project-g" ("test/test-g-1.elc" "test/test-g-util.elc")
+  (eldev--test-without-files "project-g" ("test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
     (eldev--test-run nil ("compile" "--set" "test")
-      (eldev--test-assert-files project-dir preexisting-files "test/test-g-1.elc" "test/test-g-util.elc")
+      (eldev--test-assert-files project-dir preexisting-files "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
       (should (= exit-code 0)))))
 
 

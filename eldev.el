@@ -512,6 +512,25 @@ BODY can contain the following keywords:
               ,@body)
             (eldev--register-option ',name ',options ',for-command ',(nreverse keywords)))))
 
+(defun eldev-inherit-options (to-command from-command &optional filter)
+  "DONOTRELEASE: Document.
+
+Since 1.7."
+  (unless (assq from-command eldev--commands)
+    (error "Unknown command `%s'" from-command))
+  (dolist (entry (cdr (assq from-command eldev--options)))
+    (let ((option  (car entry))
+          (handler (cdr entry)))
+      (when filter
+        (pcase (funcall filter option handler)
+          ;; All other return values are reserved for future.  Ideas: changing option
+          ;; name, changing (wrapping) handler, providing keywords.
+          (`t)
+          (`nil  (setf option nil))
+          (value (error "Filter function may only return t or nil currently (got `%S' instead)" value))))
+      (when option
+        (eldev--register-option handler option to-command nil)))))
+
 (defmacro eldev-defbooloptions (t-name nil-name variable t-body nil-body &rest common-body)
   "Define a yes/no (boolean) option.
 This is only a wrapper over `eldev-defoption'."

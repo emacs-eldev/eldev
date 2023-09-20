@@ -6,6 +6,7 @@
   (eldev--test-run "project-a" ("test")
     (should (string-match-p "passed.+project-a-test-hello" stdout))
     (should (string-match-p "passed.+project-a-test-triviality" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-1 ()
@@ -13,17 +14,20 @@
   (eldev--test-run "project-b" ("test")
     (should (string-match-p "passed.+project-b-test-hello" stdout))
     (should (string-match-p "FAILED.+project-b-test-triviality-failing" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-test-project-b-2 ()
   ;; Only one passing test.
   (eldev--test-run "project-b" ("test" "hello")
     (should (string-match-p "passed.+project-b-test-hello" stdout))
+    (should (string-match-p "Ran 1 test" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-3 ()
   ;; Only one failing test.
   (eldev--test-run "project-b" ("test" "failing")
+    (should (string-match-p "Ran 1 test" stdout))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-test-project-b-4 ()
@@ -43,12 +47,16 @@
   (eldev--test-run "project-c" ("test")
     (should (string-match-p "passed.+project-c-test-hello" stdout))
     (should (string-match-p "passed.+project-c-test-triviality" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-g-1 ()
-  ;; One passing test.  This project uses a loading root for its tests.
+  ;; Two passing tests, one is "integration test", but here we run it too.  This project
+  ;; uses a loading root for its tests.
   (eldev--test-run "project-g" ("test")
     (should (string-match-p "passed.+project-g-1" stdout))
+    (should (string-match-p "passed.+project-g-integration-1" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-missing-dependency-1 ()

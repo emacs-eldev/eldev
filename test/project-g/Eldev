@@ -1,2 +1,17 @@
 ;; This project deliberately uses additional loading root for its tests.
 (eldev-add-loading-roots 'test "test")
+
+
+;; Mainly for testing `eldev-parse-command-line' and `eldev-inherit-options' in a more or
+;; less realistic setup.  Same as command `test', but run tests from a fixed file.
+(eldev-defcommand project-g-test-integration (&rest parameters)
+  :command        test-integration
+  :custom-parsing t
+  :category       testing
+  (let* ((parsed       (eldev-parse-command-line parameters :command 'test-integration))
+         (command-line (plist-get parsed :all-options)))
+    (when (plist-get parsed :without-options)
+      (signal 'eldev-wrong-command-usage `(t "Too many command parameters")))
+    (eldev-test "test-g-integration.el")))
+
+(eldev-inherit-options 'test-integration 'test (lambda (option handler) (not (eq handler #'eldev-test-files))))

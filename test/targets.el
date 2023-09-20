@@ -197,6 +197,9 @@
     "    test/test-g-1.elc  [ELC]"
     "        test/test-g-1.el"
     "        [inh] test/test-g-util.elc"
+    "    test/test-g-integration.elc  [ELC]"
+    "        test/test-g-integration.el"
+    "        [inh] test/test-g-util.elc"
     "    test/test-g-util.elc  [ELC]"
     "        test/test-g-util.el"
     "        [inh] project-g.elc"))
