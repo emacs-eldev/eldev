@@ -29,25 +29,6 @@
     (signal 'eldev-wrong-option-usage `("unknown test type `%s'" ,type)))
   (setf eldev-test-type (intern type)))
 
-(eldev-defcommand eldev-test-all (&rest parameters)
-  "Same as `test --test-type=all'."
-  :custom-parsing t
-  :category       testing
-  (let ((parsed (eldev-parse-command-line parameters :command 'test-all)))
-    (eldev-test-selection "all")
-    (apply #'eldev-test (plist-get parsed :without-options))))
-
-(eldev-defcommand eldev-test-integration (&rest parameters)
-  "Same as `test --test-type=integration'."
-  :custom-parsing t
-  :category       testing
-  (let ((parsed (eldev-parse-command-line parameters :command 'test-integration)))
-    (eldev-test-selection "integration")
-    (apply #'eldev-test (plist-get parsed :without-options))))
-
-(eldev-inherit-options 'test-all 'test (lambda (_option handler) (not (eq handler #'eldev-test-selection))))
-(eldev-inherit-options 'test-integration 'test-all)
-
 (add-hook 'eldev-test-hook
           (lambda ()
             (eldev-verbose "Using Eldev tests of type `%s'" eldev-test-type)

@@ -68,7 +68,7 @@ jobs:
         ELDEV_LOCAL: "."
 
     - name: Test integration
-      run: ./bin/eldev -p -dtTC test-integration --omit-backtraces --expect 30
+      run: ./bin/eldev -p -dtTC test --test-type integration --omit-backtraces --expect 30
       env:
         ELDEV_LOCAL: "."
 
