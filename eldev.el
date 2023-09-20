@@ -518,7 +518,7 @@ BODY can contain the following keywords:
 Since 1.7."
   (unless (assq from-command eldev--commands)
     (error "Unknown command `%s'" from-command))
-  (dolist (entry (cdr (assq from-command eldev--options)))
+  (dolist (entry (reverse (cdr (assq from-command eldev--options))))
     (let ((option  (car entry))
           (handler (cdr entry)))
       (when filter

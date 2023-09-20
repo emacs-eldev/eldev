@@ -17,5 +17,11 @@
     (should (string-match-p "Unknown option .--file." stderr))
     (should (= exit-code 1))))
 
+(ert-deftest eldev-defcommand-inheriting-options-1 ()
+  ;; `eldev-inherit-options' should produce help similar to the source command.
+  (eldev--test-run "project-g" ("help" "test-integration")
+    (should (member "  -r, --runner=NAME     Choose test runner [default: simple]" (eldev--test-line-list stdout)))
+    (should (= exit-code 0))))
+
 
 (provide 'test/extending)
