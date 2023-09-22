@@ -51,7 +51,39 @@
         (message "Bootstrapping Eldev for Emacs %s from %s...\n" eldev--emacs-version archive-name)
         (when eldev-pkg
           (message "Eldev package itself will be used from `%s'\n" eldev-local)))
-      (package-refresh-contents)
+      ;; See `eldev-retrying-for-robustness'; since Eldev is not bootstrapped yet, we have
+      ;; to inline everything.  No control from command line here.
+      (let* ((all-retry-delays (when (equal (getenv "CI") "true") '(30 60 120 180 300)))
+             (remaining-delays all-retry-delays))
+        (catch 'obtained-result
+          (while t
+            (condition-case error
+                (throw 'obtained-result (let ((debug-on-error (and debug-on-error (null remaining-delays))))
+                                          ;; See similar workarounds for `package-refresh-contents' in `eldev.el'.
+                                          (let* (failure
+                                                 (failure-catcher (lambda (original archive &rest arguments)
+                                                                    (unless failure
+                                                                      (condition-case-unless-debug error
+                                                                          (apply original archive arguments)
+                                                                        (error (setf failure (cons error (if (consp archive) (car archive) archive)))))))))
+                                            (advice-add 'package--download-one-archive :around failure-catcher)
+                                            (unwind-protect
+                                                (package-refresh-contents)
+                                              (advice-remove 'package--download-one-archive failure-catcher))
+                                            (when failure
+                                              (error "%s (when updating contents of package archive `%s')" (error-message-string (car failure)) (cdr failure))))))
+              (error (let ((inhibit-message nil)
+                           (delay           (pop remaining-delays)))
+                       (unless delay
+                         (when all-retry-delays
+                           (message "Giving up: too many retries already"))
+                         (signal (car error) (cdr error)))
+                       (message "%s" (error-message-string error))
+                       (message "Assuming this is an intermittent problem, waiting %s before retrying...\n"
+                                (if (< delay 60) (format "%s s" delay) (format "%s m" (/ delay 60))))
+                       (sleep-for delay)
+                       (let ((n (- 5 (length remaining-delays))))
+                         (message "Retry #%d%s..." n (if (= n 5) ", the last" " of maximum 5")))))))))
       (if eldev-pkg
           (package-download-transaction (package-compute-transaction nil requirements))
         (package-install 'eldev)))

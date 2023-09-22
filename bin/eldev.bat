@@ -85,7 +85,39 @@ REM the newline variable above MUST be followed by two empty lines.
         (message """Bootstrapping Eldev for Emacs %%s from %%s...\n""" eldev--emacs-version archive-name) !NL!^
         (when eldev-pkg !NL!^
           (message """Eldev package itself will be used from `%%s'\n""" eldev-local))) !NL!^
-      (package-refresh-contents) !NL!^
+      ;; See `eldev-retrying-for-robustness'; since Eldev is not bootstrapped yet, we have !NL!^
+      ;; to inline everything.  No control from command line here. !NL!^
+      (let* ((all-retry-delays (when (equal (getenv """CI""") """true""") '(30 60 120 180 300))) !NL!^
+             (remaining-delays all-retry-delays)) !NL!^
+        (catch 'obtained-result !NL!^
+          (while t !NL!^
+            (condition-case error !NL!^
+                (throw 'obtained-result (let ((debug-on-error (and debug-on-error (null remaining-delays)))) !NL!^
+                                          ;; See similar workarounds for `package-refresh-contents' in `eldev.el'. !NL!^
+                                          (let* (failure !NL!^
+                                                 (failure-catcher (lambda (original archive ^&rest arguments) !NL!^
+                                                                    (unless failure !NL!^
+                                                                      (condition-case-unless-debug error !NL!^
+                                                                          (apply original archive arguments) !NL!^
+                                                                        (error (setf failure (cons error (if (consp archive) (car archive) archive))))))))) !NL!^
+                                            (advice-add 'package--download-one-archive :around failure-catcher) !NL!^
+                                            (unwind-protect !NL!^
+                                                (package-refresh-contents) !NL!^
+                                              (advice-remove 'package--download-one-archive failure-catcher)) !NL!^
+                                            (when failure !NL!^
+                                              (error """%%s (when updating contents of package archive `%%s')""" (error-message-string (car failure)) (cdr failure)))))) !NL!^
+              (error (let ((inhibit-message nil) !NL!^
+                           (delay           (pop remaining-delays))) !NL!^
+                       (unless delay !NL!^
+                         (when all-retry-delays !NL!^
+                           (message """Giving up: too many retries already""")) !NL!^
+                         (signal (car error) (cdr error))) !NL!^
+                       (message """%%s""" (error-message-string error)) !NL!^
+                       (message """Assuming this is an intermittent problem, waiting %%s before retrying...\n""" !NL!^
+                                (if (^< delay 60) (format """%%s s""" delay) (format """%%s m""" (/ delay 60)))) !NL!^
+                       (sleep-for delay) !NL!^
+                       (let ((n (- 5 (length remaining-delays)))) !NL!^
+                         (message """Retry #%%d%%s...""" n (if (= n 5) """, the last""" """ of maximum 5"""))))))))) !NL!^
       (if eldev-pkg !NL!^
           (package-download-transaction (package-compute-transaction nil requirements)) !NL!^
         (package-install 'eldev))) !NL!^
