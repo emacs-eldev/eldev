@@ -22,3 +22,8 @@ A few environment variables can affect Eldev’s behavior.
     `~/.config/eldev`; runtime files are placed either in `~/.eldev`
     or `~/.cache/eldev`.  Used by Eldev’s own regression tests, should
     be of no interest for typical use.
+
+`CI`::
+
+    When this is set to `true`, Eldev’s <<#robust-mode,robust mode>>
+    is activated by default.
