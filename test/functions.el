@@ -87,5 +87,14 @@
     (should (equal (eldev--test-line-list (buffer-string)) '("1")))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-call-process-stderr-forwarding ()
+  ;; Starting a nested Eldev to catch the output it forwards from the nested (3rd level,
+  ;; sort of) Emacs.  Testing that stderr forwarding doesn't inject extra newlines (it
+  ;; could up until 1.7).
+  (eldev--test-run "trivial-project" ("exec" `(eldev-call-process eldev-emacs-executable '("--batch" "--eval" "(dotimes (_ 10) (princ nil #'external-debugging-output) (sleep-for 0.01))")
+                                                :forward-output 'stderr))
+    (should-not (string-match-p "\n" stderr))
+    (should     (= exit-code 0))))
+
 
 (provide 'test/functions)

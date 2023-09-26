@@ -1804,7 +1804,12 @@ Since 1.2:
                                                                :buffer   stderr-buffer
                                                                :filter   (when (eq forward-output 'stderr)
                                                                            (lambda (process string)
-                                                                             (message "%s" string)
+                                                                             ;; See comments in `eldev-output'.
+                                                                             (if noninteractive
+                                                                                 (princ string #'external-debugging-output)
+                                                                               (let ((inhibit-message           nil)
+                                                                                     (eldev--real-stderr-output t))
+                                                                                 (message "%s" string)))
                                                                              (internal-default-process-filter process string)))
                                                                :sentinel #'ignore
                                                                :noquery  t))
