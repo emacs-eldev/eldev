@@ -840,17 +840,7 @@ Since 0.2."
               (setf replaced-up-to next-change)))))
       (pcase special-destination
         (`stderr
-         (if noninteractive
-             ;; Starting with 1.6 we do it like this for non-interactive (i.e. the
-             ;; "normal") usecase.  This allows us to process `:nolf' also here, but
-             ;; otherwise there should be no detectable differences compared to using
-             ;; `message' (except fewer newlines).  Despite how it may look from the last
-             ;; `pcase' branch, `debugging-output' as the destination is still
-             ;; substantially different: for that indentation and faces are applied above.
-             (princ (if nolf message (concat message "\n")) #'external-debugging-output)
-           (let ((inhibit-message           nil)
-                 (eldev--real-stderr-output t))
-             (message "%s" message))))
+         (eldev--do-stderr-output message (not nolf)))
         (`display-warning
          (let ((scan 0)
                probably-error)
@@ -868,6 +858,20 @@ Since 0.2."
                   (set-binary-mode 'stdout nil))))))))
   ;; To make e.g. calling from M-: give nicer results.
   nil)
+
+(defun eldev--do-stderr-output (string &optional add-lf)
+  (if noninteractive
+      ;; Starting with 1.6 we do it like this for non-interactive (i.e. the "normal")
+      ;; usecase.  This allows us to process `:nolf' (see `eldev-output' above) also here,
+      ;; but otherwise there should be no detectable differences compared to using
+      ;; `message' (except fewer newlines).  Despite how it may look from the last `pcase'
+      ;; branch, `debugging-output' as the destination is still substantially different:
+      ;; for that indentation and faces are applied above.
+      (princ (if add-lf (concat string "\n") string) #'external-debugging-output)
+    (let ((inhibit-message           nil)
+          (eldev--real-stderr-output t))
+      ;; `message' always adds a newline and there appears to be no way to avoid that.
+      (message "%s" string))))
 
 (defun eldev--get-colorizing-scheme ()
   ;; Main purpose of this function is to autoguess background, but I
@@ -1804,12 +1808,7 @@ Since 1.2:
                                                                :buffer   stderr-buffer
                                                                :filter   (when (eq forward-output 'stderr)
                                                                            (lambda (process string)
-                                                                             ;; See comments in `eldev-output'.
-                                                                             (if noninteractive
-                                                                                 (princ string #'external-debugging-output)
-                                                                               (let ((inhibit-message           nil)
-                                                                                     (eldev--real-stderr-output t))
-                                                                                 (message "%s" string)))
+                                                                             (eldev--do-stderr-output string)
                                                                              (internal-default-process-filter process string)))
                                                                :sentinel #'ignore
                                                                :noquery  t))
@@ -1881,7 +1880,7 @@ Since 1.2:
                       (when (eq forward-output 'stderr)
                         (with-temp-buffer
                           (insert-file-contents-literally stderr-file)
-                          (message "%s" (buffer-string))))
+                          (eldev--do-stderr-output (buffer-string))))
                       ;; Only discard after "forwarding".
                       (when discard-ansi
                         (when (buffer-live-p stdout-buffer)
