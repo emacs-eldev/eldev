@@ -503,8 +503,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (declare (indent 3))
   (let ((function (make-symbol (format "%s:impl" name))))
     `(progn
-       ;; Apparently we cannot get away with unnamed lambdas here.
-       (defun ,function ,arguments ,@body)
+       ;; Implementation of `skip-unless' is copied from Emacs source.
+       (cl-macrolet ((skip-unless (form) `(ert--skip-unless ,form)))
+         ;; Apparently we cannot get away with unnamed lambdas here.
+         (defun ,function ,arguments ,@body))
        ,@(mapcar (lambda (arg-values)
                    `(ert-deftest ,(intern (format "%s/%s" name (eldev--ert-defargtest-format-arguments arg-values))) ()
                       (,function ,@(if (= (length arguments) 1) (list arg-values) arg-values))))

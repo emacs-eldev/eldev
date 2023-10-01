@@ -95,6 +95,8 @@
 
 (eldev-ert-defargtest eldev-loading-modes-warnings (mode)
                       ('byte-compiled 'built-and-compiled 'compiled-on-demand 'packaged)
+  ;; This project uses `makeinfo'.  Maybe use another?
+  (skip-unless (or (not (eq mode 'packaged)) (eldev-makeinfo-executable t)))
   (let ((eldev--test-project "project-b"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("clean")
