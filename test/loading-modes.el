@@ -93,5 +93,23 @@
       (should-not (file-exists-p (eldev--test-file "project-j-advanced.elc")))
       (should-not (file-exists-p (eldev--test-file "project-j-autoloads.elc"))))))
 
+(eldev-ert-defargtest eldev-loading-modes-warnings (mode)
+                      ('byte-compiled 'built-and-compiled 'compiled-on-demand 'packaged)
+  (let ((eldev--test-project "project-b"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("clean")
+      (should     (= exit-code 0))
+      (should-not (file-exists-p (eldev--test-file "project-b.elc"))))
+    ;; Run just the passing test.
+    (eldev--test-run nil ((format "--loading=%s" mode) "test" "hello")
+      ;; Compilation warnings must appear on Eldev's stderr, but otherwise the command and
+      ;; project testing must succeed.
+      (should     (string-match-p "project-b-never-declared-this-variable" stderr))
+      (should     (string-match-p "noprefixforthisvar"                     stderr))
+      ;; Also, we don't want actual output here, only stderr.
+      (should-not (string-match-p "ELC"                                    stdout))
+      (should     (= exit-code 0))
+      (should     (eq (file-exists-p "project-b.elc") (not (eq mode 'packaged)))))))
+
 
 (provide 'test/loading-modes)

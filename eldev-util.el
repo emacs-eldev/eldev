@@ -1896,19 +1896,6 @@ Since 1.2:
       (when (and stderr-buffer (buffer-live-p stderr-buffer))
         (kill-buffer stderr-buffer)))))
 
-(defun eldev--forward-process-output (&optional header-message header-if-empty-output only-when-verbose)
-  "Forward output captured by `eldev-call-process'.
-This is now superseded by `:forward-output' option of the latter,
-but has different enough semantics to remain useful occasionally."
-  (if (= (point-min) (point-max))
-      (when header-if-empty-output
-        (eldev-verbose header-if-empty-output))
-    (when header-message
-      (eldev-verbose header-message))
-    (if only-when-verbose
-        (eldev-verbose "%s" (buffer-string))
-      (eldev-output :nolf "%s" (buffer-string)))))
-
 
 (defun eldev-discard-ansi-control-sequences ()
   "Discard all ANSI control sequences in the current buffer.

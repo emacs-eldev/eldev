@@ -3119,11 +3119,16 @@ descriptor."
         (let ((default-directory dependency-dir))
           (dolist (command commands)
             (eldev-call-process (eldev-shell-command) command
+              :forward-output     'stderr
+              :destination        '(t nil)
               :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
               :die-on-error       (if project-itself
                                       "child Eldev process"
                                     (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
-              (eldev--forward-process-output "Output of the child Eldev process:" "Child Eldev process produced no output" t)
+              (if (= (point-min) (point-max))
+                  (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
+                (eldev-verbose "(Non-stderr) output of the child Eldev process:")
+                (eldev-verbose (buffer-string)))
               (when (string= (car command) "package")
                 (eldev-discard-ansi-control-sequences)
                 (goto-char (point-max))
