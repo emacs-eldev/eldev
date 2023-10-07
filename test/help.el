@@ -35,4 +35,16 @@
     (should (= exit-code 0))))
 
 
+(eldev-ert-defargtest eldev-help-sorts-option (short-first)
+                      (nil t)
+  (eldev--test-run "empty-project" ("--setup" `(eldev-defoption eldev--test-custom-option ()
+                                                 "Only for testing"
+                                                 :options     ,(if short-first '(-X --custom-option) '(--custom-option -X))
+                                                 :for-command help)
+                                    "help" "help")
+    ;; Should sort short options first, even if (accidentally) specified otherwise when defining.
+    (should (string-match-p "-X, --custom-option" stdout))
+    (should (= exit-code 0))))
+
+
 (provide 'test/help)

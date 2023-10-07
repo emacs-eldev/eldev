@@ -1921,7 +1921,9 @@ If COMMAND is nil, list global options instead."
       (eldev-output (or title "\nOptions:"))
       (dolist (group by-handler)
         (let* ((value-mode  (eldev-get (car group) :option-value))
-               (options     (cdr group))
+               ;; Sort short options before long ones (but usually they are already sorted).
+               (options     (sort (copy-sequence (cdr group))
+                                  (lambda (a b) (and (not (string-prefix-p "--" (symbol-name a))) (string-prefix-p "--" (symbol-name b))))))
                (all-strings (mapconcat #'symbol-name options ", ")))
           (when (eldev-all-p (string-prefix-p "--" (symbol-name it)) options)
             (setf all-strings (concat "    " all-strings)))
