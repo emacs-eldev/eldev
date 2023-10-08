@@ -5754,8 +5754,12 @@ typically see anyway.")
 (defvar eldev-build-force-rebuilding nil
   "Targets that are to be rebuilt even if they appear up-to-date.
 Can be either a list of target names or symbol t, in which case
-all targets will be force-built.  However, a target will only
-ever be force-built if it is otherwise a part of building plan.")
+all targets will be force-built.  If it is a list that includes
+t, that element will be replaced with target names specified to
+command `build'.
+
+However, a target will only ever be force-built if it is
+otherwise a part of building plan.")
 
 (defvar eldev-build-infinitely-new nil
   "Files (sources or intermediate targets) that are “infinitely new”.
@@ -5966,8 +5970,10 @@ Also see commands `compile' and `package'."
   :parameters     "[TARGET...]"
   :category       building
   :profiling-self t
-  ;; When building, project loading mode is ignored.  The reason is that building itself
-  ;; can involve compiling or packaging.
+  ;; Resolve t elements in `eldev-build-force-rebuilding' now.
+  (when (and (listp eldev-build-force-rebuilding) (memq t eldev-build-force-rebuilding))
+    (setf eldev-build-force-rebuilding (append (delq t eldev-build-force-rebuilding)
+                                               (eldev-filter (not (eldev-virtual-target-p it)) parameters))))
   (require 'eldev-build)
   (eldev--do-build parameters))
 
@@ -6055,15 +6061,19 @@ this might require adding some `eval-and-compile' forms in your code"
   :for-command    (build compile package))
 
 (eldev-defoption eldev-build-force-rebuilding (&optional target)
-  "Force building of TARGET even if it appears up-to-date (or all
-targets if TARGET is not specified)"
+  "Force building of TARGET even if it appears up-to-date (or targets
+otherwise listed on the command line if option value is not specified)"
   :options        (-f --force)
   :optional-value TARGET
   :for-command    (build compile package)
   (unless (eq eldev-build-force-rebuilding t)
-    (if target
-        (push target eldev-build-force-rebuilding)
-      (setf eldev-build-force-rebuilding t))))
+    (push (or target t) eldev-build-force-rebuilding)))
+
+(eldev-defoption eldev-build-force-rebuilding-all ()
+  "Force building of all targets"
+  :options        (-F --force-all)
+  :for-command    (build compile package)
+  (setf eldev-build-force-rebuilding t))
 
 (eldev-defoption eldev-build-infinitely-new (&optional file)
   "Consider FILE “infinitely new” (or all files if FILE is not

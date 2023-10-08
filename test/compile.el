@@ -218,4 +218,55 @@
       (should (= exit-code 1)))))
 
 
+(ert-deftest eldev-compile-force-1 ()
+  (eldev--test-without-files "project-g" ("project-g.elc" "project-g-util.elc")
+    (eldev--test-run nil ("compile")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should     (string-match-p "ELC +project-g-util\\.el" stdout))
+      (eldev--test-assert-files project-dir preexisting-files "project-g.elc" "project-g-util.elc")
+      (should     (= exit-code 0)))
+    ;; Compiling again should be a no-op.
+    (eldev--test-run nil ("compile")
+      (should     (string= stdout "Nothing to do\n"))
+      (should     (= exit-code 0)))
+    ;; Compiling with `--force' but without arguments should be a no-op too (either use
+    ;; `--force-all' or specify the forced target).
+    (eldev--test-run nil ("compile" "--force")
+      (should     (string= stdout "Nothing to do\n"))
+      (should     (= exit-code 0)))
+    ;; Compiling one source file again, with forcing all explicitly listed sources
+    ;; (i.e. the same file).
+    (eldev--test-run nil ("compile" "--force" "project-g.el")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should-not (string-match-p "ELC +project-g-util\\.el" stdout))
+      (should     (= exit-code 0)))
+    ;; Compiling one source file again, with forcing it by name: this shouldn't do
+    ;; anything since it's not a target, but a source file.
+    (eldev--test-run nil ("compile" "--force=project-g.el" "project-g.el")
+      (should     (string= stdout "Nothing to do\n"))
+      (should     (= exit-code 0)))
+    ;; Compiling one source file again, with forcing its resulting _target_ by name.
+    (eldev--test-run nil ("compile" "--force=project-g.elc" "project-g.el")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should-not (string-match-p "ELC +project-g-util\\.el" stdout))
+      (should     (= exit-code 0)))
+    ;; Same as above without listing sources explicitly; result must be the same, as the
+    ;; forced target is a dependency of `:compile'.
+    (eldev--test-run nil ("compile" "--force=project-g.elc")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should-not (string-match-p "ELC +project-g-util\\.el" stdout))
+      (should     (= exit-code 0)))
+    ;; Compiling one file and forcing all targets; unrelated targets still must not be
+    ;; rebuilt.
+    (eldev--test-run nil ("compile" "--force-all" "project-g.el")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should-not (string-match-p "ELC +project-g-util\\.el" stdout))
+      (should     (= exit-code 0)))
+    ;; Compiling everything and forcing all targets.
+    (eldev--test-run nil ("compile" "--force-all")
+      (should     (string-match-p "ELC +project-g\\.el"      stdout))
+      (should     (string-match-p "ELC +project-g-util\\.el" stdout))
+      (should     (= exit-code 0)))))
+
+
 (provide 'test/compile)
