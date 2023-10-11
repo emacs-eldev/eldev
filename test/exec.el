@@ -162,5 +162,11 @@
     (should (<= 0.9 (eldev-parse-number (string-trim stderr) :floating-point t) 2.0))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-exec-debugging-time-it-3 ()
+  ;; Would fail with non-literal format string argument.
+  (eldev--test-run "project-a" ("exec" `(eldev-time-it (concat "%.1f") (sleep-for 1)))
+    (should (<= 0.9 (eldev-parse-number (string-trim stderr) :floating-point t) 2.0))
+    (should (= exit-code 0))))
+
 
 (provide 'test/exec)

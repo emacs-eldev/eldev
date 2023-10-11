@@ -975,8 +975,10 @@ Since 1.4."
   "Execute BODY and print execution time using `eldev-debug'.
 FORMAT-STRING is used to format the resulting message.  It should
 format exactly one floating-point number (of seconds taken),
-i.e. use \"%f\".  If it doesn't format any variables, \": %.2f
-s\" is appended to it.
+i.e. use \"%f\".  FORMAT-STRING can be a literal string or a form
+that evaluates to a string, but in either case will be used for
+formatting.  If it is a literal that doesn't format any
+variables, \": %.2f s\" is appended to it.
 
 This macro uses function `float-time' to measure time spent on
 executing BODY.  It is not particularly suited for measuring very
@@ -988,7 +990,7 @@ Since 1.4."
   (declare (indent 1) (debug (stringp body)))
   (let ((notch (make-symbol "$notch")))
     ;; Detect if `format-string' already formats the seconds.  FIXME: Can this be improved?
-    (unless (ignore-errors (not (string= (format format-string 0) format-string)))
+    (when (and (stringp format-string) (ignore-errors (string= (format format-string 0) format-string)))
       (setf format-string (concat format-string ": %.2f s")))
     `(let ((,notch (float-time)))
        (prog1 ,(macroexp-progn body)
