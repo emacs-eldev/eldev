@@ -894,6 +894,16 @@ Used by Eldev startup script."
   ;; with `.eldev' in case Eldev is executed there by error, for example.
   (add-hook 'eldev--project-validated-hook (lambda () (eldev-user-emacs-dir t))))
 
+(defmacro eldev--maybe-with-target-dependencies (do-set-up public &rest body)
+  "Execute BODY, possibly setting up `eldev--target-dependencies'."
+  (declare (indent 2) (debug (form form body)))
+  (let ((set-up-now (make-symbol "$set-up-now")))
+    `(let ((,set-up-now (when ,do-set-up (eldev--load-target-dependencies ,public))))
+       (unwind-protect
+           (progn ,@body)
+         (when ,set-up-now
+           (eldev--save-target-dependencies))))))
+
 (defun eldev-cli (command-line)
   "Eldev entry point."
   ;; We parse command line in a way separate from `command-line-args' and
@@ -5820,16 +5830,6 @@ In addition to t or nil, can also be symbol `concise'.")
 
 (defsubst eldev-virtual-target-p (target)
   (string-prefix-p ":" target))
-
-(defmacro eldev--maybe-with-target-dependencies (do-set-up public &rest body)
-  "Execute BODY, possibly setting up `eldev--target-dependencies'."
-  (declare (indent 2) (debug (form form body)))
-  (let ((set-up-now (make-symbol "$set-up-now")))
-    `(let ((,set-up-now (when ,do-set-up (eldev--load-target-dependencies ,public))))
-       (unwind-protect
-           (progn ,@body)
-         (when ,set-up-now
-           (eldev--save-target-dependencies))))))
 
 (defmacro eldev-with-target-dependencies (&rest body)
   "Execute BODY with target dependency mechanism set up."
