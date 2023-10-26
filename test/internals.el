@@ -8,9 +8,11 @@
 
 ;; Make `eldev--test-internals-inc' add 2, not 1, for BODY.  Nested calls still make it
 ;; add only 2 (not 3, 4, ...) because of how advices work; this is expected.
+(defun eldev--test-internals-strengthened-inc (original x)
+  (1+ (funcall original x)))
 (defmacro eldev--test-internals-strengthen-inc (&rest body)
   (declare (indent 0))
-  `(eldev-advised ('eldev--test-internals-inc :around (lambda (original x) (1+ (funcall original x))))
+  `(eldev-advised ('eldev--test-internals-inc :around 'eldev--test-internals-strengthened-inc)
      ,@body))
 
 

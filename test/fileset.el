@@ -45,20 +45,21 @@
 
 
 (defmacro eldev--do-test-fileset (fileset all-files expected-files)
-  `(let* ((all-files      ,all-files)
+  `(let* ((fileset        ,fileset)
+          (all-files      ,all-files)
           (excluded-files (eldev-filter (not (member it (eldev-listify ,expected-files))) all-files))
           (file-types     (if eldev-pretend-files
                               (if eldev-consider-only-pretend-files "pretend files only" "real and pretend files")
                             "real files")))
      (condition-case error
-         (progn (should (equal (eldev-find-files ,fileset nil "test/files") ,expected-files))
-                (should (equal (eldev-filter-files all-files ,fileset nil "test/files") ,expected-files)))
-       (error (eldev-error "Failed for fileset `%S' for %s" ,fileset file-types)
+         (progn (should (equal (eldev-find-files fileset nil "test/files") ,expected-files))
+                (should (equal (eldev-filter-files all-files fileset nil "test/files") ,expected-files)))
+       (error (eldev-error "Failed for fileset `%S' for %s" fileset file-types)
               (signal (car error) (cdr error))))
      (condition-case error
-         (progn (should (equal (eldev-find-files '(:not ,fileset) nil "test/files") excluded-files))
-                (should (equal (eldev-filter-files all-files '(:not ,fileset) nil "test/files") excluded-files)))
-       (error (eldev-error "Failed for fileset `(:not %S)' for %s" ,fileset file-types)
+         (progn (should (equal (eldev-find-files `(:not ,fileset) nil "test/files") excluded-files))
+                (should (equal (eldev-filter-files all-files `(:not ,fileset) nil "test/files") excluded-files)))
+       (error (eldev-error "Failed for fileset `(:not %S)' for %s" fileset file-types)
               (signal (car error) (cdr error))))))
 
 (defmacro eldev--test-fileset (fileset expected-files)
