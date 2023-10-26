@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 ;;;###autoload
 (defun project-j-hello-to (whom)
   ;; Not requiring anything for this function: it must be autoloaded.

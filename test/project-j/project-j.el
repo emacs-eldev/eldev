@@ -1,4 +1,4 @@
-;;; project-j.el --- Test project with autoload cookies in multiple files
+;;; project-j.el --- Test project with autoload cookies in multiple files  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (project-i)
