@@ -48,4 +48,39 @@
   (should (equal (eldev--test-internals-inc 5) 6)))
 
 
+(defmacro eldev--test-target-dependencies (&rest body)
+  (declare (indent 0))
+  `(let ((eldev-verbosity-level                  'quiet)
+         (eldev--target-dependencies             nil)
+         (eldev--target-dependencies-need-saving nil))
+     ,@body))
+
+(eldev-ert-defargtest eldev--maybe-with-target-dependencies-1 (do-set-up public)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
+  (eldev--test-target-dependencies
+    (eldev--maybe-with-target-dependencies do-set-up public
+      (if do-set-up
+          (progn (should eldev--target-dependencies)
+                 (should (eq (car eldev--target-dependencies) (not (null public))))
+                 (if public
+                     (should (hash-table-p (cdr eldev--target-dependencies)))
+                   ;; Must be left for lazy loading.
+                   (should-not (cdr eldev--target-dependencies))))
+        (should-not eldev--target-dependencies))
+      (should-not eldev--target-dependencies-need-saving))))
+
+(ert-deftest eldev--maybe-with-target-dependencies-2 ()
+  (let ((eldev-verbosity-level 'quiet))
+    (eldev--maybe-with-target-dependencies t nil
+      (should (equal eldev--target-dependencies '(nil . nil)))
+      ;; Make public and official.
+      (eldev-with-target-dependencies
+        (should (car eldev--target-dependencies))
+        (should (hash-table-p (cdr eldev--target-dependencies))))
+      (should-not eldev--target-dependencies-need-saving))))
+
+
 (provide 'test/internals)

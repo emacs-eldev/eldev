@@ -966,22 +966,23 @@ Used by Eldev startup script."
                                       (eldev-advised (#'load :before (when compile-on-demand-sources
                                                                        (lambda (file &optional _noerror _nomessage nosuffix &rest _ignored)
                                                                          (unless nosuffix
-                                                                           (let ((default-directory eldev-project-dir))
-                                                                             (let ((relative-name (file-relative-name file)))
-                                                                               ;; Ignore files outside the project or inside Eldev's local project cache (e.g. from dependencies).
-                                                                               (unless (or (eldev-external-or-absolute-filename relative-name)
-                                                                                           (not (eldev-external-filename (file-relative-name relative-name eldev-cache-dir))))
-                                                                                 (when (if (file-exists-p relative-name)
-                                                                                           (string-suffix-p ".el" relative-name)
-                                                                                         (file-exists-p (setf relative-name (concat relative-name ".el"))))
-                                                                                   (eldev--byte-compile-.el-on-demand relative-name compile-on-demand-sources)))))))))
+                                                                           (let* ((default-directory eldev-project-dir)
+                                                                                  (relative-name     (file-relative-name file)))
+                                                                             ;; Ignore files outside the project or inside Eldev's local project cache (e.g. from dependencies).
+                                                                             (unless (or (eldev-external-or-absolute-filename relative-name)
+                                                                                         (not (eldev-external-filename (file-relative-name relative-name eldev-cache-dir))))
+                                                                               (when (if (file-exists-p relative-name)
+                                                                                         (string-suffix-p ".el" relative-name)
+                                                                                       (file-exists-p (setf relative-name (concat relative-name ".el"))))
+                                                                                 (eldev--maybe-byte-compile-.el-on-demand relative-name compile-on-demand-sources))))))))
                                         ;; See comments in `eldev--byte-compile-.el'.
                                         (eldev-advised (#'require :before (when compile-on-demand-sources
                                                                             (lambda (feature &optional filename &rest _ignored)
                                                                               (unless (and feature (memq feature features))
                                                                                 (let ((default-directory eldev-project-dir))
-                                                                                  (eldev--byte-compile-.el-on-demand (or filename (eldev--find-feature-provider feature)) compile-on-demand-sources))))))
-                                          (eldev--execute-command command-line)
+                                                                                  (eldev--maybe-byte-compile-.el-on-demand (or filename (eldev--find-feature-provider feature)) compile-on-demand-sources))))))
+                                          (eldev--maybe-with-target-dependencies compile-on-demand-sources nil
+                                            (eldev--execute-command command-line))
                                           (setf exit-code 0)))
                                     (when (setf archive-files-to-delete (eldev-filter (file-exists-p (eldev--package-archive-dir it external-dir)) archive-files-to-delete))
                                       (eldev-trace "Deleting package archive contents to avoid polluting the external directory: %s"
@@ -5806,6 +5807,7 @@ In addition to t or nil, can also be symbol `concise'.")
 (defvar eldev-targets-list-dependencies nil
   "Whether to print known target dependencies.")
 
+;; A cons cell of (PUBLIC . DEPENDENCY-HASH-TABLE).
 (defvar eldev--target-dependencies nil)
 (defvar eldev--target-dependencies-need-saving nil)
 
@@ -5819,26 +5821,47 @@ In addition to t or nil, can also be symbol `concise'.")
 (defsubst eldev-virtual-target-p (target)
   (string-prefix-p ":" target))
 
+(defmacro eldev--maybe-with-target-dependencies (do-set-up public &rest body)
+  "Execute BODY, possibly setting up `eldev--target-dependencies'."
+  (declare (indent 2) (debug (form form body)))
+  (let ((set-up-now (make-symbol "$set-up-now")))
+    `(let ((,set-up-now (when ,do-set-up (eldev--load-target-dependencies ,public))))
+       (unwind-protect
+           (progn ,@body)
+         (when ,set-up-now
+           (eldev--save-target-dependencies))))))
+
 (defmacro eldev-with-target-dependencies (&rest body)
   "Execute BODY with target dependency mechanism set up."
   (declare (indent 0) (debug (body)))
-  `(progn (require 'eldev-build)
-          (eldev--load-target-dependencies)
-          (unwind-protect
-              (progn ,@body)
-            (eldev--save-target-dependencies))))
+  `(eldev--maybe-with-target-dependencies t t ,@body))
 
-(defun eldev--load-target-dependencies ()
-  (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
-    (setf eldev--target-dependencies (cdr (assq 'dependencies contents))))
-  (unless eldev--target-dependencies
-    (setf eldev--target-dependencies (make-hash-table :test #'equal))))
+(defun eldev--load-target-dependencies (public &optional force)
+  (prog1
+      ;; Return t if setting up now; actually loading a lazily scheduled map doesn't count.
+      (null eldev--target-dependencies)
+    ;; Don't replace already loaded dependency map.  But if it is t by now, we might replace
+    ;; that with an actually loaded value (unless called as `lazy' again).
+    (unless eldev--target-dependencies
+      (setf eldev--target-dependencies (cons nil nil)))
+    (when public
+      (setf (car eldev--target-dependencies) t))
+    (when (and (null (cdr eldev--target-dependencies)) (or public force))
+      (require 'eldev-build)
+      (let ((eldev-verbosity-level (if public eldev-verbosity-level 'quiet)))
+        (setf (cdr eldev--target-dependencies) (or (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
+                                                     (cdr (assq 'dependencies contents)))
+                                                   (make-hash-table :test #'equal)))))))
 
 (defun eldev--save-target-dependencies ()
-  (if eldev--target-dependencies-need-saving
-      (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
-        `((dependencies . ,eldev--target-dependencies)))
-    (eldev-trace "Target dependency information is up-to-date, not saving...")))
+  ;; Unless dependency usage is public, save quietly.
+  (let ((eldev-verbosity-level (if (car eldev--target-dependencies) eldev-verbosity-level 'quiet)))
+    (if eldev--target-dependencies-need-saving
+        (eldev-do-save-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
+          (setf eldev--target-dependencies-need-saving nil)
+          `((dependencies . ,(cdr eldev--target-dependencies))))
+      (eldev-trace "Target dependency information is up-to-date, not saving...")))
+  (setf eldev--target-dependencies nil))
 
 
 ;; Internal helper for `eldev-defbuilder'.
@@ -6127,6 +6150,7 @@ as two last lines of output"
   :for-command    (build compile package))
 
 
+(declare-function eldev--do-get-target-dependencies 'eldev-build)
 (declare-function eldev--byte-compile-.el 'eldev-build)
 (declare-function eldev--do-byte-compile-.el-on-demand 'eldev-build)
 
@@ -6145,18 +6169,31 @@ as two last lines of output"
   (require 'eldev-build)
   (eldev--byte-compile-.el source target))
 
-(defun eldev--byte-compile-.el-on-demand (file all-source-files)
-  ;; Ignore non-string files: this will happen if advice for `require' is called for a feature not within the
-  ;; project being built.
-  (when (and (stringp file) (file-newer-than-file-p file (eldev-replace-suffix file ".el" ".elc")))
+(defun eldev--maybe-byte-compile-.el-on-demand (file all-source-files)
+  ;; Ignore non-string "files": happen if the advice for `require' is called for a feature
+  ;; not within the project being built, see `eldev--find-feature-provider'.
+  (when (stringp file)
     (unless (car all-source-files)
       (let ((main-el-files (make-hash-table :test #'equal)))
         (dolist (source (eldev-find-files `(:and ,(eldev-standard-fileset 'main) "*.el")))
           (puthash source t main-el-files))
         (setf (car all-source-files) main-el-files)))
+    ;; Only maybe compile if the file does belong to project sources.
+    ;; FIXME: Do we actually need this check?
     (when (gethash file (car all-source-files))
       (require 'eldev-build)
-      (eldev--do-byte-compile-.el-on-demand file))))
+      (when (eldev--need-to-recompile-.elc (eldev-replace-suffix file ".el" ".elc"))
+        (eldev--do-byte-compile-.el-on-demand file)))))
+
+;; Simplified version of `eldev--need-to-build-full'.  Maybe should just use that, but it
+;; kind of depends on `eldev--build-targets'.
+(defun eldev--need-to-recompile-.elc (elc-file)
+  (let ((el-file (eldev-replace-suffix elc-file ".elc" ".el")))
+    (or (file-newer-than-file-p el-file elc-file)
+        (progn (eldev--load-target-dependencies nil t)
+               (eldev-any-p (pcase (car it)
+                              (`inherits (eldev--need-to-recompile-.elc (cadr it))))
+                            (eldev--do-get-target-dependencies elc-file 'eldev-builder-byte-compile-.el))))))
 
 
 (eldev-defbuilder eldev-builder-makeinfo (source target)
@@ -6227,6 +6264,9 @@ Since 1.3."
     all-generated))
 
 (defun eldev--find-feature-provider (feature)
+  "Determine project file providing given FEATURE.
+Return value is either a string (project file) or one of symbols
+`built-in', `external' or `unknown'."
   (or (gethash feature eldev--feature-providers)
       (puthash feature
                (if (featurep feature)

@@ -500,6 +500,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 
 (defmacro eldev-ert-defargtest (name arguments values &rest body)
+  "Define a parameterized test with given NAME.
+This is a poor-man's substitute for functionality missing from
+ERT.  Parameters are passed to the defined function as ARGUMENTS.
+The specific sets to use are defined by VALUES.  These values are
+additionally embedded into final (from ERT point of view) test
+name, and can, therefore, be used in selectors.  Check existing
+uses to see VALUES format and how they affect actual test names."
   (declare (indent 3))
   (let ((function (make-symbol (format "%s:impl" name))))
     `(progn

@@ -116,5 +116,22 @@
       (should     (= exit-code 0))
       (should     (eq (file-exists-p "project-b.elc") (not (eq mode 'packaged)))))))
 
+(eldev-ert-defargtest eldev-loading-modes-recompiling (mode)
+                      ('byte-compiled 'compiled-on-demand 'packaged)
+  (eldev--test-with-temp-copy "project-d" nil
+    (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
+      (should (string= stdout "1\n"))
+      (should (= exit-code 0)))
+    ;; Change return value of `project-d-defun'.
+    (eldev--test-with-file-buffer nil "project-d-util.el"
+      (re-search-forward (rx ",@body " (group "1")))
+      (replace-match "2" t t nil 1))
+    ;; FIXME: This currently depends on Eldev knowing target dependencies, which are found
+    ;;        as side-effect of the first `eval'.  Is there a way to make it work even
+    ;;        with target dependencies unknown?
+    (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
+      (should (string= stdout "2\n"))
+      (should (= exit-code 0)))))
+
 
 (provide 'test/loading-modes)

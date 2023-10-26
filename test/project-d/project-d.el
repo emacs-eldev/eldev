@@ -15,6 +15,9 @@
 (defun project-d-hello ()
   (project-d-misc-hello))
 
+(project-d-defun project-d-custom ()
+  nil)
+
 (provide 'project-d)
 
 ;;; project-d.el ends here

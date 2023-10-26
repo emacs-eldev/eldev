@@ -230,11 +230,16 @@ Returned list must not be modified.  Instead, use function
 
 This function may only be called while inside the body of a
 `eldev-with-target-dependencies' macro."
-  (unless eldev--target-dependencies
+  ;; This function is for public use, so don't "notice" dependency information if it is
+  ;; internal.
+  (unless (car eldev--target-dependencies)
     (error "May only be called inside `eldev-with-target-dependencies' macro"))
-  (let ((dependencies (gethash target eldev--target-dependencies)))
+  (eldev--do-get-target-dependencies target finder))
+
+(defun eldev--do-get-target-dependencies (target &optional finder)
+  (let ((dependencies (gethash target (cdr eldev--target-dependencies))))
     (if finder
-        (assq finder dependencies)
+        (cdr (assq finder dependencies))
       (let (all-dependencies)
         (dolist (entry dependencies)
           (dolist (dependency (cdr entry))
@@ -264,9 +269,10 @@ dependencies can remain the same because of different finders.
 This function may only be called while inside the body of a
 `eldev-with-target-dependencies' macro."
   (let ((current-dependencies (eldev-get-target-dependencies dependencies finder)))
+    ;; FIXME: This seems to be badly wrong.
     (unless (equal (sort (copy-sequence dependencies)         (lambda (a b) (string< (car a) (car b))))
                    (sort (copy-sequence current-dependencies) (lambda (a b) (string< (car a) (car b)))))
-      (eldev--assq-set finder (copy-sequence dependencies) (gethash target eldev--target-dependencies) #'equal)
+      (eldev--assq-set finder (copy-sequence dependencies) (gethash target (cdr eldev--target-dependencies)) #'equal)
       (setf eldev--target-dependencies-need-saving t))))
 
 
@@ -700,6 +706,7 @@ possible to build arbitrary targets this way."
             (load target nil t t)))))))
 
 (defun eldev--trigger-early-byte-compilation (file)
+  ;; See `eldev--find-feature-provider': `file' might not really be a file here.
   (when (stringp file)
     ;; Reset `default-directory', because it can have been changed e.g. when called from
     ;; inside byte-compilation.
