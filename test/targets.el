@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 (require 'test/common)
 
 
@@ -252,8 +254,7 @@
            (should (= exit-code 0)))))))
 
 (defun eldev--test-targets-combine (&rest lists)
-  (let ((targets (copy-sequence (pop lists)))
-        section)
+  (let ((targets (copy-sequence (pop lists))))
     (dolist (list lists)
       (while list
         (let* ((section      (pop list))

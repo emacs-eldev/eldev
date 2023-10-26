@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 (require 'test/common)
 (require 'eldev-plugins)
 

@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 (require 'test/common)
 
 ;; Testing various functions, macros etc. without particular relation to any command.

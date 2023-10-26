@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 (require 'eldev)
 (require 'eldev-vc)
 (require 'ert)
@@ -366,10 +368,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 (defun eldev--test-line-list (multiline-string)
   (split-string multiline-string "\n" t))
 
-(defmacro eldev--test-canonicalize-bin/eldev-path (_result)
-  (let ((result (make-symbol "result")))
+(defmacro eldev--test-canonicalize-bin/eldev-path (path)
+  (let ((result (make-symbol "$result")))
     (if (eq system-type 'windows-nt)
-        `(let ((,result  ,_result))
+        `(let ((,result  ,path))
            (if (string-match "^\\(.*/bin/eldev\\)" ,result)
                (let* ((matched (match-string 1 ,result))
                       (replacement
@@ -379,7 +381,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
                                                  nil 'literal)))
                  (replace-match replacement nil 'literal ,result 1))
              ,result))
-      _result)))
+      path)))
 
 (defmacro eldev--test-in-project-environment (&rest body)
   `(let ((eldev-project-dir   (eldev--test-project-dir))
@@ -395,6 +397,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
      (eldev--test-delete-quietly nil ',files-to-delete)
      (let* ((project-dir       (eldev--test-project-dir))
             (preexisting-files (eldev--test-find-files project-dir)))
+       (ignore preexisting-files)
        (unwind-protect
            (progn ,@body)
          (eldev--test-delete-quietly nil ',files-to-delete)))))
