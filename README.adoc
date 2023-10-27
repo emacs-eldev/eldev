@@ -163,3 +163,10 @@ discussed later.
 Eldev mostly follows GNU conventions in its command line.  Perhaps the
 only exception is that global options must be specified before command
 name and command-specific options — after it.
+
+
+== Documentation
+
+NOTE: Detailed documentation on Eldev features is
+{uri-documentation}[*available online*].  This page intentionally
+provides only a brief overview.
