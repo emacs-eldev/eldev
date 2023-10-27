@@ -3,20 +3,6 @@
 (require 'test/common)
 
 
-(defun eldev--test-compile-pretend-source-is-changed (el-file &optional test-project)
-  (let* ((el-file   (expand-file-name el-file (eldev--test-project-dir test-project)))
-         ;; Consider all `.elc' files in the directory, not only the
-         ;; direct product of compiling `el-file'.
-         (elc-files (directory-files (file-name-directory el-file) t (rx ".elc" eos))))
-    (while (progn (set-file-times el-file)
-                  (eldev-any-p (not (file-newer-than-file-p el-file it)) elc-files))
-      ;; Apparently if OS time granularity is large enough, we can set
-      ;; `.el' modification time equal to that of `.elc', not newer.
-      ;; Working with time in Elisp is a fucking nightmare, let's just
-      ;; sleep instead.
-      (sleep-for 0.1))))
-
-
 (ert-deftest eldev-compile-everything-1 ()
   (eldev--test-without-files "trivial-project" "trivial-project.elc"
     (eldev--test-run nil ("compile")
@@ -114,7 +100,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
+    (eldev--test-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile")
       :important-files ("project-d-misc.el" "project-d-misc.elc" "project-d.elc")
       ;; `project-d.elc' must be recompiled because of dependency.
@@ -126,7 +112,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
+    (eldev--test-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d.el")
       :important-files ("project-d-misc.el" "project-d.elc")
       ;; `project-d.elc' must be recompiled because of dependency.
@@ -139,7 +125,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
+    (eldev--test-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d-misc.el")
       :important-files ("project-d-misc.el" "project-d-misc.elc")
       (eldev--test-assert-building stdout '("project-d-misc.el"))
@@ -150,7 +136,7 @@
     (eldev--test-run nil ("compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))
-    (eldev--test-compile-pretend-source-is-changed "project-d-misc.el")
+    (eldev--test-pretend-source-is-changed "project-d-misc.el")
     (eldev--test-run nil ("compile" "project-d-util.el")
       (should (string= stdout "Nothing to do\n"))
       (should (= exit-code 0)))))

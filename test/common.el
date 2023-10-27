@@ -502,6 +502,23 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
         (ert-skip line)))))
 
 
+(defun eldev--test-pretend-source-is-changed (el-file &optional test-project)
+  "Make given EL-FILE newer than all `.elc' file in TEST-PROJECT.
+The file may or may not really be changed before or after by the
+caller, this function deals only with modification time."
+  (let* ((el-file   (expand-file-name el-file (eldev--test-project-dir test-project)))
+         ;; Consider all `.elc' files in the directory, not only the
+         ;; direct product of compiling `el-file'.
+         (elc-files (directory-files (file-name-directory el-file) t (rx ".elc" eos))))
+    (while (progn (set-file-times el-file)
+                  (eldev-any-p (not (file-newer-than-file-p el-file it)) elc-files))
+      ;; Apparently if OS time granularity is large enough, we can set
+      ;; `.el' modification time equal to that of `.elc', not newer.
+      ;; Working with time in Elisp is a fucking nightmare, let's just
+      ;; sleep instead.
+      (sleep-for 0.1))))
+
+
 (defmacro eldev-ert-defargtest (name arguments values &rest body)
   "Define a parameterized test with given NAME.
 This is a poor-man's substitute for functionality missing from

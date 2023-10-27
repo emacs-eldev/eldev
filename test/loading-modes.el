@@ -128,6 +128,7 @@
     (eldev--test-with-file-buffer nil "project-d-util.el"
       (re-search-forward (rx ",@body " (group "1")))
       (replace-match "2" t t nil 1))
+    (eldev--test-pretend-source-is-changed "project-d-util.el")
     ;; FIXME: This currently depends on Eldev knowing target dependencies, which are found
     ;;        as side-effect of the first `eval'.  Is there a way to make it work even
     ;;        with target dependencies unknown?
