@@ -682,7 +682,7 @@ possible to build arbitrary targets this way."
 
 (defvar eldev--byte-compile-.el-on-demand-recursing-for nil)
 
-(defun eldev--do-byte-compile-.el-on-demand (source)
+(defun eldev--do-byte-compile-.el-on-demand (source quiet)
   (unless (member source eldev--byte-compile-.el-on-demand-recursing-for)
     (let ((eldev--byte-compile-.el-on-demand-recursing-for eldev--byte-compile-.el-on-demand-recursing-for)
           (target (eldev-replace-suffix source ".el" ".elc")))
@@ -698,7 +698,7 @@ possible to build arbitrary targets this way."
         ;; quiet here.  Warnings and errors will still be shown, though, possibly in the
         ;; middle of actual project's output — but that is an unavoidable side-effect of
         ;; on-demand compilation.
-        (let ((eldev-verbosity-level 'quiet))
+        (let ((eldev-verbosity-level (if quiet 'quiet eldev-verbosity-level)))
           (eldev--do-build (list target) t)
           ;; Keep in sync with `eldev--byte-compile-.el'.  Force-load the byte-compiled
           ;; file now, to replace raw Lisp functions with faster byte-compiled versions.

@@ -150,6 +150,11 @@ projects this allows to avoid recompiling everything just to test some
 core functionality.  Even more important if higher-level files do not
 even compile at the moment, but you still want to run tests on the
 byte-compiled core.")
+    (noisy-compiled-on-demand
+     . "Like `compiled-on-demand', but additionally prints standard
+information about compilations it performs.  The “normal” mode only
+prints warnings and errors, as output “in the middle” can potentially
+break the compiled project or whatever uses it.")
     (built
      . "Build project or dependency first.  Only important for those projects
 that define custom rules, i.e. where target `:default' is not empty.")
@@ -638,6 +643,12 @@ comma/space-separated TYPES"
   :hidden-if      (eq eldev-project-loading-mode 'compiled-on-demand)
   (eldev-set-loading-mode 'compiled-on-demand))
 
+(eldev-defoption eldev-set-loading-mode-noisy-compiled-on-demand ()
+  "Shorthand for `--loading=noisy-compiled-on-demand'"
+  :options        (-O --noisy-compiled-on-demand)
+  :hidden-if      (eq eldev-project-loading-mode 'compiled-on-demand)
+  (eldev-set-loading-mode 'noisy-compiled-on-demand))
+
 (eldev-defbooloptions eldev-load-prefer-newer-mode eldev-load-first-mode load-prefer-newer
   ("Set `load-prefer-newer' to t"
    :options       (-N --load-newer)
@@ -962,8 +973,9 @@ Used by Eldev startup script."
                                  (package-user-dir (or external-dir package-user-dir)))
                             (setf command-line (eldev-parse-options command-line nil t))
                             (if command-line
-                                (let ((compile-on-demand-sources (when (eq eldev-project-loading-mode 'compiled-on-demand) (list nil)))
-                                      archive-files-to-delete)
+                                (let* ((compile-on-demand-quiet   (eq eldev-project-loading-mode 'compiled-on-demand))
+                                       (compile-on-demand-sources (when (or compile-on-demand-quiet (eq eldev-project-loading-mode 'noisy-compiled-on-demand)) (list nil)))
+                                       archive-files-to-delete)
                                   ;; If we are using external directory, maybe rename
                                   ;; archives so that they don't clash with what is
                                   ;; retrieved in that directory already.
@@ -984,13 +996,14 @@ Used by Eldev startup script."
                                                                                (when (if (file-exists-p relative-name)
                                                                                          (string-suffix-p ".el" relative-name)
                                                                                        (file-exists-p (setf relative-name (concat relative-name ".el"))))
-                                                                                 (eldev--maybe-byte-compile-.el-on-demand relative-name compile-on-demand-sources))))))))
+                                                                                 (eldev--maybe-byte-compile-.el-on-demand relative-name compile-on-demand-sources compile-on-demand-quiet))))))))
                                         ;; See comments in `eldev--byte-compile-.el'.
                                         (eldev-advised (#'require :before (when compile-on-demand-sources
                                                                             (lambda (feature &optional filename &rest _ignored)
                                                                               (unless (and feature (memq feature features))
                                                                                 (let ((default-directory eldev-project-dir))
-                                                                                  (eldev--maybe-byte-compile-.el-on-demand (or filename (eldev--find-feature-provider feature)) compile-on-demand-sources))))))
+                                                                                  (eldev--maybe-byte-compile-.el-on-demand (or filename (eldev--find-feature-provider feature))
+                                                                                                                           compile-on-demand-sources compile-on-demand-quiet))))))
                                           (eldev--maybe-with-target-dependencies compile-on-demand-sources nil
                                             (eldev--execute-command command-line))
                                           (setf exit-code 0)))
@@ -1708,7 +1721,7 @@ See the manual for more information about local dependencies."
   (if loading-mode
       (progn (unless (assq loading-mode eldev--loading-modes)
                (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
-             (when (eq loading-mode 'compiled-on-demand)
+             (when (memq loading-mode '(compiled-on-demand noisy-compiled-on-demand))
                (error "Loading mode `%s' is not supported for local dependencies" loading-mode)))
     (setf loading-mode 'as-is))
   (setf dir (file-name-as-directory dir))
@@ -2704,8 +2717,8 @@ Since 0.2."
                                       ;; In all these modes dependency is activated in exactly the same way,
                                       ;; the difference is in `eldev--load-local-dependency'.  Special
                                       ;; handling of mode `compiled-on-demand' is performed elsewhere.
-                                      ((or `as-is `source `byte-compiled `compiled-on-demand `built `built-and-compiled `built-source)
-                                       (when (and (eq loading-mode 'compiled-on-demand) (not (eq dependency-name package-name)))
+                                      ((or `as-is `source `byte-compiled `compiled-on-demand `noisy-compiled-on-demand `built `built-and-compiled `built-source)
+                                       (when (and (memq loading-mode '(compiled-on-demand noisy-compiled-on-demand)) (not (eq dependency-name package-name)))
                                          (error "Loading mode `%s' is not supported for local dependencies" loading-mode))
                                        (dolist (requirement (package-desc-reqs dependency))
                                          (unless (package-activate (car requirement))
@@ -3106,9 +3119,9 @@ descriptor."
          (package-name    (package-desc-name (eldev-package-descriptor)))
          (project-itself  (eq dependency-name package-name))
          (dependency-dir  (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-dependencies))))
-         ;; For project itself autoloads are handled differently.  For other loading mode
-         ;; they get built without special care.
-         (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled compiled-on-demand)))
+         ;; For the project itself autoloads are handled differently.  For other loading
+         ;; modes they get built without special care.
+         (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled compiled-on-demand noisy-compiled-on-demand)))
                             (eldev--cross-project-internal-eval dependency-dir '(not (null (memq 'autoloads (eldev-active-plugins)))) t))))
     (when (cdr (assq dependency-name package-alist))
       (error "Local dependency `%s' is already listed in `package-alist'" dependency-name))
@@ -3119,7 +3132,7 @@ descriptor."
                       (`source             `(("clean" ".elc" "--set" "main" "--delete")
                                              ,@(when build-autoloads `(("build" ":autoloads")))))
                       (`byte-compiled      `(("build" ":compile" ,@(when build-autoloads `(":autoloads")))))
-                      (`compiled-on-demand nil)
+                      ((or `compiled-on-demand `noisy-compiled-on-demand) nil)
                       (`built              `(("build" ":default")))
                       (`built-and-compiled `(("build" ":default" ":compile")))
                       (`built-source       `(("clean" ".elc" "--set" "main" "--delete")
@@ -6169,7 +6182,7 @@ as two last lines of output"
   (require 'eldev-build)
   (eldev--byte-compile-.el source target))
 
-(defun eldev--maybe-byte-compile-.el-on-demand (file all-source-files)
+(defun eldev--maybe-byte-compile-.el-on-demand (file all-source-files quiet)
   ;; Ignore non-string "files": happen if the advice for `require' is called for a feature
   ;; not within the project being built, see `eldev--find-feature-provider'.
   (when (stringp file)
@@ -6183,7 +6196,7 @@ as two last lines of output"
     (when (gethash file (car all-source-files))
       (require 'eldev-build)
       (when (eldev--need-to-recompile-.elc (eldev-replace-suffix file ".el" ".elc"))
-        (eldev--do-byte-compile-.el-on-demand file)))))
+        (eldev--do-byte-compile-.el-on-demand file quiet)))))
 
 ;; Simplified version of `eldev--need-to-build-full'.  Maybe should just use that, but it
 ;; kind of depends on `eldev--build-targets'.

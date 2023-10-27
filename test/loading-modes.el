@@ -96,7 +96,7 @@
       (should-not (file-exists-p (eldev--test-file "project-j-autoloads.elc"))))))
 
 (eldev-ert-defargtest eldev-loading-modes-warnings (mode)
-                      ('byte-compiled 'built-and-compiled 'compiled-on-demand 'packaged)
+                      ('byte-compiled 'built-and-compiled 'compiled-on-demand 'noisy-compiled-on-demand 'packaged)
   ;; This project uses `makeinfo'.  Maybe use another?
   (skip-unless (or (not (eq mode 'packaged)) (eldev-makeinfo-executable t)))
   (let ((eldev--test-project "project-b"))
@@ -113,15 +113,19 @@
         ;; care, just avoid test failure.
         (should   (string-match-p "project-b-never-declared-this-variable" stderr))
         (should   (string-match-p "noprefixforthisvar"                     stderr)))
-      ;; Also, we don't want actual output here, only stderr.
-      (should-not (string-match-p "ELC"                                    stdout))
+      ;; Also, we don't want actual output here, only stderr.  Unless the mode is
+      ;; `noisy-compiled-on-demand', that is.
+      (should     (eq (not (null (string-match-p "ELC" stdout))) (eq mode 'noisy-compiled-on-demand)))
       (should     (= exit-code 0))
       (should     (eq (file-exists-p "project-b.elc") (not (eq mode 'packaged)))))))
 
 (eldev-ert-defargtest eldev-loading-modes-recompiling (mode)
-                      ('byte-compiled 'compiled-on-demand 'packaged)
+                      ('byte-compiled 'compiled-on-demand 'noisy-compiled-on-demand 'packaged)
   (eldev--test-with-temp-copy "project-d" nil
     (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
+      (when (eq mode 'noisy-compiled-on-demand)
+        (flush-lines "ELC")
+        (setf stdout (buffer-string)))
       (should (string= stdout "1\n"))
       (should (= exit-code 0)))
     ;; Change return value of `project-d-defun'.
@@ -133,6 +137,9 @@
     ;;        as side-effect of the first `eval'.  Is there a way to make it work even
     ;;        with target dependencies unknown?
     (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
+      (when (eq mode 'noisy-compiled-on-demand)
+        (flush-lines "ELC")
+        (setf stdout (buffer-string)))
       (should (string= stdout "2\n"))
       (should (= exit-code 0)))))
 

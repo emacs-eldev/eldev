@@ -30,18 +30,26 @@
 ;; In this and the following tests make sure that loading mode `compiled-on-demand'
 ;; doesn't screw up explicit compilation.
 (eldev-ert-defargtest eldev-compile-everything-5 (on-demand)
-                      (nil t)
+                      (nil 'normal 'noisy)
   (eldev--test-without-files "project-d" ("project-d.elc" "project-d-misc.elc" "project-d-util.elc")
-    (eldev--test-run nil ((if on-demand "--compiled-on-demand" "--as-is") "compile")
+    (eldev--test-run nil ((eldev-pcase-exhaustive on-demand
+                            (`nil    "--as-is")
+                            (`normal "--compiled-on-demand")
+                            (`noisy  "--noisy-compiled-on-demand"))
+                          "compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))))
 
 (eldev-ert-defargtest eldev-compile-everything-6 (on-demand)
-                      (nil t)
+                      (nil 'normal 'noisy)
   ;; `project-e' contains files that must be loaded before
   ;; compilation.
   (eldev--test-without-files "project-e" ("project-e.elc" "project-e-misc.elc" "project-e-util.elc")
-    (eldev--test-run nil ((if on-demand "--compiled-on-demand" "--as-is") "compile" "--load-before-compiling")
+    (eldev--test-run nil ((eldev-pcase-exhaustive on-demand
+                            (`nil    "--as-is")
+                            (`normal "--compiled-on-demand")
+                            (`noisy  "--noisy-compiled-on-demand"))
+                          "compile" "--load-before-compiling")
       (eldev--test-assert-files project-dir preexisting-files "project-e.elc" "project-e-misc.elc" "project-e-util.elc")
       (should (= exit-code 0)))))
 
