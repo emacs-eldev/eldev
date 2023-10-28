@@ -5858,13 +5858,15 @@ In addition to t or nil, can also be symbol `concise'.")
     (unless eldev--target-dependencies
       (setf eldev--target-dependencies (cons nil nil)))
     (when public
+      (require 'eldev-build)
       (setf (car eldev--target-dependencies) t))
     (when (and (null (cdr eldev--target-dependencies)) (or public force))
-      (require 'eldev-build)
-      (let ((eldev-verbosity-level (if public eldev-verbosity-level 'quiet)))
-        (setf (cdr eldev--target-dependencies) (or (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
-                                                     (cdr (assq 'dependencies contents)))
-                                                   (make-hash-table :test #'equal)))))))
+      (setf (cdr eldev--target-dependencies) (or (eldev--do-load-target-dependencies public) (make-hash-table :test #'equal))))))
+
+(defun eldev--do-load-target-dependencies (public)
+  (let ((eldev-verbosity-level (if public eldev-verbosity-level 'quiet)))
+    (eldev-do-load-cache-file (expand-file-name "target-dependencies.build" (eldev-cache-dir t)) "target dependencies" 2
+      (cdr (assq 'dependencies contents)))))
 
 (defun eldev--save-target-dependencies ()
   ;; Unless dependency usage is public, save quietly.

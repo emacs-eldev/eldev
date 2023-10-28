@@ -209,7 +209,9 @@ However, it is allowed to use this function as described below.
 By default, list of all dependencies, i.e. across all possible
 dependency finders, is returned.  However, if argument FINDER is
 specified, returned list includes dependencies only for that
-finder.
+finder.  In any case, the returned list is in no particular
+order.  Pass it through `eldev-canonical-dependency-order' if
+needed.
 
 Returned list's elements look like (TYPE DEPENDENCY [...]).
 Following types (symbols) are currently defined:
@@ -249,6 +251,32 @@ This function may only be called while inside the body of a
               (push dependency all-dependencies))))
         all-dependencies))))
 
+(defun eldev-canonical-dependency-order (dependencies)
+  "Sort DEPENDENCIES into a canonical order.
+The list is not sorted in-place, instead a sorted copy is
+returned.  Particular way of sorting is not guaranteed (i.e. it
+may change in future), but will stay the same within one Eldev
+invocation.
+
+Since 1.7."
+  (sort (copy-sequence dependencies) #'eldev-dependency-entry-lessp))
+
+(defun eldev-dependency-entry-lessp (a b)
+  "Compare dependency entries A and B.
+You probably shouldn't use this directly, instead call
+`eldev-canonical-dependency-order'.
+
+See `eldev-get-target-dependencies' for a description of entry
+format.  This function can be used to sort a list of such entries
+into a “canonical” order.  How dependencies are compared is not
+specified (i.e. it may change in future), but is guaranteed to
+stay the same within one Eldev invocation.
+
+Since 1.7."
+  (if (eq (car a) (car b))
+      (string< (cadr a) (cadr b))
+    (string< (symbol-name (car a)) (symbol-name (car b)))))
+
 (defun eldev-set-target-dependencies (target finder dependencies)
   "Set the list of TARGET's DEPENDENCIES according to given FINDER.
 FINDER should be a unique symbol, e.g. caller function name.  The
@@ -268,12 +296,11 @@ dependencies can remain the same because of different finders.
 
 This function may only be called while inside the body of a
 `eldev-with-target-dependencies' macro."
-  (let ((current-dependencies (eldev-get-target-dependencies dependencies finder)))
-    ;; FIXME: This seems to be badly wrong.
-    (unless (equal (sort (copy-sequence dependencies)         (lambda (a b) (string< (car a) (car b))))
-                   (sort (copy-sequence current-dependencies) (lambda (a b) (string< (car a) (car b)))))
-      (eldev--assq-set finder (copy-sequence dependencies) (gethash target (cdr eldev--target-dependencies)) #'equal)
-      (setf eldev--target-dependencies-need-saving t))))
+  (when (or eldev--target-dependencies-need-saving  ; Skip sorting and comparing if dependencies are already modified.
+            (let ((current-dependencies (eldev-get-target-dependencies target finder)))
+              (not (equal (eldev-canonical-dependency-order dependencies) (eldev-canonical-dependency-order current-dependencies)))))
+    (eldev--assq-set finder (copy-sequence dependencies) (gethash target (cdr eldev--target-dependencies)) #'equal)
+    (setf eldev--target-dependencies-need-saving t)))
 
 
 (defun eldev--do-targets (parameters)
@@ -327,7 +354,7 @@ This function may only be called while inside the body of a
                    (puthash entry target printed-target-entries)
                    (eldev--print-target-level sources (1+ level) all-targets printed-target-entries)
                    (when eldev-targets-list-dependencies
-                     (dolist (dependency (sort (copy-sequence (eldev-get-target-dependencies target)) (lambda (a b) (string< (car a) (car b)))))
+                     (dolist (dependency (eldev-canonical-dependency-order (eldev-get-target-dependencies target)))
                        (eldev-output "%s    %s %s" indentation
                                      (eldev-colorize (eldev-pcase-exhaustive (car dependency)
                                                        (`depends-on "[dep]")

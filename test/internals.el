@@ -2,6 +2,8 @@
 
 (require 'test/common)
 
+(require 'eldev-build)
+
 
 (defun eldev--test-internals-inc (x)
   (1+ x))
@@ -54,10 +56,12 @@
 
 (defmacro eldev--test-target-dependencies (&rest body)
   (declare (indent 0))
-  `(let ((eldev-verbosity-level                  'quiet)
-         (eldev--target-dependencies             nil)
+  `(let ((eldev--target-dependencies             nil)
          (eldev--target-dependencies-need-saving nil))
-     ,@body))
+     ;; Make these functions do nothing while `body' is evaluated.
+     (eldev-advised (#'eldev--do-load-target-dependencies :override (lambda (&rest _)))
+       (eldev-advised (#'eldev--save-target-dependencies :override (lambda (&rest _)))
+         ,@body))))
 
 (eldev-ert-defargtest eldev--maybe-with-target-dependencies-1 (do-set-up public)
                       ((nil nil)
@@ -77,7 +81,7 @@
       (should-not eldev--target-dependencies-need-saving))))
 
 (ert-deftest eldev--maybe-with-target-dependencies-2 ()
-  (let ((eldev-verbosity-level 'quiet))
+  (eldev--test-target-dependencies
     (eldev--maybe-with-target-dependencies t nil
       (should (equal eldev--target-dependencies '(nil . nil)))
       ;; Make public and official.
@@ -85,6 +89,28 @@
         (should (car eldev--target-dependencies))
         (should (hash-table-p (cdr eldev--target-dependencies))))
       (should-not eldev--target-dependencies-need-saving))))
+
+;; This function is part of public interface, but we test it here, along with internal
+;; `eldev--maybe-with-target-dependencies'.
+(ert-deftest eldev-set-target-dependencies ()
+  (eldev--test-target-dependencies
+    (eldev-with-target-dependencies
+      (let ((dependencies '((depends-on "bar") (depends-on "baz") (inherits "x") (inherits "y") (inherits "z"))))
+        (eldev-set-target-dependencies "foo" 'finder dependencies)
+        (should (equal (eldev-canonical-dependency-order (eldev-get-target-dependencies "foo"))
+                       (eldev-canonical-dependency-order dependencies)))
+        (should (equal (eldev-canonical-dependency-order (eldev-get-target-dependencies "foo" 'finder))
+                       (eldev-canonical-dependency-order dependencies)))
+        (should eldev--target-dependencies-need-saving)
+        ;; Pretend they are saved.
+        (setf eldev--target-dependencies-need-saving nil)
+        ;; Exactly the same dependencies, just in a different order.
+        (eldev-set-target-dependencies "foo" 'finder (nreverse (copy-sequence dependencies)))
+        (should (equal (eldev-canonical-dependency-order (eldev-get-target-dependencies "foo"))
+                       (eldev-canonical-dependency-order dependencies)))
+        (should (equal (eldev-canonical-dependency-order (eldev-get-target-dependencies "foo" 'finder))
+                       (eldev-canonical-dependency-order dependencies)))
+        (should-not eldev--target-dependencies-need-saving)))))
 
 
 (provide 'test/internals)
