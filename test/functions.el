@@ -92,7 +92,8 @@
 ;; It seems there was/is a race condition due to which process output could be sometimes
 ;; missing.  Try to trigger this bug if still present with some "stress-testing".
 (ert-deftest eldev-call-process-4 ()
-  (let ((num-loops 1000))
+  ;; Seems to be terribly slow on Windows (maybe it's GitHub CI machines, don't know).
+  (let ((num-loops (if (eq system-type 'windows-nt) 100 1000)))
     (dotimes (k num-loops)
       (ert-info ((format "loop %d of %d" (1+ k) num-loops))
         (eldev-call-process "echo" '("x")
