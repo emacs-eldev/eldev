@@ -518,7 +518,16 @@ BODY can contain the following keywords:
             (eldev--register-option ',name ',options ',for-command ',(nreverse keywords)))))
 
 (defun eldev-inherit-options (to-command from-command &optional filter)
-  "DONOTRELEASE: Document.
+  "Make options of FROM-COMMAND also available for TO-COMMAND.
+By default all options of FROM-COMMAND are taken.
+
+However, you can optionally specify a FILTER.  It should be a
+function accepting two arguments: option name as a symbol and
+option handler function.  The filter must return t or nil (other
+values are reserved for future functionality) that specifies if
+given option should be made available for TO-COMMAND.  Filter is
+called for all option variants; e.g. for command `exec' options
+`-f' and `--file' would be considered separately.
 
 Since 1.7."
   (unless (assq from-command eldev--commands)
