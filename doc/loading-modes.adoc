@@ -36,9 +36,20 @@ Elisp files are byte-compiled before a command (e.g. `test`) even gets
 to start working.  This makes the mode useful during work on the
 project “core” because 1) compilation time is reduced; 2) you can test
 or otherwise use the core without even updating higher-level files to
-be compilable first.  However, as a drawback, compilation can run “in
-the middle” of project’s real code, which can occasionally cause
-unforeseen troubles, as well as screw up <<profiling,profiling>>.
+be successfully compilable first.  However, as a drawback, compilation
+can run “in the middle” of project’s real code, which can occasionally
+cause unforeseen troubles, as well as screw up
+<<profiling,profiling>>.
+
+{since-1-7} Mode `noisy-compiled-on-demand` is basically the same,
+with the only exception that Eldev prints a message (the same as
+during normal compilation) when it decides to recompile something.  In
+comparison, `compiled-on-demand` will only write to _stderr_ and only
+if there are compilation warnings or errors.  Since having “random”
+text inserted in normal program output is potentially disrupting,
+especially if said output is processed by another tool, this is not
+the default and you have to actively choose between
+`compiled-on-demand` and `noisy-compiled-on-demand`.
 
 When using <<evaluating,commands `exec` and `eval`>> with
 `compiled-on-demand` mode, you may want to use option `-R`

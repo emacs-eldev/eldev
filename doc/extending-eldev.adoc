@@ -387,6 +387,15 @@ Repeat parameters from the command line.  If you want, I can even
 colorize them!
 ....
 
+==== Reusing options for new commands
+
+{since-1-7} Sometimes you want to define a command that is similar to
+something provided by Eldev by default, yet does something a bit
+differently — or in addition.  Function `eldev-inherit-options` may
+come handy here: it takes all (or at least most) options that can be
+passed to command A and make them work also with command B.  See
+function Elisp documentation for the syntax.
+
 === Custom test runners
 
 FIXME
