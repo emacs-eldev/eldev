@@ -1745,9 +1745,21 @@ Elisp files are byte-compiled before a command (e.g. <code>test</code>) even get
 to start working.  This makes the mode useful during work on the
 project “core” because 1) compilation time is reduced; 2) you can test
 or otherwise use the core without even updating higher-level files to
-be compilable first.  However, as a drawback, compilation can run “in
-the middle” of project’s real code, which can occasionally cause
-unforeseen troubles, as well as screw up <a href="#profiling">profiling</a>.</p>
+be successfully compilable first.  However, as a drawback, compilation
+can run “in the middle” of project’s real code, which can occasionally
+cause unforeseen troubles, as well as screw up
+<a href="#profiling">profiling</a>.</p>
+</div>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.7-8be" alt="Since 1.7"></span> Mode <code>noisy-compiled-on-demand</code> is basically the same,
+with the only exception that Eldev prints a message (the same as
+during normal compilation) when it decides to recompile something.  In
+comparison, <code>compiled-on-demand</code> will only write to <em>stderr</em> and only
+if there are compilation warnings or errors.  Since having “random”
+text inserted in normal program output is potentially disrupting,
+especially if said output is processed by another tool, this is not
+the default and you have to actively choose between
+<code>compiled-on-demand</code> and <code>noisy-compiled-on-demand</code>.</p>
 </div>
 <div class="paragraph">
 <p>When using <a href="#evaluating">commands <code>exec</code> and <code>eval</code></a> with
@@ -4903,6 +4915,17 @@ colorize them!</pre>
 </div>
 </div>
 </div>
+<div class="sect3">
+<h4 id="_reusing_options_for_new_commands">Reusing options for new commands</h4>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.7-8be" alt="Since 1.7"></span> Sometimes you want to define a command that is similar to
+something provided by Eldev by default, yet does something a bit
+differently — or in addition.  Function <code>eldev-inherit-options</code> may
+come handy here: it takes all (or at least most) options that can be
+passed to command A and make them work also with command B.  See
+function Elisp documentation for the syntax.</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_custom_test_runners">Custom test runners</h3>
@@ -5028,7 +5051,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-09-22 19:05:28 UTC
+Last updated 2023-10-29 17:00:49 UTC
 </div>
 </div>
 </body>
