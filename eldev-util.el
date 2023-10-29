@@ -1840,15 +1840,13 @@ Since 1.2:
                                      ;; is important for making it return quickly if the process dies.
                                      (accept-process-output wait-on 1.0)
                                      t)))
-                          (when (version< emacs-version "25.2")
-                            ;; Apparently only on Emacs 25.1 there was a synchronization bug that occasionally
-                            ;; resulted in parts of child process output getting lost otherwise.  Pretty sure
-                            ;; no-one uses 25.1 anymore, but this also happens on GitHub when packing Eldev
-                            ;; itself during continuous integration for testing, e.g.:
-                            ;; https://github.com/emacs-eldev/eldev/actions/runs/3726835847/jobs/6320581066.
-                            ;;
-                            ;; The below is only a workaround, let's hope it is enough in practice.
-                            (accept-process-output nil 0.5))
+                          ;; Emacs (or maybe this is not Emacs-specific, not sure) can declare processes
+                          ;; finished even if there is still some not-yet-accepted output, which we'd lose
+                          ;; without the following loop (see test `eldev-call-process-4').  However, the
+                          ;; preceding loop is still important to have, as the following never waits (process
+                          ;; is dead by now, cannot generate yet more), whereas the previous loop runs for as
+                          ;; long as the process is alive.
+                          (while (accept-process-output))
                           (process-exit-status process)))
                     (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer

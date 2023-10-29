@@ -89,6 +89,16 @@
     (should (equal (eldev--test-line-list (buffer-string)) '("1")))
     (should (= exit-code 0))))
 
+;; It seems there was/is a race condition due to which process output could be sometimes
+;; missing.  Try to trigger this bug if still present with some "stress-testing".
+(ert-deftest eldev-call-process-4 ()
+  (let ((num-loops 1000))
+    (dotimes (k num-loops)
+      (ert-info ((format "loop %d of %d" (1+ k) num-loops))
+        (eldev-call-process "echo" '("x")
+          (should (equal (buffer-string) "x\n"))
+          (should (= exit-code 0)))))))
+
 (ert-deftest eldev-call-process-stderr-forwarding ()
   ;; Starting a nested Eldev to catch the output it forwards from the nested (3rd level,
   ;; sort of) Emacs.  Testing that stderr forwarding doesn't inject extra newlines (it
