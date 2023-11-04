@@ -734,7 +734,10 @@ PROMPT.  More can be added later (preserving semantics).  Since
 
 (defun eldev-colorize (string &rest types)
   "Apply given Eldev colorizing to STRING."
-  (setf string (copy-sequence (if (symbolp string) (symbol-name string) string string)))
+  (setf string (copy-sequence (cond ((stringp string) string)
+                                    ((symbolp string) (symbol-name string))
+                                    ;; We get here e.g. if `eldev-debug' is mixed up with `eldev-dump'.
+                                    (t                (error "Expected a string or a symbol, got %S instead" string)))))
   (when types
     (add-face-text-property 0 (length string) types nil string))
   string)
