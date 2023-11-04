@@ -6176,6 +6176,7 @@ as two last lines of output"
 
 (declare-function eldev--do-get-target-dependencies 'eldev-build)
 (declare-function eldev--byte-compile-.el 'eldev-build)
+(declare-function eldev--need-to-build-full 'eldev-build)
 (declare-function eldev--do-byte-compile-.el-on-demand 'eldev-build)
 
 (eldev-defbuilder eldev-builder-byte-compile-.el (source target)
@@ -6206,18 +6207,9 @@ as two last lines of output"
     ;; FIXME: Do we actually need this check?
     (when (gethash file (car all-source-files))
       (require 'eldev-build)
-      (when (eldev--need-to-recompile-.elc (eldev-replace-suffix file ".el" ".elc"))
-        (eldev--do-byte-compile-.el-on-demand file quiet)))))
-
-;; Simplified version of `eldev--need-to-build-full'.  Maybe should just use that, but it
-;; kind of depends on `eldev--build-targets'.
-(defun eldev--need-to-recompile-.elc (elc-file)
-  (let ((el-file (eldev-replace-suffix elc-file ".elc" ".el")))
-    (or (file-newer-than-file-p el-file elc-file)
-        (progn (eldev--load-target-dependencies nil t)
-               (eldev-any-p (pcase (car it)
-                              (`inherits (eldev--need-to-recompile-.elc (cadr it))))
-                            (eldev--do-get-target-dependencies elc-file 'eldev-builder-byte-compile-.el))))))
+      (let ((elc-file (eldev-replace-suffix file ".el" ".elc")))
+        (when (eldev--need-to-build-full elc-file elc-file 'on-demand)
+          (eldev--do-byte-compile-.el-on-demand file quiet))))))
 
 
 (eldev-defbuilder eldev-builder-makeinfo (source target)

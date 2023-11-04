@@ -444,14 +444,20 @@ This function may only be called while inside the body of a
   (let ((cycle (member dependency dependency-stack)))
     (when cycle
       (signal 'eldev-error `("%s form a dependency cycle" ,(eldev-message-enumerate "Target" (reverse dependency-stack))))))
-  (let ((entry (gethash dependency all-targets)))
-    (when entry
+  ;; `on-demand' is a special case, search for uses.  In this case we don't have a target
+  ;; map or dependency map prepared.
+  (let* ((on-demand (eq all-targets 'on-demand))
+         (entry     (unless on-demand (gethash dependency all-targets))))
+    (when (or entry on-demand)
       (push dependency dependency-stack)
-      (or (eldev-any-p (eldev--need-to-build target it) (cdr (assq 'sources entry)))
+      (or (eldev-any-p (eldev--need-to-build target it) (if on-demand (list (eldev-replace-suffix dependency ".elc" ".el")) (cdr (assq 'sources entry))))
           (eldev-any-p (eldev-pcase-exhaustive (car it)
                          (`depends-on (eldev--need-to-build target (cadr it)))
                          (`inherits   (eldev--need-to-build-full target (cadr it) all-targets dependency-stack)))
-                       (eldev-get-target-dependencies dependency))))))
+                       (if on-demand
+                           (progn (eldev--load-target-dependencies nil t)
+                                  (eldev--do-get-target-dependencies dependency 'eldev-builder-byte-compile-.el))
+                         (eldev-get-target-dependencies dependency)))))))
 
 (defun eldev--build-add-to-plan (target all-targets &optional dependency-stack)
   (let ((already-planned (gethash target eldev--build-plan)))

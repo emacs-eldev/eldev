@@ -119,8 +119,13 @@
       (should     (= exit-code 0))
       (should     (eq (file-exists-p "project-b.elc") (not (eq mode 'packaged)))))))
 
-(eldev-ert-defargtest eldev-loading-modes-recompiling (mode)
-                      ('byte-compiled 'compiled-on-demand 'noisy-compiled-on-demand 'packaged)
+(eldev-ert-defargtest eldev-loading-modes-recompiling (mode require-manually)
+                      (('byte-compiled            nil)
+                       ('compiled-on-demand       nil)
+                       ('compiled-on-demand       t)
+                       ('noisy-compiled-on-demand nil)
+                       ('noisy-compiled-on-demand t)
+                       ('packaged                 nil))
   (eldev--test-with-temp-copy "project-d" nil
     (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
       (when (eq mode 'noisy-compiled-on-demand)
@@ -136,7 +141,12 @@
     ;; FIXME: This currently depends on Eldev knowing target dependencies, which are found
     ;;        as side-effect of the first `eval'.  Is there a way to make it work even
     ;;        with target dependencies unknown?
-    (eldev--test-run nil ((format "--loading=%s" mode) "eval" `(project-d-custom))
+    (eldev--test-run nil ((format "--loading=%s" mode)
+                          "eval"
+                          (if require-manually "--dont-require" "--require")
+                          ;; `compile-on-demand' could get confused if it recompiled `project-d-util' first:
+                          ;; would not recompile `project-d' afterwards.
+                          (if require-manually `(progn (require 'project-d-util) (require 'project-d) (project-d-custom)) `(project-d-custom)))
       (when (eq mode 'noisy-compiled-on-demand)
         (flush-lines "ELC")
         (setf stdout (buffer-string)))
