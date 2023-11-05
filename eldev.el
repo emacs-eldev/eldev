@@ -4570,7 +4570,10 @@ be silenced."
     ;; Since normally test frameworks print progress to stderr, so do we here.
     (if (and (not force-number) (< num-executed (+ eldev--test-runner-concise-num-reported 50)) (not (and num-planned (= num-executed num-planned))))
         (eldev-print :nolf progress)
-      (eldev-print "%s %d" progress num-executed)
+      (if num-planned
+          (let ((num-planned-string (number-to-string num-planned)))
+            (eldev-print "%s %s%s" progress (format (format "%%%dd" (length num-planned-string)) num-executed) (eldev-colorize (format "/%s" num-planned-string) 'details)))
+        (eldev-print "%s %d" progress num-executed))
       (setf eldev--test-runner-concise-num-reported num-executed))
     (setf eldev--test-runner-concise-num-executed num-executed)))
 

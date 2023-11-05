@@ -131,8 +131,22 @@
 (ert-deftest eldev-test-project-a-concise ()
   (eldev--test-run "project-a" ("test" "--runner" "concise")
     (should-not (string-match-p "project-a-test-hello" stdout))
-    (should     (string-match-p (rx ".. 2") stdout))
+    (should     (string-match-p (rx bol ".. 2/2" eol) stdout))
     (should     (= exit-code 0))))
+
+
+(ert-deftest eldev-test-runner-concise-tick ()
+  ;; Also simulate a "need to print failure information" after "test" #155.
+  (eldev--test-run "trivial-project" ("exec" `(dolist (n (number-sequence 1 220)) (eldev-test-runner-concise-tick (= n 155) n 220)))
+    (should (string= stdout "\
+..................................................  50/220
+.................................................. 100/220
+.................................................. 150/220
+..... 155/220
+.................................................. 205/220
+............... 220/220
+"))
+    (should (= exit-code 0))))
 
 
 (provide 'test/test)
