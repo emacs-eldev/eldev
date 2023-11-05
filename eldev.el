@@ -2455,7 +2455,7 @@ Since 0.2."
     (eldev--do-install-or-upgrade-dependencies core additional-sets to-be-upgraded dry-run activate main-command-effect no-error-if-missing)))
 
 (defun eldev--do-install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
-  ;; See comments in `eldev-cli'.
+  ;; See comments in `eldev--execute-command'.
   (let* ((eldev-message-rerouting-destination :stderr)
          (self                              (eq core 'eldev))
          (external-dir                      (unless self (eldev-external-package-dir)))
@@ -3045,7 +3045,7 @@ for all archives instead."
 (defun eldev--fetch-archive-contents (archives &optional refetch-contents)
   (when archives
     (eldev-verbose "Fetching contents of %s..." (eldev-message-enumerate "package archive" archives #'car))
-    ;; See comments in `eldev-cli'.
+    ;; See comments in `eldev--execute-command'.
     (let ((eldev-message-rerouting-destination         :stderr)
           (eldev-global-cache-archive-contents-max-age (if refetch-contents -1 eldev-global-cache-archive-contents-max-age))
           (package-archives                            archives)
@@ -4567,7 +4567,8 @@ be silenced."
     (setf num-executed (1+ eldev--test-runner-concise-num-executed)))
   (let* ((num-new  (- num-executed eldev--test-runner-concise-num-executed))
          (progress (make-string num-new ?.)))
-    ;; Since normally test frameworks print progress to stderr, so do we here.
+    ;; Normally test frameworks print progress using `message', but we redirect that to stdout (see
+    ;; `eldev--execute-command').  So, print progress output of this runner to stdout too.
     (if (and (not force-number) (< num-executed (+ eldev--test-runner-concise-num-reported 50)) (not (and num-planned (= num-executed num-planned))))
         (eldev-print :nolf progress)
       (if num-planned
