@@ -6262,8 +6262,8 @@ as two last lines of output"
   (require 'eldev-build)
   (eldev--do-package sources targets))
 
-(defun eldev--package-name-version ()
-  (let ((package (eldev-package-descriptor)))
+(defun eldev--package-name-version (&optional project-dir)
+  (let ((package (eldev-package-descriptor project-dir)))
     (format "%s-%s" (package-desc-name package) (eldev-message-version (or eldev-package-forced-version package)))))
 
 (defun eldev-generated-files ()

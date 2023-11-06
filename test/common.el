@@ -504,14 +504,21 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 (defun eldev--test-pretend-source-is-changed (el-file &optional test-project)
   "Make given EL-FILE newer than all `.elc' file in TEST-PROJECT.
-The file may or may not really be changed before or after by the
-caller, this function deals only with modification time."
-  (let* ((el-file   (expand-file-name el-file (eldev--test-project-dir test-project)))
+Also the project's package tarball used for loading in mode
+`packaged' (if at all generated).  The purpose is to make sure
+that those files get regenerated.  The file may or may not really
+be changed before or after by the caller, this function deals
+only with modification time."
+  (let* ((el-file      (expand-file-name el-file (eldev--test-project-dir test-project)))
          ;; Consider all `.elc' files in the directory, not only the
          ;; direct product of compiling `el-file'.
-         (elc-files (directory-files (file-name-directory el-file) t (rx ".elc" eos))))
+         (elc-files    (directory-files (file-name-directory el-file) t (rx ".elc" eos)))
+         ;; Assuming the location, but good enough for tests.
+         (package-file (expand-file-name (format "%s.tar" (let ((eldev-verbosity-level 'quiet))
+                                                            (eldev--package-name-version (eldev--test-project-dir test-project))))
+                                         (expand-file-name "local/generated" (let ((eldev-project-dir (eldev--test-project-dir test-project))) (eldev-cache-dir t))))))
     (while (progn (set-file-times el-file)
-                  (eldev-any-p (not (file-newer-than-file-p el-file it)) elc-files))
+                  (eldev-any-p (not (and it (file-newer-than-file-p el-file it))) (cons package-file elc-files)))
       ;; Apparently if OS time granularity is large enough, we can set
       ;; `.el' modification time equal to that of `.elc', not newer.
       ;; Working with time in Elisp is a fucking nightmare, let's just
