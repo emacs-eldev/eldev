@@ -2046,10 +2046,12 @@ return the descriptor of the project being built."
   (let ((descriptor (unless skip-cache
                       (cdr (assoc project-dir eldev--package-descriptors)))))
     (unless descriptor
-      (let ((eldev-project-main-file (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file t)))
+      ;; This line is the same as in `eldev-project-main-file', but we handle unset (nil)
+      ;; `main-file' differently here, therefore cannot reuse code.
+      (let ((main-file (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file t)))
         (setf descriptor (with-temp-buffer
-                           (if eldev-project-main-file
-                               (progn (insert-file-contents (expand-file-name eldev-project-main-file project-dir))
+                           (if main-file
+                               (progn (insert-file-contents (expand-file-name main-file project-dir))
                                       (package-buffer-info))
                              ;; FIXME: Maybe use `abbreviate-file-name', but make sure it is really safe first.
                              (let ((default-directory (expand-file-name project-dir)))
