@@ -109,6 +109,8 @@ Since Eldev 0.11."
 
 ;; General.
 
+(defvar eldev--running-from-dir nil)
+
 ;; Replacements for a small parts of `dash'.
 (defmacro eldev-any-p (form list)
   "Same as `--any' in Dash.
@@ -1765,8 +1767,8 @@ Since 1.2:
   (let* ((use-make-process     (fboundp 'make-process))
          (process-environment  process-environment)
          (local-eldev          (getenv "ELDEV_LOCAL"))
-         (local-eldev-abspath  (when (and local-eldev (not (string-prefix-p ":pa:" local-eldev)))
-                                 (expand-file-name local-eldev eldev-project-dir)))
+         (local-eldev-abspath  (when (and local-eldev eldev--running-from-dir (not (string-prefix-p ":pa:" local-eldev)))
+                                 (expand-file-name local-eldev eldev--running-from-dir)))
          (original-destination destination)
          stdout-buffer
          temp-stdout

@@ -907,9 +907,10 @@ Since 1.7.")
 (defun eldev-start-up ()
   "Prepare Eldev.
 Used by Eldev startup script."
-  (setf package-user-dir     (expand-file-name "packages" (eldev-cache-dir t))
-        package-archives     nil
-        user-emacs-directory (eldev-user-emacs-dir))
+  (setf eldev--running-from-dir default-directory
+        package-user-dir        (expand-file-name "packages" (eldev-cache-dir t))
+        package-archives        nil
+        user-emacs-directory    (eldev-user-emacs-dir))
   ;; The idea of postponing directory creation is to avoid littering random directories
   ;; with `.eldev' in case Eldev is executed there by error, for example.
   (add-hook 'eldev--project-validated-hook (lambda () (eldev-user-emacs-dir t))))
