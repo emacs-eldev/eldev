@@ -1762,14 +1762,25 @@ Since 1.2:
     (error "Unknown value of `:forward-output': %S" forward-output))
   (when (and destination forward-output (eldev-xor (eq destination t) (eq forward-output t)))
     (error "Incompatible `:destination' (%S) and `:forward-output' (%S)" destination forward-output))
-  (let ((use-make-process     (fboundp 'make-process))
-        (original-destination destination)
-        stdout-buffer
-        temp-stdout
-        stdout-file
-        stderr-buffer
-        stderr-file
-        dont-wait)
+  (let* ((use-make-process     (fboundp 'make-process))
+         (process-environment  process-environment)
+         (local-eldev          (getenv "ELDEV_LOCAL"))
+         (local-eldev-abspath  (when (and local-eldev (not (string-prefix-p ":pa:" local-eldev)))
+                                 (expand-file-name local-eldev eldev-project-dir)))
+         (original-destination destination)
+         stdout-buffer
+         temp-stdout
+         stdout-file
+         stderr-buffer
+         stderr-file
+         dont-wait)
+    ;; While using relative paths for `ELDEV_LOCAL' is likely a bad idea in general, it
+    ;; can lead to so confusing errors if Eldev subprocesses are invoked in different
+    ;; directories, that we make sure to avoid those by always expanding relative paths
+    ;; here.  Also, we use `.' as `ELDEV_LOCAL' on GitHub; let's continue to do so (and
+    ;; not using an absolute path) at least to ensure this fix stays.
+    (when (and local-eldev-abspath (not (string= local-eldev local-eldev-abspath)))
+      (push (format "ELDEV_LOCAL=%s" local-eldev-abspath) process-environment))
     (unwind-protect
         (progn
           (pcase destination
