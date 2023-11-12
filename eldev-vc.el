@@ -81,8 +81,9 @@ Since 0.8."
 
 (defmacro eldev-with-vc-buffer (project-dir &rest body)
   "Execute `vc' code in BODY in given PROJECT-DIR.
-If PROJECT-DIR is nil, `eldev-project-dir is used instead.  BODY
-has access to locally bound variable `backend'.   buffer is set a
+If PROJECT-DIR is nil, `eldev-project-dir' is used instead.  BODY
+has access to locally bound variable `backend'.  Current buffer
+is a VC status buffer with the specified directory.
 
 Since 0.8."
   (declare (indent 1) (debug (sexp body)))

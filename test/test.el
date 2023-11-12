@@ -61,6 +61,16 @@
     (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
+(eldev-ert-defargtest eldev-test-project-l-1 (loading-mode)
+                      ('source 'byte-compiled 'packaged)
+  ;; Project with special source directories.  One of the tests needs a resource located
+  ;; in the second source directory; make sure it can be found in various loading modes.
+  (eldev--test-run "project-l" ("--loading" loading-mode "test")
+    (should (string-match-p "passed.+project-l-test-hello" stdout))
+    (should (string-match-p "passed.+project-l-resource-contents" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-test-missing-dependency-1 ()
   ;; It might be installed by a different test that provides a
   ;; suitable archive in setup form.
@@ -90,6 +100,15 @@
   (eldev--test-run "project-c" ("--packaged" "test" "project-c.el")
     (should (string-match-p "passed.+project-c-test-hello" stdout))
     (should (string-match-p "passed.+project-c-test-triviality" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
+    (should (= exit-code 0))))
+
+(ert-deftest eldev-test-utility-files-in-package-mode-2 ()
+  ;; Same as above, for a project with special source directories.
+  (eldev--test-run "project-l" ("--packaged" "test" "project-l.el")
+    (should (string-match-p "passed.+project-l-test-hello" stdout))
+    (should (string-match-p "passed.+project-l-resource-contents" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
 

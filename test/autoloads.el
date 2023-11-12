@@ -61,6 +61,16 @@
         (should (string= stdout "\"Hello\"\n"))
         (should (= exit-code 0))))))
 
+(ert-deftest eldev-autoloads-6 ()
+  ;; This project has special source directories and activates `autoloads' plugin.
+  (let ((eldev--test-project "project-l"))
+    (eldev--test-run nil ("eval" "--dont-require" `(project-l-hello))
+      (should (string= stdout "\"Hello\"\n"))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("eval" "--dont-require" `(project-l-misc-hello))
+      (should (string= stdout "\"Hello\"\n"))
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-autoloads-no-backup-1 ()
   (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j-autoloads.el~")

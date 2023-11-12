@@ -1928,6 +1928,19 @@ Since 1.2."
 (defvar eldev-project-dir nil
   "Directory of the project being built.")
 
+(defvar eldev-project-source-dirs nil
+  "Subdirectory or several actually containing project source code.
+If the source files lie directly in the project root (as is the
+case in most smaller projects), this doesn't need to be set.
+However, if there is a subdirectory, e.g. `lisp' or `src', where
+the sources are contained, `eldev-project-source-dirs' must be
+set in file `Eldev' to its name.  The value may also be a list of
+subdirectories, if e.g. some resource files that need to in
+`load-path' during development are contained in yet another
+subdirectory.
+
+Since 1.8.")
+
 (defvar eldev-project-main-file nil
   "Name of the file with project headers.
 If there is only one such file in the root directory, this can be
@@ -2015,6 +2028,12 @@ Since 0.2.")
             ;; clean up temporary file
             (delete-directory temp-dir t)))))))
 
+(defun eldev-project-source-dirs ()
+  "DONOTRELEASE: Document.
+
+Since 1.8."
+  (mapcar (lambda (dir) (file-name-as-directory (expand-file-name dir eldev-project-dir))) (eldev-listify (or eldev-project-source-dirs "."))))
+
 (declare-function eldev--cross-project-internal-eval "eldev" (project-dir form &optional use-caching))
 
 (defun eldev-project-main-file (&optional project-dir skip-cache)
@@ -2059,15 +2078,18 @@ return the descriptor of the project being built."
   (let ((descriptor (unless skip-cache
                       (cdr (assoc project-dir eldev--package-descriptors)))))
     (unless descriptor
-      ;; This line is the same as in `eldev-project-main-file', but we handle unset (nil)
-      ;; `main-file' differently here, therefore cannot reuse code.
-      (let ((main-file (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file t)))
+      (let ((source-dirs (eldev--cross-project-internal-eval project-dir '(eldev-project-source-dirs) t))
+            ;; This line is the same as in `eldev-project-main-file', but we handle unset
+            ;; (nil) `main-file' differently here, therefore cannot reuse code.
+            (main-file   (eldev--cross-project-internal-eval project-dir 'eldev-project-main-file t)))
         (setf descriptor (with-temp-buffer
                            (if main-file
-                               (progn (insert-file-contents (expand-file-name main-file project-dir))
+                               ;; FIXME: Here we explicitly use only one (the first)
+                               ;;        source directory.  Should that be changed?
+                               (progn (insert-file-contents (expand-file-name main-file (car source-dirs)))
                                       (package-buffer-info))
                              ;; FIXME: Maybe use `abbreviate-file-name', but make sure it is really safe first.
-                             (let ((default-directory (expand-file-name project-dir)))
+                             (let ((default-directory (car source-dirs)))
                                (dired-mode)
                                ;; Used to use `condition-case-unless-debug' here, but it makes the error in
                                ;; debug mode leak out e.g. for `version' command, which is not supposed to

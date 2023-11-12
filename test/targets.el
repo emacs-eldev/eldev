@@ -207,6 +207,45 @@
     "        [inh] project-g.elc"))
 
 
+(defvar eldev--test-targets-project-l-main
+  '(":default"
+    "    :autoloads"
+    "        src/project-l-autoloads.el  [AUTOLOADS]"
+    "            src/project-l-misc.el"
+    "            src/project-l-util.el"
+    "            src/project-l.el"
+    ":package"
+    "    dist/project-l-1.0.tar  [PACK]"
+    "        resources/project-l/simple-resource.txt"
+    "        src/project-l-misc.el"
+    "        src/project-l-util.el"
+    "        src/project-l.el"
+    ":compile"
+    "    src/project-l-misc.elc  [ELC]"
+    "        src/project-l-misc.el"
+    "        [dep] src/project-l-autoloads.el"
+    "        [inh] src/project-l-util.elc"
+    "    src/project-l-util.elc  [ELC]"
+    "        src/project-l-util.el"
+    "        [dep] src/project-l-autoloads.el"
+    "    src/project-l.elc  [ELC]"
+    "        src/project-l.el"
+    "        [dep] src/project-l-autoloads.el"
+    "        [inh] src/project-l-misc.elc"
+    ":package-archive-entry"
+    "    dist/project-l-1.0.entry  [repeated, see `dist/project-l-1.0.tar' above]"))
+
+(defvar eldev--test-targets-project-l-test
+  '(":default"
+    ":compile"
+    "    test/dummy.elc  [ELC]"
+    "        test/dummy.el"
+    "    test/project-l.elc  [ELC]"
+    "        test/project-l.el"
+    "        [inh] src/project-l.elc"
+    "        [inh] test/dummy.elc"))
+
+
 (defsubst eldev--test-targets-dependency-line-p (line)
   (string-match-p (rx "[" (or "dep" "inh") "]") line))
 
@@ -372,6 +411,19 @@
 
 (ert-deftest eldev-targets-project-g-4 ()
   (eldev--test-project-dependencies "project-g" ("all") eldev--test-targets-project-g-main eldev--test-targets-project-g-test))
+
+
+(ert-deftest eldev-targets-project-l-1 ()
+  (eldev--test-project-dependencies "project-l" () eldev--test-targets-project-l-main))
+
+(ert-deftest eldev-targets-project-l-2 ()
+  (eldev--test-project-dependencies "project-l" ("main") eldev--test-targets-project-l-main))
+
+(ert-deftest eldev-targets-project-l-3 ()
+  (eldev--test-project-dependencies "project-l" ("test") eldev--test-targets-project-l-test))
+
+(ert-deftest eldev-targets-project-l-4 ()
+  (eldev--test-project-dependencies "project-l" ("all") eldev--test-targets-project-l-main eldev--test-targets-project-l-test))
 
 
 (provide 'test/targets)

@@ -3,7 +3,7 @@
 (require 'test/common)
 
 
-(defmacro eldev--test-packaging (test-project &optional child-emacs-form &rest body)
+(defmacro eldev--test-packaging (test-project expected-locatable-files &optional additional-child-emacs-form &rest body)
   `(let* ((eldev--test-project (or ,test-project eldev--test-project))
           (test-emacs-dir      (expand-file-name "--package-test-emacs" (eldev--test-project-cache-dir)))
           (dist-dir            (expand-file-name "dist" (eldev--test-project-dir)))
@@ -29,6 +29,8 @@
          (should (= exit-code 0))
          (setf descriptor (read stdout)))
        (ignore-errors (delete-directory test-emacs-dir t))
+       ;; Test that the generated package can be installed in Emacs and produces the
+       ;; expected package descriptor.
        (eldev--test-call-process "Emacs" eldev-emacs-executable
                                  ("--batch" "--no-site-file" "--no-site-lisp" "--execute"
                                   `(progn
@@ -44,7 +46,10 @@
                                        (eldev--package-install-file ,package-file)
                                        (package-activate ',(package-desc-name descriptor))
                                        (prin1 (cadr (assq ',(package-desc-name descriptor) package-alist)))
-                                       ,',child-emacs-form)))
+                                       (dolist (file ,',expected-locatable-files)
+                                         (unless (locate-file file load-path)
+                                           (error "Cannot locate file `%s' after loading the generated package" file)))
+                                       ,',additional-child-emacs-form)))
          (should (= exit-code 0))
          ;; Cannot compare just like that.
          (let ((installed-desciptor (read stdout)))
@@ -56,26 +61,30 @@
 
 
 (ert-deftest eldev-package-1 ()
-  (eldev--test-packaging "trivial-project"))
+  (eldev--test-packaging "trivial-project" '("trivial-project.el")))
 
 (ert-deftest eldev-package-2 ()
-  (eldev--test-packaging "project-a"))
+  (eldev--test-packaging "project-a" '("project-a.el")))
 
 (ert-deftest eldev-package-3 ()
   ;; This project comes with an Info "manual".  Make sure it gets
   ;; installed.
   (skip-unless (eldev-makeinfo-executable t))
 
-  (eldev--test-packaging "project-b" (info "project-b")))
+  (eldev--test-packaging "project-b" '("project-b.el" "project-b.info") (info "project-b")))
 
 (ert-deftest eldev-package-4 ()
-  (eldev--test-packaging "project-c"))
+  (eldev--test-packaging "project-c" '("project-c.el")))
 
 (ert-deftest eldev-package-5 ()
-  (eldev--test-packaging "project-d"))
+  (eldev--test-packaging "project-d" '("project-d.el" "project-d-misc.el" "project-d-util.el")))
 
 (ert-deftest eldev-package-6 ()
-  (eldev--test-packaging "project-e"))
+  (eldev--test-packaging "project-e" '("project-e.el" "project-e-misc.el" "project-e-util.el")))
+
+(ert-deftest eldev-package-7 ()
+  ;; Project with special source directories.
+  (eldev--test-packaging "project-l" '("project-l.el" "project-l-misc.el" "project-l-util.el" "project-l/simple-resource.txt")))
 
 
 (provide 'test/package)

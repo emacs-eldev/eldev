@@ -2691,6 +2691,8 @@ Since 0.2."
       ;; of command (e.g. it is feasible that someone would require a test utility feature
       ;; from `eval' command), but at _the end_.
       (when (eq core 'project)
+        ;; FIXME: What about project with special source subdirectories?  While this is
+        ;; for requiring test files, it feels a bit dirty in this case...
         (add-to-list 'load-path eldev-project-dir t)))))
 
 (defun eldev--unload-self ()
@@ -2734,20 +2736,29 @@ Since 0.2."
                                          (unless (package-activate (car requirement))
                                            (throw 'exit nil)))
                                        (let* ((load-path-before load-path)
-                                              (package-dir      (if (eq dependency-name package-name)
+                                              (dependency-dir   (if (eq dependency-name package-name)
                                                                     eldev-project-dir
                                                                   ;; 2 and 3 stand for directory name and its absolute path.
                                                                   (eldev-trace "Activating %s in directory `%s'" description (nth 2 (assq dependency-name eldev--local-dependencies)))
-                                                                  (nth 3 (assq dependency-name eldev--local-dependencies)))))
-                                         ;; Use package's autoloads file if it is present.  At this
-                                         ;; stage we never generate anything: only use existing files.
-                                         (eldev--load-autoloads-file (expand-file-name (format "%s-autoloads.el" dependency-name) package-dir))
-                                         ;; For non-ancient packages, autoloads file is supposed to
-                                         ;; modify `load-path'.  But if there is no such file, or it
-                                         ;; doesn't do that for whatever reason, do it ourselves.
-                                         (when (and (eq load-path load-path-before) (not (member package-dir load-path)))
-                                           (push package-dir load-path))
-                                         (eldev--assq-set dependency-name package-dir eldev--package-load-paths))
+                                                                  (nth 3 (assq dependency-name eldev--local-dependencies))))
+                                              (source-dirs      (eldev--cross-project-internal-eval dependency-dir '(eldev-project-source-dirs) t)))
+                                         ;; Use package's autoloads file if it is present.  At this stage we
+                                         ;; never generate anything: only use existing files.
+                                         (eldev--load-autoloads-file (expand-file-name (format "%s-autoloads.el" dependency-name) (car source-dirs)))
+                                         ;; For non-ancient packages, autoloads file is supposed to modify
+                                         ;; `load-path'.  But if there is no such file, or it doesn't do that
+                                         ;; for whatever reason, do it ourselves.
+                                         ;;
+                                         ;; Now that there can be multiple source directories, what the
+                                         ;; standard autoloads file does is not enough, as it handles only
+                                         ;; one.  In this case, also rewrite `load-path'.
+                                         (when (or (eq load-path load-path-before)
+                                                   (when (and (cdr source-dirs) (eq (cdr load-path) load-path-before))
+                                                     (pop load-path)))
+                                           (dolist (source-dir (reverse source-dirs))
+                                             (unless (member source-dir load-path)
+                                               (push source-dir load-path))))
+                                         (eldev--assq-set dependency-name dependency-dir eldev--package-load-paths))
                                        (push dependency-name package-activated-list)
                                        t)
                                       (`packaged
@@ -6305,6 +6316,7 @@ Return value is either a string (project file) or one of symbols
 
 (defun eldev--validate-el-feature-source (filename)
   (or (when filename
+        ;; FIXME: Is this correct in presence of source directories?
         (setf filename (file-relative-name filename eldev-project-dir))
         (if (or (eldev-external-or-absolute-filename filename)
                 (not (eldev-external-or-absolute-filename (file-relative-name filename eldev-cache-dir))))

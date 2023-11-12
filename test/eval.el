@@ -65,6 +65,12 @@
     (should (string= stdout "\"Hello\"\n"))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-eval-autorequire-feature-6 ()
+  ;; Project with special source directories.
+  (eldev--test-run "project-l" ("--quiet" "eval" `(project-l-hello))
+    (should (string= stdout "\"Hello\"\n"))
+    (should (= exit-code 0))))
+
 (ert-deftest eldev-eval-autorequire-feature-disabled-1 ()
   ;; Unless autorequiring is disabled explicitly.
   (eldev--test-run "trivial-project" ("eval" "--dont-require" `(trivial-project-hello))

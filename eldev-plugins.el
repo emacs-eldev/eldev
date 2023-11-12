@@ -60,12 +60,18 @@ Since 0.3."
 
 ;; Autoloads.
 
+(defun eldev--autoloads-source-dir ()
+  (if eldev-project-source-dirs (file-name-as-directory (car eldev-project-source-dirs)) ""))
+
 (defvar eldev--collect-autoloads-from
-  '(:and eldev-main-fileset
-         ;; Have to duplicate `autoload' logic here.  I have no idea why it discards files
-         ;; with `=' at the front, but we need to do the same to remain compatible with
-         ;; installed packages.
-         ("./*.el" "./*.el.gz" "!./.*" "!./=*")))
+  ;; FIXME: Here we explicitly use only one (the first) source directory.  Should that be
+  ;;        changed?
+  (let ((source-dir (eldev--autoloads-source-dir)))
+    `(:and eldev-main-fileset
+           ;; Have to duplicate `autoload' logic here (moved to `loaddefs-gen' in later
+           ;; Emacs versions).  I have no idea why it discards files with `=' at the front,
+           ;; but we need to do the same to remain compatible with installed packages.
+           (,(format "./%s*.el" source-dir) ,(format "./%s*.el.gz" source-dir) ,(format "!./%s.*" source-dir) ,(format "!./%s=*" source-dir)))))
 
 (defvar elisp-lint--autoloads-filename)
 
@@ -101,34 +107,35 @@ out-of-date."
     :message        target
     :source-files   eldev--collect-autoloads-from
     :targets        (lambda (_sources)
-                      (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
+                      (format "%s%s-autoloads.el" (eldev--autoloads-source-dir) (package-desc-name (eldev-package-descriptor))))
     :define-cleaner (eldev-cleaner-autoloads
                      "Delete the generated package autoloads files."
                      :default t)
     :collect        (":default" ":autoloads")
     ;; To make sure that `update-directory-autoloads' doesn't grab files it shouldn't,
     ;; override `directory-files' temporarily.
-    (eldev-advised (#'directory-files :around (lambda (original directory &rest arguments)
-                                                (let ((files (apply original directory arguments)))
-                                                  (if (file-equal-p directory eldev-project-dir)
-                                                      (let (filtered)
-                                                        (dolist (file files)
-                                                          (when (eldev-any-p (file-equal-p file it) sources)
-                                                            (push file filtered)))
-                                                        (nreverse filtered))
-                                                    files))))
-      (let ((inhibit-message   t)
-            (make-backup-files nil))
-        (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) eldev-project-dir)
-        ;; Always load the generated file.  Maybe there are cases when we don't need that,
-        ;; but most of the time we do.
-        (eldev--load-autoloads-file (expand-file-name target eldev-project-dir)))))
+    (let ((effective-dir (expand-file-name (eldev--autoloads-source-dir) eldev-project-dir)))
+      (eldev-advised (#'directory-files :around (lambda (original directory &rest arguments)
+                                                  (let ((files (apply original directory arguments)))
+                                                    (if (file-equal-p directory effective-dir)
+                                                        (let (filtered)
+                                                          (dolist (file files)
+                                                            (when (eldev-any-p (file-equal-p file it) sources)
+                                                              (push file filtered)))
+                                                          (nreverse filtered))
+                                                      files))))
+        (let ((inhibit-message   t)
+              (make-backup-files nil))
+          (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) effective-dir)
+          ;; Always load the generated file.  Maybe there are cases when we don't need that,
+          ;; but most of the time we do.
+          (eldev--load-autoloads-file (expand-file-name target eldev-project-dir))))))
   (add-hook 'eldev-before-loading-dependencies-hook
             (lambda (type _additional-sets)
               (when (and type (not (eq type 'load-only)))
                 (eldev-with-verbosity-level-except 'quiet (#'eldev-load-project-dependencies #'eldev-load-extra-dependencies)
                   (eldev-build ":autoloads")))))
-  (let* ((autoloads-el    (format "%s-autoloads.el" (package-desc-name (eldev-package-descriptor))))
+  (let* ((autoloads-el    (format "%s%s-autoloads.el" (eldev--autoloads-source-dir) (package-desc-name (eldev-package-descriptor))))
          (as-dependencies `((depends-on ,autoloads-el))))
     (setf eldev-standard-excludes `(:or ,eldev-standard-excludes ,(format "./%s" autoloads-el)))
     ;; FIXME: Or maybe make this optional?  However, if autoloads file is already present,

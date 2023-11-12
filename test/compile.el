@@ -3,6 +3,13 @@
 (require 'test/common)
 
 
+(defun eldev--test-on-demand-to-loading-mode-option (on-demand)
+  (eldev-pcase-exhaustive on-demand
+    (`nil    "--as-is")
+    (`normal "--compiled-on-demand")
+    (`noisy  "--noisy-compiled-on-demand")))
+
+
 (ert-deftest eldev-compile-everything-1 ()
   (eldev--test-without-files "trivial-project" "trivial-project.elc"
     (eldev--test-run nil ("compile")
@@ -32,11 +39,7 @@
 (eldev-ert-defargtest eldev-compile-everything-5 (on-demand)
                       (nil 'normal 'noisy)
   (eldev--test-without-files "project-d" ("project-d.elc" "project-d-misc.elc" "project-d-util.elc")
-    (eldev--test-run nil ((eldev-pcase-exhaustive on-demand
-                            (`nil    "--as-is")
-                            (`normal "--compiled-on-demand")
-                            (`noisy  "--noisy-compiled-on-demand"))
-                          "compile")
+    (eldev--test-run nil ((eldev--test-on-demand-to-loading-mode-option on-demand) "compile")
       (eldev--test-assert-files project-dir preexisting-files "project-d.elc" "project-d-misc.elc" "project-d-util.elc")
       (should (= exit-code 0)))))
 
@@ -45,12 +48,16 @@
   ;; `project-e' contains files that must be loaded before
   ;; compilation.
   (eldev--test-without-files "project-e" ("project-e.elc" "project-e-misc.elc" "project-e-util.elc")
-    (eldev--test-run nil ((eldev-pcase-exhaustive on-demand
-                            (`nil    "--as-is")
-                            (`normal "--compiled-on-demand")
-                            (`noisy  "--noisy-compiled-on-demand"))
-                          "compile" "--load-before-compiling")
+    (eldev--test-run nil ((eldev--test-on-demand-to-loading-mode-option on-demand) "compile" "--load-before-compiling")
       (eldev--test-assert-files project-dir preexisting-files "project-e.elc" "project-e-misc.elc" "project-e-util.elc")
+      (should (= exit-code 0)))))
+
+(eldev-ert-defargtest eldev-compile-everything-7 (on-demand)
+                      (nil 'normal 'noisy)
+  ;; `project-l' has special source directories.
+  (eldev--test-without-files "project-l" ("src/project-l.elc" "src/project-l-misc.elc" "src/project-l-util.elc")
+    (eldev--test-run nil ((eldev--test-on-demand-to-loading-mode-option on-demand) "compile")
+      (eldev--test-assert-files project-dir preexisting-files "src/project-l.elc" "src/project-l-misc.elc" "src/project-l-util.elc")
       (should (= exit-code 0)))))
 
 

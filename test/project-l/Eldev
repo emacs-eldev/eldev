@@ -1,0 +1,6 @@
+(setf eldev-project-source-dirs '("src" "resources")
+      eldev-files-to-package `(:or ,eldev-files-to-package '("resources/**/*.txt")))
+
+(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
+
+(eldev-use-plugin 'autoloads)

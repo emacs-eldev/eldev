@@ -758,7 +758,8 @@ possible to build arbitrary targets this way."
   (let* ((package           (eldev-package-descriptor))
          (pretended-version (or eldev-package-forced-version (package-desc-version package)))
          (package-target    (car targets))
-         (entry-target      (cadr targets)))
+         (entry-target      (cadr targets))
+         (source-dirs       (when eldev-project-source-dirs (eldev-project-source-dirs))))
     ;; Hardly anyone would make an entry without the package, but let's check.
     (when (memq (eldev-build-target-status package-target) '(planned building))
       (if (cdr sources)
@@ -769,12 +770,37 @@ possible to build arbitrary targets this way."
                  (descriptor-file  (eldev-package-descriptor-file-name))
                  temporary-descriptor
                  files-to-tar)
-            (condition-case nil
-                (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir))
-              (file-error
-               (let ((working-dir-pkg (expand-file-name name-version working-dir)))
-                 (copy-directory eldev-project-dir working-dir-pkg t t t))))
-            (make-directory (file-name-directory package-target) t)
+            (if (unless source-dirs
+                  ;; If the project has no special source subdirectories, try simply
+                  ;; symlinking the whole directory at once.
+                  (condition-case nil
+                      (progn (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir)) t)
+                    (file-error)))
+                (dolist (source sources)
+                  (push (concat name-version-dir source) files-to-tar))
+              ;; Either source directories are involved, or symlinking failed for whatever
+              ;; reason.  Create filetree for the package.
+              (let ((working-dir-pkg (expand-file-name name-version working-dir))
+                    created-dirs)
+                (mkdir working-dir-pkg)
+                (dolist (source sources)
+                  (let* ((path-within-source-dir (catch 'found
+                                                   (dolist (source-dir source-dirs)
+                                                     (when (file-in-directory-p source source-dir)
+                                                       (throw 'found (file-relative-name source source-dir))))
+                                                   (error "File `%s' is to be added to the package, but is not contained in any of `eldev-project-source-dirs'" source)))
+                         (subdirectory           (file-name-directory path-within-source-dir)))
+                    (let ((source-abspath (expand-file-name source eldev-project-dir))
+                          (target-abspath (expand-file-name path-within-source-dir working-dir-pkg)))
+                      (when subdirectory
+                        (unless (member subdirectory created-dirs)
+                          (mkdir (file-name-directory target-abspath) t)
+                          (push subdirectory created-dirs)))
+                      (unless (condition-case nil
+                                  (progn (add-name-to-file source-abspath target-abspath) t)
+                                (file-error))
+                        (copy-file source-abspath target-abspath)))
+                    (push (concat name-version-dir path-within-source-dir) files-to-tar)))))
             (unless (file-exists-p descriptor-file)
               (with-temp-file (expand-file-name descriptor-file (expand-file-name name-version-dir working-dir))
                 (insert "; -*- no-byte-compile: t -*-\n")
@@ -790,10 +816,9 @@ possible to build arbitrary targets this way."
               (setf temporary-descriptor t))
             (when (or temporary-descriptor (not (member descriptor-file sources)))
               (push (concat name-version-dir descriptor-file) files-to-tar))
-            (dolist (source sources)
-              (push (concat name-version-dir source) files-to-tar))
             ;; Note that `file-name-as-directory' is important on older Emacs versions,
             ;; otherwise `tar' will be executed from `/tmp'.
+            (make-directory (file-name-directory package-target) t)
             (let ((default-directory (file-name-as-directory working-dir)))
               (eldev-verbose "%s" (eldev-message-enumerate-files "Packaging the following file%s: %s (%d)" sources))
               (eldev-call-process (eldev-tar-executable) `("-cf" ,(expand-file-name package-target eldev-project-dir) ,@(nreverse files-to-tar))
