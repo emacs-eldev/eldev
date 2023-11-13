@@ -770,12 +770,14 @@ possible to build arbitrary targets this way."
                  (descriptor-file  (eldev-package-descriptor-file-name))
                  (descriptor-entry (concat name-version-dir descriptor-file))
                  temporary-descriptor
+                 symlinked-dir
                  files-to-tar)
             (if (unless source-dirs
                   ;; If the project has no special source subdirectories, try simply
                   ;; symlinking the whole directory at once.
                   (condition-case nil
-                      (progn (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir)) t)
+                      (progn (make-symbolic-link eldev-project-dir (expand-file-name name-version working-dir))
+                             (setf symlinked-dir t))
                     (file-error)))
                 (dolist (source sources)
                   (push (concat name-version-dir source) files-to-tar))
@@ -837,8 +839,8 @@ possible to build arbitrary targets this way."
                 (when (/= exit-code 0)
                   (signal 'eldev-build-failed `("Failed to create package tarball `%s'" ,package-target)))))
             ;; Note that if packaging fails, `working-dir' and `descriptor-file' are not
-            ;; deleted.  This is intentional.
-            (when temporary-descriptor
+            ;; deleted.  This is intentional, so that failed "remains" can be investigated.
+            (when (and temporary-descriptor symlinked-dir)
               (delete-file descriptor-file))
             (delete-directory working-dir t))
         ;; Single-file package.
