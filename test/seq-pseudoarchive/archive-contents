@@ -1,0 +1,2 @@
+(1
+ (seq . [(99999999 9999) nil "Fake upgrade for built-in package `seq'" tar nil]))

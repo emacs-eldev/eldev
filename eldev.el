@@ -2452,7 +2452,12 @@ Since 0.2."
                                                                     (unwind-protect
                                                                         (apply original etc)
                                                                       (setf inside-load was-inside)))))
-                                    (apply original pkg-desc etc)))))))
+                                    ;; Workaround for Emacs bug with built-in packages described in
+                                    ;; https://github.com/emacs-eldev/eldev/issues/93.
+                                    (let ((load-path load-path))
+                                      (unless (member dir load-path)
+                                        (push dir load-path))
+                                      (apply original pkg-desc etc))))))))
     (eldev--do-install-or-upgrade-dependencies core additional-sets to-be-upgraded dry-run activate main-command-effect no-error-if-missing)))
 
 (defun eldev--do-install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)

@@ -69,4 +69,15 @@
   (eldev-vc-detect "/"))
 
 
+(eldev-ert-defargtest eldev-emacs-bug-67025 (with-debug)
+                      (nil t)
+  (let ((eldev--test-project "project-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--setup" `(eldev-use-package-archive `("seq-pseudoarchive" . ,(expand-file-name "../seq-pseudoarchive")))
+                          "--setup" `(eldev-add-extra-dependencies 'exec '(:package seq :version "99999999"))
+                          (if with-debug "--debug" "--no-debug") "exec" 1)
+      (should (string= stdout ""))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/integration/misc)
