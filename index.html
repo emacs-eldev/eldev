@@ -480,6 +480,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#loading-modes">Loading modes</a>
 <ul class="sectlevel2">
+<li><a href="#source-directory">Project source directory</a></li>
 <li><a href="#autoloads">Autoloads</a></li>
 </ul>
 </li>
@@ -1815,6 +1816,45 @@ You can always ask Eldev for a full list:</p>
 <div class="literalblock">
 <div class="content">
 <pre>$ eldev --list-modes</pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="source-directory">Project source directory</h3>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.8-8be" alt="Since 1.8"></span> Usually Elisp projects contain their source files directly
+in the root directory.  For smaller projects with one or a few files
+this is the most convenient setup.  Eldev assumes this is as the
+default and effectively just adds project directory to <code>load-path</code>
+when making project’s features available for loading in Emacs.</p>
+</div>
+<div class="paragraph">
+<p>However, some bigger projects instead collect the source files in a
+subdirectory, to avoid having too many entries at the top, which could
+distract from other root contents, or simply make the root directory
+view so large that “README” text after it is buried somewhere deep
+down.  One example of such a project is <a href="https://github.com/magit/magit">Magit</a>.</p>
+</div>
+<div class="paragraph">
+<p>It’s easy to configure Eldev to understand such a layout.  Simply add
+the following to project’s file <code>Eldev</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(setf eldev-project-source-dirs "lisp")</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>As the name of the variable implies, you can also have <em>several</em>
+subdirectories if you want.  For example, for project resources:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(setf eldev-project-source-dirs '("lisp" "resources"))</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Directory names are not fixed and can be anything.  Another option
+could be <code>src</code>, for example.</p>
 </div>
 </div>
 <div class="sect2">
@@ -5051,7 +5091,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-10-29 17:00:49 UTC
+Last updated 2023-11-15 18:28:23 UTC
 </div>
 </div>
 </body>
