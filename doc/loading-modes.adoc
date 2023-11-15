@@ -94,6 +94,40 @@ You can always ask Eldev for a full list:
 
     $ eldev --list-modes
 
+[#source-directory]
+=== Project source directory
+
+{since-1-8} Usually Elisp projects contain their source files directly
+in the root directory.  For smaller projects with one or a few files
+this is the most convenient setup.  Eldev assumes this is as the
+default and effectively just adds project directory to `load-path`
+when making project’s features available for loading in Emacs.
+
+However, some bigger projects instead collect the source files in a
+subdirectory, to avoid having too many entries at the top, which could
+distract from other root contents, or simply make the root directory
+view so large that “README” text after it is buried somewhere deep
+down.  One example of such a project is {uri-magit}[Magit].
+
+It’s easy to configure Eldev to understand such a layout.  Simply add
+the following to project’s file `Eldev`:
+
+[source]
+----
+(setf eldev-project-source-dirs "lisp")
+----
+
+As the name of the variable implies, you can also have _several_
+subdirectories if you want.  For example, for project resources:
+
+[source]
+----
+(setf eldev-project-source-dirs '("lisp" "resources"))
+----
+
+Directory names are not fixed and can be anything.  Another option
+could be `src`, for example.
+
 [#autoloads]
 === Autoloads
 
