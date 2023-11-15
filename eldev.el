@@ -1043,6 +1043,7 @@ Used by Eldev startup script."
 
 ;; See https://debbugs.gnu.org/db/65/65763.html.  Even if they "decide whether this will be the solution" in a
 ;; year, this bug is still present in released Emacs versions.
+(declare-function vc-refresh-state nil)  ; For Emacs 24.
 (defun eldev--work-around-emacs-bug-65763 ()
   ;; Don't reset `debug-on-error' for random calls, this might in theory affect something in an undesired way.
   ;; Suppressing the warning too.  No-one asked for anything here, just open the file, ffs.
