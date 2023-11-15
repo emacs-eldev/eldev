@@ -1931,11 +1931,11 @@ Since 1.2."
 (defvar eldev-project-source-dirs nil
   "Subdirectory or several actually containing project source code.
 If the source files lie directly in the project root (as is the
-case in most smaller projects), this doesn't need to be set.
-However, if there is a subdirectory, e.g. `lisp' or `src', where
-the sources are contained, `eldev-project-source-dirs' must be
-set in file `Eldev' to its name.  The value may also be a list of
-subdirectories, if e.g. some resource files that need to in
+case in nearly all smaller projects), this doesn't need to be
+set.  However, if there is a subdirectory, e.g. `lisp' or `src',
+where the sources are contained, `eldev-project-source-dirs' must
+be set in file `Eldev' to its name.  The value may also be a list
+of subdirectories, if e.g. some resource files that need to in
 `load-path' during development are contained in yet another
 subdirectory.
 
@@ -2029,7 +2029,11 @@ Since 0.2.")
             (delete-directory temp-dir t)))))))
 
 (defun eldev-project-source-dirs ()
-  "DONOTRELEASE: Document.
+  "List of absolute paths of project source directories.
+This is similar to variable `eldev-project-source-dirs', but is
+always a list of at least one item and contains absolute rather
+than relative paths.  If the variable is not set for a project,
+this is a list with the expanded value `eldev-project-dir'.
 
 Since 1.8."
   (mapcar (lambda (dir) (file-name-as-directory (expand-file-name dir eldev-project-dir))) (eldev-listify (or eldev-project-source-dirs "."))))
