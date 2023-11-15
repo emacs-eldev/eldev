@@ -69,6 +69,7 @@
   (eldev-vc-detect "/"))
 
 
+;; https://debbugs.gnu.org/db/67/67025.html
 (eldev-ert-defargtest eldev-emacs-bug-67025 (with-debug)
                       (nil t)
   (let ((eldev--test-project "project-a"))
@@ -78,6 +79,21 @@
                           (if with-debug "--debug" "--no-debug") "exec" 1)
       (should (string= stdout ""))
       (should (= exit-code 0)))))
+
+;; https://debbugs.gnu.org/db/65/65763.html
+(eldev-ert-defargtest eldev-emacs-bug-65763 (with-debug)
+                      (nil t)
+  (eval-and-compile (require 'vc-git))
+  (let ((debug-on-error  with-debug)
+        (vc-git-program  "im-not-installed-for-sure"))
+    (condition-case error
+        (let ((dir (eldev--test-tmp-subdir "emacs-bug-65763")))
+          (mkdir dir t)
+          ;; Using a random filename, else Emacs might cache VC-related data between tests.
+          (with-current-buffer (find-file-noselect (expand-file-name (format "whatever-%s.txt" (random)) dir) t)
+            (insert "bla bla bla")
+            (save-buffer)))
+      (error (ert-fail error)))))
 
 
 (provide 'test/integration/misc)

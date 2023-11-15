@@ -930,6 +930,7 @@ Used by Eldev startup script."
   ;; We parse command line in a way separate from `command-line-args' and
   ;; `command-line-args-left', but whatever code we execute from here should believe there
   ;; are no arguments left.
+  (eldev--work-around-emacs-bug-65763)
   (let (command-line-args-left
         command
         eldev-too-old
@@ -1039,6 +1040,19 @@ Used by Eldev startup script."
         (setf eldev-too-old (cddr eldev-too-old)))
       (eldev-warn "%s" (apply #'eldev-format-message eldev-too-old)))
     (or exit-code 1)))
+
+;; See https://debbugs.gnu.org/db/65/65763.html.  Even if they "decide whether this will be the solution" in a
+;; year, this bug is still present in released Emacs versions.
+(defun eldev--work-around-emacs-bug-65763 ()
+  ;; Don't reset `debug-on-error' for random calls, this might in theory affect something in an undesired way.
+  ;; Suppressing the warning too.  No-one asked for anything here, just open the file, ffs.
+  (let ((at (memq 'vc-refresh-state find-file-hook)))
+    (when at
+      (setf (car at) (lambda () (let ((debug-on-error nil) (inhibit-message t)) (vc-refresh-state))))))
+  (advice-add 'save-buffer :around (lambda (original &rest args)
+                                     (eldev-advised ('vc-before-save :around (lambda (original &rest args)
+                                                                               (let ((debug-on-error nil) (inhibit-message t)) (apply original args))))
+                                       (apply original args)))))
 
 (defmacro eldev-named-step (type name &rest body)
   "Execute BODY as a named step of given TYPE.
