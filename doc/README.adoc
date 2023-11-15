@@ -29,6 +29,7 @@
 :uri-relint: https://github.com/mattiase/relint
 :uri-elisp-lint: https://github.com/gonewest818/elisp-lint/
 :uri-projectile: https://github.com/bbatsov/projectile
+:uri-magit: https://github.com/magit/magit
 :uri-github-wflows: https://help.github.com/en/actions
 :uri-github-wflows-vars: https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
 :uri-travis: https://travis-ci.org/
@@ -66,6 +67,7 @@
 :since-1-5: image:https://img.shields.io/badge/since-1.5-8be[Since 1.5,float=right]
 :since-1-6: image:https://img.shields.io/badge/since-1.6-8be[Since 1.6,float=right]
 :since-1-7: image:https://img.shields.io/badge/since-1.7-8be[Since 1.7,float=right]
+:since-1-8: image:https://img.shields.io/badge/since-1.8-8be[Since 1.8,float=right]
 
 
 toc::[]
