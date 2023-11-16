@@ -1,7 +1,7 @@
 ;;; project-l.el --- Test project where source code is contained in a subdirectory of project root; and with autoloads
 
 ;; Version: 1.0
-;; Package-Requires: ((dependency-a "0.1"))
+;; Package-Requires: ((dependency-a "0.1") (dependency-d "1.0"))
 ;; Homepage: https://example.com/
 
 ;;; Commentary:

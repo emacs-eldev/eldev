@@ -64,11 +64,28 @@
 (ert-deftest eldev-autoloads-6 ()
   ;; This project has special source directories and activates `autoloads' plugin.
   (let ((eldev--test-project "project-l"))
+    (eldev--test-delete-cache)
     (eldev--test-run nil ("eval" "--dont-require" `(project-l-hello))
       (should (string= stdout "\"Hello\"\n"))
       (should (= exit-code 0)))
     (eldev--test-run nil ("eval" "--dont-require" `(project-l-misc-hello))
       (should (string= stdout "\"Hello\"\n"))
+      (should (= exit-code 0)))
+    ;; It's a dependency of the project, and also has autoloaded functions.
+    (eldev--test-run nil ("eval" "--dont-require" `(dependency-d-autoloaded) `(dependency-d-stable))
+      (should (string= stdout (eldev--test-lines "\"Loaded automatically\"" "t")))
+      (should (= exit-code 0)))
+    ;; Make sure this works also with local dependencies.
+    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-d")
+                          "eval" "--dont-require" `(dependency-d-autoloaded) `(dependency-d-stable))
+      (should (string= stdout (eldev--test-lines "\"Loaded automatically\"" "nil")))
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-autoloads-7 ()
+  ;; This dependency library has a special source directory and activates `autoloads' plugin.
+  (let ((eldev--test-project "dependency-d"))
+    (eldev--test-run nil ("eval" "--dont-require" `(dependency-d-autoloaded))
+      (should (string= stdout "\"Loaded automatically\"\n"))
       (should (= exit-code 0)))))
 
 

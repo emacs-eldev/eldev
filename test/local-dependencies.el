@@ -50,6 +50,23 @@
       (should (string= stdout (eldev--test-lines "t" "t" "(1 0)" "(1 0)")))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-local-dependencies-3 ()
+  (let ((eldev--test-project "project-l"))
+    (eldev--test-delete-cache)
+    ;; `dependency-d' uses a source directory.  Make sure it is handled correctly when it
+    ;; is loaded as a local.  Explicitly requiring the dependency feature since the
+    ;; project doesn't do that for autoload testing.
+    (eldev--test-run nil ("--quiet" "eval" `(progn (require 'dependency-d) (dependency-d-stable)) `(package-desc-version (eldev-find-package-descriptor 'dependency-d)))
+      (should (string= stdout (eldev--test-lines "t" "(1 0)")))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-d")
+                          "eval" `(progn (require 'dependency-d) (dependency-d-stable)) `(package-desc-version (eldev-find-package-descriptor 'dependency-d)))
+      (should (string= stdout (eldev--test-lines "nil" "(1 0 99)")))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--quiet" "eval" `(progn (require 'dependency-d) (dependency-d-stable)) `(package-desc-version (eldev-find-package-descriptor 'dependency-d)))
+      (should (string= stdout (eldev--test-lines "t" "(1 0)")))
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-local-dependency-fixes-missing-dependency-1 ()
   (eldev--test-run "dependency-a" ("clean")

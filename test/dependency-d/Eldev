@@ -1,0 +1,3 @@
+(setf eldev-project-source-dirs "lisp")
+
+(eldev-use-plugin 'autoloads)

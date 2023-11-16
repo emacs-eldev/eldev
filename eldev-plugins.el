@@ -61,7 +61,7 @@ Since 0.3."
 ;; Autoloads.
 
 (defun eldev--autoloads-source-dir ()
-  (if eldev-project-source-dirs (file-name-as-directory (car eldev-project-source-dirs)) ""))
+  (if eldev-project-source-dirs (file-name-as-directory (car (eldev-listify eldev-project-source-dirs))) ""))
 
 (defvar eldev--collect-autoloads-from
   ;; FIXME: Here we explicitly use only one (the first) source directory.  Should that be

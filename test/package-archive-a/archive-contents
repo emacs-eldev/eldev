@@ -1,6 +1,7 @@
 (1
  (dependency-a . [(1 0) nil "Dependency test package A" single nil])
  (dependency-b . [(1 0) ((dependency-a (0))) "Dependency test package B" single nil])
+ (dependency-d . [(1 0) nil "Dependency test package D with a special source directory" single nil])
  (dummy-lint . [(1 0) nil "Dummy linter" single nil])
  (misc-a . [(1 0) nil "Miscellaneous package A" single nil])
  (project-i . [(1 0) nil "Test project with autoload cookies in multiple files" tar nil])
