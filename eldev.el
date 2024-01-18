@@ -3714,7 +3714,16 @@ mode output is restricted to just the version."
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
   (let* ((package     (eldev-package-descriptor))
-         (description (when (fboundp 'package--get-description) (package--get-description package))))
+         (description (when (fboundp 'package--get-description)
+                        (condition-case nil
+                            (package--get-description package)
+                          ;; package--get-description will only look at the root directory,
+                          ;; thus not finding the project description file if source directories are used.
+                          ;; Repeat its call to lm-commentary manually with first source directory.
+                          (file-missing (let ((source-dirs (eldev--cross-project-internal-eval eldev-project-dir '(eldev-project-source-dirs) t)))
+                                          (eval-and-compile (require 'lisp-mnt))
+                                          (lm-commentary (expand-file-name
+                                                          (format "%s.el" (package-desc-name package)) (car source-dirs)))))))))
     (unless (> (length description) 0)
       (setf description (package-desc-summary package)))
     (eldev-output "%s %s" (eldev-colorize (package-desc-name package) 'name) (eldev-message-version package))
