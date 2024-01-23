@@ -26,7 +26,7 @@ jobs:
           - os: macos-latest
             emacs_version: '29.2'
           - os: windows-latest
-            emacs_version: '29.1'
+            emacs_version: '29.2'
 
     steps:
     - name: Set up Emacs
