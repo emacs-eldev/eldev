@@ -683,10 +683,11 @@ collection.</p>
 <i class="fa icon-tip" title="Tip"></i>
 </td>
 <td class="content">
-If you are using <a href="https://www.flycheck.org/">Flycheck</a>, check out
-<a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a> package.  It provides integration
-between Flycheck and Eldev, allowing the former to automatically use
-proper dependencies in Eldev projects.
+If you are using <a href="https://www.flycheck.org/">Flycheck</a> or
+<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Flymake.html">Flymake</a>, check out <a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a>
+or, correspondingly, <a href="https://github.com/emacs-eldev/flymake-eldev">flymake-eldev</a> package.  They
+provide integration between Flycheck/Flymake and Eldev, allowing the
+former to automatically use proper dependencies in Eldev projects.
 </td>
 </tr>
 </table>
@@ -708,7 +709,7 @@ think real-world usage provides better models.</p>
 nothing in its <code>Eldev</code>.  The file is actually not even needed, it
 is only there to signify that Eldev can be used on the project and
 for some tools (<a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a>,
-<a href="https://github.com/bbatsov/projectile">Projectile</a>).</p>
+<a href="https://github.com/emacs-eldev/flymake-eldev">flymake-eldev</a>, <a href="https://github.com/bbatsov/projectile">Projectile</a>).</p>
 </dd>
 <dt class="hdlist1"><a href="https://github.com/doublep/iter2"><code>iter2</code></a>; its file <a href="https://github.com/doublep/iter2/blob/master/Eldev"><code>Eldev</code></a>; its file <a href="https://github.com/doublep/iter2/blob/master/.github/workflows/test.yml"><code>.github/workflows/test.yml</code></a></dt>
 <dd>
@@ -1026,10 +1027,10 @@ thus executing arbitrary code.</p>
 <div class="paragraph">
 <p>Even seemingly harmless things, like opening a <code>.el</code> file in Emacs can
 lead to unforeseen consequences.  If you e.g. have
-<a href="https://www.flycheck.org/">Flycheck</a> enabled everywhere, this will result in
-byte-compiling said file, which also can execute arbitrary code, for
-example using <code>(eval-when-compile &#8230;&#8203;)</code> form.  The same holds for
-installing (not even using!) Elisp packages.</p>
+<a href="https://www.flycheck.org/">Flycheck</a> or <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Flymake.html">Flymake</a> enabled everywhere,
+this will result in byte-compiling said file, which also can execute
+arbitrary code, for example using <code>(eval-when-compile &#8230;&#8203;)</code> form.  The
+same holds for installing (not even using!) Elisp packages.</p>
 </div>
 <div class="paragraph">
 <p>Only use build tools on code that you trust.  Better yet, don’t even
@@ -1092,8 +1093,8 @@ so to Gradle’s <code>build.gradle</code>: because it is a program.  File <code
 is not strictly required, but nearly all projects will have one.  It
 is also generally recommended to create it even if empty, because
 otherwise some tools (e.g. <a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a>,
-<a href="https://github.com/bbatsov/projectile">Projectile</a>) will not recognize the project as
-Eldev-based without it.</p>
+<a href="https://github.com/emacs-eldev/flymake-eldev">flymake-eldev</a>, <a href="https://github.com/bbatsov/projectile">Projectile</a>) will
+not recognize the project as Eldev-based without it.</p>
 </div>
 <div class="paragraph">
 <p>You can create the file in your project manually, but it is easier to
@@ -2930,7 +2931,8 @@ will then not recognize the project as using Eldev.</p>
 <dd>
 <p>Earlier examples would add <code>no-byte-compile</code>
 to file <code>Eldev</code>, which is now not recommended.  E.g. it would prevent
-<a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a> from checking the file.</p>
+<a href="https://github.com/flycheck/flycheck-eldev">flycheck-eldev</a> and
+<a href="https://github.com/emacs-eldev/flymake-eldev">flymake-eldev</a> from checking the file.</p>
 </dd>
 <dt class="hdlist1"><code>explicit-main-file</code></dt>
 <dd>
@@ -5091,7 +5093,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2023-11-15 18:28:23 UTC
+Last updated 2024-01-23 19:42:30 UTC
 </div>
 </div>
 </body>
