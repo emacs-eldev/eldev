@@ -176,9 +176,9 @@ or “NO”, depending on `ok'."
     `(result   nil
       warnings ,(eldev-format-message "\
 It is recommended to have file `%s' in your project root if you use Eldev.
-Otherwise, certain tools (e.g. Projectile or `flycheck-eldev') won't consider
-your project to be Eldev-based.  It is even fine to have a completely empty
-file if you don't have anything to configure or customize." eldev-file))))
+Otherwise, certain tools (e.g. Projectile, `flycheck-eldev' or `flymake-eldev')
+won't consider your project to be Eldev-based.  It is even fine to have a
+completely empty file if you don't have anything to configure or customize." eldev-file))))
 
 (defvar no-byte-compile)
 

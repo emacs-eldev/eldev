@@ -14,10 +14,10 @@ thus executing arbitrary code.
 
 Even seemingly harmless things, like opening a `.el` file in Emacs can
 lead to unforeseen consequences.  If you e.g. have
-{uri-flycheck}[Flycheck] enabled everywhere, this will result in
-byte-compiling said file, which also can execute arbitrary code, for
-example using `(eval-when-compile ...)` form.  The same holds for
-installing (not even using!) Elisp packages.
+{uri-flycheck}[Flycheck] or {uri-flymake}[Flymake] enabled everywhere,
+this will result in byte-compiling said file, which also can execute
+arbitrary code, for example using `(eval-when-compile ...)` form.  The
+same holds for installing (not even using!) Elisp packages.
 
 Only use build tools on code that you trust.  Better yet, don’t even
 touch code that you don’t plan running.

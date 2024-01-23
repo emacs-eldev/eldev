@@ -82,7 +82,8 @@ to run Eldev on projects that don’t have it, but some external tools
 will then not recognize the project as using Eldev.
 `eldev-byte-compilable`:: Earlier examples would add `no-byte-compile`
 to file `Eldev`, which is now not recommended.  E.g. it would prevent
-{uri-flycheck-eldev}[flycheck-eldev] from checking the file.
+{uri-flycheck-eldev}[flycheck-eldev] and
+{uri-flymake-eldev}[flymake-eldev] from checking the file.
 `explicit-main-file`:: Some projects have package headers in multiple
 files, which could confuse Emacs packaging system.  If you have such
 headers only in one file, this test won’t complain.

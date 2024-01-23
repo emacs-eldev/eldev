@@ -8,8 +8,8 @@ so to Gradle’s `build.gradle`: because it is a program.  File `Eldev`
 is not strictly required, but nearly all projects will have one.  It
 is also generally recommended to create it even if empty, because
 otherwise some tools (e.g. {uri-flycheck-eldev}[flycheck-eldev],
-{uri-projectile}[Projectile]) will not recognize the project as
-Eldev-based without it.
+{uri-flymake-eldev}[flymake-eldev], {uri-projectile}[Projectile]) will
+not recognize the project as Eldev-based without it.
 
 You can create the file in your project manually, but it is easier to
 just let Eldev itself do it for you, especially the first time:

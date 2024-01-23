@@ -49,10 +49,11 @@ Eldev is not widely used, but as of August 2022 there are
 Additionally, Eldev contains a fairly large regression test
 collection.
 
-TIP: If you are using {uri-flycheck}[Flycheck], check out
-{uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
-between Flycheck and Eldev, allowing the former to automatically use
-proper dependencies in Eldev projects.
+TIP: If you are using {uri-flycheck}[Flycheck] or
+{uri-flymake}[Flymake], check out {uri-flycheck-eldev}[flycheck-eldev]
+or, correspondingly, {uri-flymake-eldev}[flymake-eldev] package.  They
+provide integration between Flycheck/Flymake and Eldev, allowing the
+former to automatically use proper dependencies in Eldev projects.
 
 [#example-projects]
 === Example projects
@@ -69,7 +70,7 @@ think real-world usage provides better models.
     nothing in its `Eldev`.  The file is actually not even needed, it
     is only there to signify that Eldev can be used on the project and
     for some tools ({uri-flycheck-eldev}[flycheck-eldev],
-    {uri-projectile}[Projectile]).
+    {uri-flymake-eldev}[flymake-eldev], {uri-projectile}[Projectile]).
 
 {uri-iter2}[`iter2`]; its file {uri-iter2}/blob/master/Eldev[`Eldev`]; its file {uri-iter2}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 

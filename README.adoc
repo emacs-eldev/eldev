@@ -11,6 +11,8 @@ endif::[]
 :uri-xdg: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
+:uri-flymake: https://www.gnu.org/software/emacs/manual/html_node/emacs/Flymake.html
+:uri-flymake-eldev: https://github.com/emacs-eldev/flymake-eldev
 
 // Some text duplication with the full documentation is expected here.
 
@@ -85,10 +87,11 @@ Eldev source code itself comes with no examples, but there is a short
 {uri-documentation}#example-projects[list of real-world projects] in
 the documentation.
 
-TIP: If you are using {uri-flycheck}[Flycheck], check out
-{uri-flycheck-eldev}[flycheck-eldev] package.  It provides integration
-between Flycheck and Eldev, allowing the former to automatically use
-proper dependencies in Eldev projects.
+TIP: If you are using {uri-flycheck}[Flycheck] or
+{uri-flymake}[Flymake], check out {uri-flycheck-eldev}[flycheck-eldev]
+or, correspondingly, {uri-flymake-eldev}[flymake-eldev] package.  They
+provide integration between Flycheck/Flymake and Eldev, allowing the
+former to automatically use proper dependencies in Eldev projects.
 
 
 == Installation
@@ -125,10 +128,10 @@ thus executing arbitrary code.
 
 Even seemingly harmless things, like opening a `.el` file in Emacs can
 lead to unforeseen consequences.  If you e.g. have
-{uri-flycheck}[Flycheck] enabled everywhere, this will result in
-byte-compiling said file, which also can execute arbitrary code, for
-example using `(eval-when-compile ...)` form.  The same holds for
-installing (not even using!) Elisp packages.
+{uri-flycheck}[Flycheck] or {uri-flymake}[Flymake] enabled everywhere,
+this will result in byte-compiling said file, which also can execute
+arbitrary code, for example using `(eval-when-compile ...)` form.  The
+same holds for installing (not even using!) Elisp packages.
 
 Only use build tools on code that you trust.  Better yet, don’t even
 touch code that you don’t plan running.

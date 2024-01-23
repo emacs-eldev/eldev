@@ -12,6 +12,8 @@
 :uri-git-hooks: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks#_git_hooks
 :uri-flycheck: https://www.flycheck.org/
 :uri-flycheck-eldev: https://github.com/flycheck/flycheck-eldev
+:uri-flymake: https://www.gnu.org/software/emacs/manual/html_node/emacs/Flymake.html
+:uri-flymake-eldev: https://github.com/emacs-eldev/flymake-eldev
 :uri-ert: https://www.gnu.org/software/emacs/manual/html_node/ert/index.html
 :uri-ert-sel: https://www.gnu.org/software/emacs/manual/html_node/ert/Test-Selectors.html
 :uri-buttercup: https://github.com/jorgenschaefer/emacs-buttercup
