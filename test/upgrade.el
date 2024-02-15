@@ -256,4 +256,12 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-upgrade-disabled-dependencies ()
+  (let ((eldev--test-project "project-a"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--disable-dependencies" "upgrade")
+      (should (string-match-p "standard dependency management is disabled" stderr))
+      (should (= exit-code 1)))))
+
+
 (provide 'test/upgrade)

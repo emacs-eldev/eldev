@@ -244,6 +244,15 @@ that as a precaution.")
 (defvar eldev-project-loading-mode nil
   "Project loading mode, `as-is' if not specified.")
 
+(defvar eldev-normal-dependency-management t
+  "Use standard package-based dependency management.
+Can be disabled in special cases.  When disabled, Eldev won't
+operate with packages, but instead rely on variable `load-path'
+to be set as appropriate, e.g. using environment variable
+`EMACSLOADPATH'.
+
+Since 1.9.")
+
 (defvar eldev-external-package-dir nil
   "Use given directory instead of managing dependencies separately.
 If this value is nil (default), Eldev will manage and install
@@ -749,6 +758,13 @@ comma/space-separated TYPES"
                         dir
                       `(:instead-of-default ,(eldev-format-message "(default would be `%s')" dir))))
   (setf eldev-external-package-dir (or dir t)))
+
+(eldev-defbooloptions eldev-manage-dependencies eldev-disable-dependencies eldev-normal-dependency-management
+  ("Use standard dependency-as-package management"
+   :options       --manage-dependencies
+   :hidden-if     :default)
+  ("Disable standard dependency-as-package management; depend on externally-set `EMACSLOADPATH'"
+   :options       (--disable-dependencies --use-emacsloadpath)))
 
 (eldev-defoption eldev-robust-mode (&optional mode)
   "Whether to retry on certain errors; WHEN can be `always', `auto' or `never'"
@@ -1748,22 +1764,26 @@ in `package-archives', it returns VALUE-IF-NOT-USED."
 (defun eldev-use-local-dependency (dir &optional loading-mode)
   "Use local dependency found in DIR.
 See the manual for more information about local dependencies."
+  (unless eldev-normal-dependency-management
+    ;; But still add it into the list in case dependency management get reenabled in time somehow.
+    (eldev-warn "Normal dependency management is disabled; local dependencies will not be used"))
   (if loading-mode
       (progn (unless (assq loading-mode eldev--loading-modes)
                (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
              (when (memq loading-mode '(compiled-on-demand noisy-compiled-on-demand))
                (error "Loading mode `%s' is not supported for local dependencies" loading-mode)))
     (setf loading-mode 'as-is))
-  (setf dir (file-name-as-directory dir))
-  (let* ((absolute-dir (expand-file-name dir eldev-project-dir))
-         (dependency   (eldev-package-descriptor absolute-dir))
-         (name         (package-desc-name dependency)))
-    (when (eq name (package-desc-name (eldev-package-descriptor)))
-      (error "Local dependency in directory `%s' is the same package as that being built: `%s'" dir name))
-    (when (assq name eldev--local-dependencies)
-      (error "Duplicate local dependency `%s' in directory `%s': already registered in directory `%s'" name dir (nth 1 (assq name eldev--local-dependencies))))
-    (push `(,name ,dependency ,dir ,absolute-dir ,loading-mode) eldev--local-dependencies)
-    (eldev-trace "Will use directory `%s' as local dependency `%s' with loading mode `%s'" dir name loading-mode)))
+  (eldev-named-step nil (eldev-format-message "using local dependency in directory `%s'" dir)
+    (setf dir (file-name-as-directory dir))
+    (let* ((absolute-dir (expand-file-name dir eldev-project-dir))
+           (dependency   (eldev-package-descriptor absolute-dir))
+           (name         (package-desc-name dependency)))
+      (when (eq name (package-desc-name (eldev-package-descriptor)))
+        (error "Local dependency in directory `%s' is the same package as that being built: `%s'" dir name))
+      (when (assq name eldev--local-dependencies)
+        (error "Duplicate local dependency `%s' in directory `%s': already registered in directory `%s'" name dir (nth 1 (assq name eldev--local-dependencies))))
+      (push `(,name ,dependency ,dir ,absolute-dir ,loading-mode) eldev--local-dependencies)
+      (eldev-trace "Will use directory `%s' as local dependency `%s' with loading mode `%s'" dir name loading-mode))))
 
 (defun eldev-add-extra-dependencies (sets &rest dependencies)
   "Additionally use DEPENDENCIES for given SETS.
@@ -2237,6 +2257,9 @@ before upgrading."
   (when (eldev-external-package-dir)
     (signal 'eldev-error `(:hint "Use global option `--isolated' (`-I')"
                                  "Cannot upgrade when using external package directory")))
+  (unless eldev-normal-dependency-management
+    (signal 'eldev-error `(:hint "Don't use global option `--disable-dependencies'"
+                                 "Command `upgrade' cannot be used if standard dependency management is disabled")))
   (eldev--load-installed-runtime-dependencies)
   (eldev--install-or-upgrade-dependencies 'project (mapcar #'car eldev--extra-dependencies) (or (mapcar #'intern parameters) t) eldev-upgrade-dry-run-mode nil t))
 
@@ -2249,7 +2272,8 @@ sources will be replaced with a package downloaded from MELPA."
   :works-on-old-eldev t
   (when parameters
     (signal 'eldev-wrong-command-usage `(t "Unexpected command parameters")))
-  (let ((package-user-dir (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) (eldev-global-cache-dir))))
+  (let ((package-user-dir                   (expand-file-name (format "%s.%s/bootstrap" emacs-major-version emacs-minor-version) (eldev-global-cache-dir)))
+        (eldev-normal-dependency-management t))
     (eldev--install-or-upgrade-dependencies 'eldev nil t eldev-upgrade-dry-run-mode nil t))
   (when eldev-upgrade-self-script
     (eldev--upgrade-self-script)))
@@ -2315,7 +2339,8 @@ be executed."
     (signal 'eldev-too-old eldev-too-old))
   (setf additional-sets (eldev-listify additional-sets))
   (run-hook-with-args 'eldev-before-loading-dependencies-hook (if load-only 'load-only t) additional-sets)
-  (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing)
+  (when eldev-normal-dependency-management
+    (eldev--install-or-upgrade-dependencies 'project additional-sets nil nil t nil no-error-if-missing))
   (run-hook-with-args 'eldev-load-dependencies-hook (if load-only 'load-only t) additional-sets))
 
 (defun eldev-load-extra-dependencies (sets &optional no-error-if-missing)
@@ -2327,7 +2352,8 @@ loaded.  Mostly useful to load runtime dependencies.
 Since 0.2."
   (setf sets (eldev-listify sets))
   (run-hook-with-args 'eldev-before-loading-dependencies-hook nil sets)
-  (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing)
+  (when eldev-normal-dependency-management
+    (eldev--install-or-upgrade-dependencies nil sets nil nil t nil no-error-if-missing))
   (run-hook-with-args 'eldev-load-dependencies-hook nil sets))
 
 (defmacro eldev-using-global-package-archive-cache (&rest body)
@@ -2442,6 +2468,9 @@ Since 0.2."
 ;; local dependencies that can change unpredictably and also requirement that certain
 ;; dependencies are installed only from certain archives.  Roll our own.
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
+  ;; This would be an internal error, as the function must not be even called then.
+  (unless eldev-normal-dependency-management
+    (error "Dependency management is disabled"))
   (eldev-advised ('package--reload-previously-loaded
                   ;; For Emacs 29.  Pointless to suggest improvements upstream, since I can't create a simple
                   ;; test (eventually did this though: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56614,

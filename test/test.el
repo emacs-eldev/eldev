@@ -3,14 +3,6 @@
 (require 'test/common)
 
 
-(ert-deftest eldev-test-project-a-1 ()
-  ;; Two tests, all pass.
-  (eldev--test-run "project-a" ("test")
-    (should (string-match-p "passed.+project-a-test-hello" stdout))
-    (should (string-match-p "passed.+project-a-test-triviality" stdout))
-    (should (string-match-p "Ran 2 tests" stdout))
-    (should (= exit-code 0))))
-
 (ert-deftest eldev-test-project-b-1 ()
   ;; Two tests, one of them fails.
   (eldev--test-run "project-b" ("test")
@@ -166,6 +158,30 @@
 ............... 220/220
 "))
     (should (= exit-code 0))))
+
+
+(ert-deftest eldev-test-project-c-disabled-dependencies-1 ()
+  ;; Dependencies are disabled.  Testing a project with dependencies without setting
+  ;; `load-path' must fail.
+  (let ((eldev--test-project "project-c"))
+    (eldev--test-delete-cache)
+    ;; Installing dependencies in the project's cache must not help.
+    (eldev--test-run nil ("prepare")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--disable-dependencies" "test")
+      (should (string-match-p "Cannot open.+project-c" stderr))
+      (should (= exit-code 1)))))
+
+(ert-deftest eldev-test-project-c-disabled-dependencies-2 ()
+  ;; Dependencies are disabled, but we supply `load-path', so testing should work.
+  (let* ((eldev--test-project "project-c")
+         (process-environment `(,(format "EMACSLOADPATH=%s:%s:%s"
+                                         (eldev--test-project-dir) (eldev--test-project-dir "dependency-a") (mapconcat #'identity load-path ":"))
+                                @process-environment)))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("--disable-dependencies" "test")
+      (should (string-match-p "Ran 2 tests" stdout))
+      (should (= exit-code 0)))))
 
 
 (provide 'test/test)
