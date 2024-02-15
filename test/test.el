@@ -176,8 +176,8 @@
   ;; Dependencies are disabled, but we supply `load-path', so testing should work.
   (let* ((eldev--test-project "project-c")
          (process-environment `(,(format "EMACSLOADPATH=%s:%s:%s"
-                                         (eldev--test-project-dir) (eldev--test-project-dir "dependency-a") (mapconcat #'identity load-path ":"))
-                                @process-environment)))
+                                         (eldev--test-project-dir) (eldev--test-project-dir "dependency-a") (mapconcat #'identity load-path path-separator))
+                                ,@process-environment)))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("--disable-dependencies" "test")
       (should (string-match-p "Ran 2 tests" stdout))
