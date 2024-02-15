@@ -856,7 +856,7 @@ plugin documentation for more information."
              (when files
                (eldev-add-extra-dependencies 'runtime '(:tool undercover))
                (eldev-load-extra-dependencies 'runtime)
-               (require 'undercover)
+               (eldev--require-external-feature 'undercover)
                (setf undercover-force-coverage (not (eq mode 'auto)))
                (eldev-trace (if undercover-force-coverage
                                 "Forcing `undercover' to generate coverage report..."

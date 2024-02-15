@@ -1100,6 +1100,10 @@ Since 1.0."
         (eldev-message-upcase-first name)
       name)))
 
+(defun eldev--require-external-feature (feature)
+  (eldev-named-step nil (eldev-format-message "requiring feature `%s' from an external tool" feature)
+    (require feature)))
+
 (defun eldev--execute-command (command-line)
   (let* ((command      (intern (car command-line)))
          (real-command (or (cdr (assq command eldev--command-aliases)) command))
@@ -5062,7 +5066,7 @@ least one warning."
     ;; install the runtime dependencies).
     (eldev--fetch-archive-contents (eldev--determine-archives-to-fetch)))
   (eldev--linter-package-present-archives)
-  (require 'package-lint)
+  (eldev--require-external-feature 'package-lint)
   ;; Avoid overriding it if it is already set (presumably in project's `Eldev').
   (unless package-lint-main-file
     (setf package-lint-main-file (eldev-project-main-file)))
@@ -5092,7 +5096,7 @@ least one warning."
   (eldev-saving-dependency-lists
     (eldev-add-extra-dependencies 'runtime '(:tool relint))
     (eldev-load-extra-dependencies 'runtime))
-  (require 'relint)
+  (eldev--require-external-feature 'relint)
   ;; I see no way to avoid diving into internals.
   (eldev-advised ('relint--output-report :around (lambda (original error-buffer file complaint &rest etc)
                                                    (eldev-lint-printing-warning (if (eq (nth 5 complaint) 'error) :error :warning)
@@ -5125,7 +5129,7 @@ change `elisp-lint's configuration."
   (with-eval-after-load 'package-lint
     (unless package-lint-main-file
       (setf package-lint-main-file (eldev-project-main-file))))
-  (require 'elisp-lint)
+  (eldev--require-external-feature 'elisp-lint)
   ;; I don't see a better way than just replacing its output function completely.
   (eldev-advised ('elisp-lint--print :override (lambda (_color format-string &rest arguments)
                                                  (eval `(eldev-warn ,format-string ,@arguments) t)

@@ -48,7 +48,7 @@
   (unless eldev--test-ecukes-initialized
     (let ((debugger       debugger)
           (debug-on-error debug-on-error))
-      (require 'ecukes))
+      (eldev--require-external-feature 'ecukes))
     (ecukes-load)
     (setf eldev--test-ecukes-initialized t)))
 
