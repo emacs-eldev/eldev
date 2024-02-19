@@ -179,6 +179,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     ,(format "ELDEV_DIR=%s"   (eldev--test-eldev-dir))
     ,@process-environment))
 
+(defun eldev--test-emacsloadpath (&rest extras)
+  (format "EMACSLOADPATH=%s" (mapconcat #'identity (append extras load-path) path-separator)))
+
+
 (defun eldev--test-force-bootstrapping-now ()
   (eldev-call-process eldev--test-shell-command nil :die-on-error t))
 

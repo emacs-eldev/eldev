@@ -175,8 +175,9 @@
 (ert-deftest eldev-test-project-c-disabled-dependencies-2 ()
   ;; Dependencies are disabled, but we supply `load-path', so testing should work.
   (let* ((eldev--test-project "project-c")
-         (process-environment `(,(format "EMACSLOADPATH=%s"
-                                         (mapconcat #'identity (append (list (eldev--test-project-dir) (eldev--test-project-dir "dependency-a")) load-path) path-separator))
+         ;; In real use, `dependency-a' would be found from the project sources by whoever
+         ;; sets `EMACSLOADPATH'.  Here we hardcode it to simplify things.
+         (process-environment `(,(eldev--test-emacsloadpath (eldev--test-project-dir) (eldev--test-project-dir "dependency-a"))
                                 ,@process-environment)))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("--disable-dependencies" "test")

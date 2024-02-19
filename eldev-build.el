@@ -374,6 +374,8 @@ This function may only be called while inside the body of a
   ;; When building, project loading mode is ignored.  The reason is that building itself
   ;; can involve compiling or packaging.
   (run-hooks 'eldev-build-system-hook)
+  (unless eldev-normal-dependency-management
+    (setf dont-touch-packages t))
   (unless dont-touch-packages
     (let ((eldev-project-loading-mode 'as-is))
       (when (memq 'test eldev-build-sets)
