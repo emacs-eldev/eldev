@@ -48,6 +48,7 @@
 :uri-docker-emacs: https://github.com/Silex/docker-emacs
 :uri-release-it: https://github.com/release-it/release-it
 :uri-emacs-forwarding: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745
+:uri-guix: https://guix.gnu.org/
 :since-0-1-1: image:https://img.shields.io/badge/since-0.1.1-8be[Since 0.1.1,float=right]
 :since-0-2: image:https://img.shields.io/badge/since-0.2-8be[Since 0.2,float=right]
 :since-0-2-1: image:https://img.shields.io/badge/since-0.2.1-8be[Since 0.2.1,float=right]
@@ -70,6 +71,7 @@
 :since-1-6: image:https://img.shields.io/badge/since-1.6-8be[Since 1.6,float=right]
 :since-1-7: image:https://img.shields.io/badge/since-1.7-8be[Since 1.7,float=right]
 :since-1-8: image:https://img.shields.io/badge/since-1.8-8be[Since 1.8,float=right]
+:since-1-9: image:https://img.shields.io/badge/since-1.9-8be[Since 1.9,float=right]
 
 
 toc::[]
