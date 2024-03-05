@@ -465,7 +465,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#setup-procedure">Setup procedure in details</a>
 <ul class="sectlevel2">
 <li><a href="#project-isolation">Project isolation</a></li>
-<li><a href="#_using_preinstalled_dependencies">Using preinstalled dependencies</a></li>
+<li><a href="#preinstalled-dependencies">Using preinstalled dependencies</a></li>
 </ul>
 </li>
 <li><a href="#dependencies">Project dependencies</a>
@@ -475,6 +475,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_examining_dependencies">Examining dependencies</a></li>
 <li><a href="#_upgrading_dependencies">Upgrading dependencies</a></li>
 <li><a href="#development-tool-sources">Development tool sources</a></li>
+<li><a href="#disabling-dependencies">Disabling dependency management</a></li>
 <li><a href="#global-cache">Global package archive cache</a></li>
 </ul>
 </li>
@@ -1252,7 +1253,7 @@ Emacs version</a> for the same project without any additional steps.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_using_preinstalled_dependencies">Using preinstalled dependencies</h3>
+<h3 id="preinstalled-dependencies">Using preinstalled dependencies</h3>
 <div class="paragraph">
 <p><span class="image right"><img src="https://img.shields.io/badge/since-0.8-8be" alt="Since 0.8"></span> Starting with version 0.8 you can opt out of some of the
 default project isolation features and use preinstalled dependencies,
@@ -1289,6 +1290,11 @@ to test on <a href="#different-emacs-versions">different Emacs versions</a> in
 external directory mode.  Therefore, it is not the default.  But, as
 usual in Eldev, you can make it the default in file
 <code>~/.config/eldev/config</code> if you want.</p>
+</div>
+<div class="paragraph">
+<p>There is also a way to <a href="#disabling-dependencies">disable dependency
+management</a> <em>completely</em>.  However, other than in few very special
+cases you should prefer normal operation.</p>
 </div>
 </div>
 </div>
@@ -1675,6 +1681,56 @@ can be referred this way.</p>
 <p><code>undercover</code></p>
 </li>
 </ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="disabling-dependencies">Disabling dependency management</h3>
+<div class="admonitionblock caution">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-caution" title="Caution"></i>
+</td>
+<td class="content">
+This operation mode is <strong>not recommended</strong>.  It exists only to
+support special usecases that “insist” on setting Emacs’ <code>load-path</code>
+directly and cannot be customized (with reasonable effort).
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.9-8be" alt="Since 1.9"></span> Eldev has limited support for operating <em>without
+dependency management</em>.  This mode can be activated using global
+option <code>--disable-dependencies</code> (there is no short version to
+emphasize that <em>it is not recommended</em>).  It exists to support certain
+environments that themselves provide a suitable value for Emacs
+variable <code>load-path</code> via environment variable <code>EMACSLOADPATH</code>.  An
+example of such an environment is <a href="https://guix.gnu.org/">GUIX</a> package building.</p>
+</div>
+<div class="paragraph">
+<p>Unlike in <a href="#preinstalled-dependencies">preinstalled-dependency mode</a>
+described earlier, here Eldev doesn’t work with dependencies (and
+<a href="#development-tool-sources">tools</a>) as standard Emacs packages at all.
+Instead, everything is expected to be loadable using <code>require</code> form
+without any further setup.  For this, variable <code>load-path</code> must be set
+appropriately, most likely using <code>EMACSLOADPATH</code> (though you could, in
+principle, set its value in e.g. <code>Eldev-local</code>).</p>
+</div>
+<div class="paragraph">
+<p>One consequence of this mode is that Emacs package system won’t
+consider dependency packages installed at all, see
+<code>package-installed-p</code>.  <a href="#autoloads">Autoloads</a> are not supported in
+this mode (neither for dependencies nor for the project itself), so
+you must explicitly require all features before using them.  There
+might be other, unexpected, limitations as well, as this mode is not
+thoroughly tested.</p>
+</div>
+<div class="paragraph">
+<p>Unless you need to build packages for GUIX or have some comparable
+environment that computes <code>load-path</code> on its own and doesn’t let Eldev
+manage dependencies normally by accessing standard package archives,
+you shouldn’t use this mode.</p>
 </div>
 </div>
 <div class="sect2">
@@ -5093,7 +5149,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2024-01-23 19:42:30 UTC
+Last updated 2024-03-05 22:22:24 UTC
 </div>
 </div>
 </body>
