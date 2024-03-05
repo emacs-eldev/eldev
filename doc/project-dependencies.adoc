@@ -297,6 +297,42 @@ Current list of the known tools:
 * `elisp-lint`
 * `undercover`
 
+[#disabling-dependencies]
+=== Disabling dependency management
+
+CAUTION: This operation mode is *not recommended*.  It exists only to
+support special usecases that “insist” on setting Emacs’ `load-path`
+directly and cannot be customized (with reasonable effort).
+
+{since-1-9} Eldev has limited support for operating _without
+dependency management_.  This mode can be activated using global
+option `--disable-dependencies` (there is no short version to
+emphasize that _it is not recommended_).  It exists to support certain
+environments that themselves provide a suitable value for Emacs
+variable `load-path` via environment variable `EMACSLOADPATH`.  An
+example of such an environment is {uri-guix}[GUIX] package building.
+
+Unlike in <<preinstalled-dependencies,preinstalled-dependency mode>>
+described earlier, here Eldev doesn’t work with dependencies (and
+<<development-tool-sources,tools>>) as standard Emacs packages at all.
+Instead, everything is expected to be loadable using `require` form
+without any further setup.  For this, variable `load-path` must be set
+appropriately, most likely using `EMACSLOADPATH` (though you could, in
+principle, set its value in e.g. `Eldev-local`).
+
+One consequence of this mode is that Emacs package system won’t
+consider dependency packages installed at all, see
+`package-installed-p`.  <<autoloads,Autoloads>> are not supported in
+this mode (neither for dependencies nor for the project itself), so
+you must explicitly require all features before using them.  There
+might be other, unexpected, limitations as well, as this mode is not
+thoroughly tested.
+
+Unless you need to build packages for GUIX or have some comparable
+environment that computes `load-path` on its own and doesn’t let Eldev
+manage dependencies normally by accessing standard package archives,
+you shouldn’t use this mode.
+
 [#global-cache]
 === Global package archive cache
 

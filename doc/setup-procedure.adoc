@@ -71,6 +71,7 @@ from affecting your Emacs and, finally, to simplify testing of certain
 * Eldev supports <<different-emacs-versions,executing on different
   Emacs version>> for the same project without any additional steps.
 
+[#preinstalled-dependencies]
 === Using preinstalled dependencies
 
 {since-0-8} Starting with version 0.8 you can opt out of some of the
@@ -102,3 +103,7 @@ to test on <<different-emacs-versions,different Emacs versions>> in
 external directory mode.  Therefore, it is not the default.  But, as
 usual in Eldev, you can make it the default in file
 `~/.config/eldev/config` if you want.
+
+There is also a way to <<disabling-dependencies,disable dependency
+management>> _completely_.  However, other than in few very special
+cases you should prefer normal operation.
