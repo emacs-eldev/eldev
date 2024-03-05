@@ -1,3 +1,5 @@
+;;  -*- lexical-binding: t -*-
+
 (require 'project-i)
 (require 'project-i-advanced)
 (require 'buttercup)
