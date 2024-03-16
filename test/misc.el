@@ -36,6 +36,26 @@
       (should (= exit-code 0)))))
 
 
+(ert-deftest eldev-issue-102-1 ()
+  ;; Org is an Emacs built-in.  Make sure it still can be developed with Eldev.
+  (let ((eldev--test-project "project-fake-org"))
+    (eldev--test-delete-cache)
+    (eldev--test-run nil ("eval" `(bound-and-true-p org-is-fake))
+      (should (string= stdout "t\n"))
+      (should (= exit-code 0)))))
+
+(ert-deftest eldev-issue-102-2 ()
+  (let ((eldev--test-project "dependency-org"))
+    (eldev--test-run nil ("eval" `(progn (require 'org) (bound-and-true-p org-is-fake)))
+      (should (string= stdout "nil\n"))
+      (should (= exit-code 0)))
+    ;; Must load the local dependency if requested, even if Org is a built-in.
+    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-fake-org")
+                          "eval" `(progn (require 'org) (bound-and-true-p org-is-fake)))
+      (should (string= stdout "t\n"))
+      (should (= exit-code 0)))))
+
+
 ;; Not a bug, just doesn't seem to fit anywhere else.  Test that
 ;; `eldev-known-tool-packages' can be customized.
 (ert-deftest eldev-known-tool-packages-1 ()

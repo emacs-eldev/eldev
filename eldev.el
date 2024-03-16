@@ -2919,7 +2919,10 @@ Since 0.2."
       (clrhash considered)
       (throw 'restart-planning t))
     (unless (and considered-before (version-list-<= required-version considered-version))
-      (unless (package-built-in-p package-name required-version)
+      (when (or (not (package-built-in-p package-name required-version))
+                ;; See issue 102.  Do replace built-in packages with the project itself
+                ;; and local dependencies.  See `local' below.
+                (and (not self) (eldev--loading-mode package-name)))
         (when (eq package-name 'emacs)
           (when optional
             (eldev-verbose "Emacs version %s (this is %s) is %s; skipping the optional dependency"
@@ -3174,8 +3177,8 @@ for all archives instead."
 
 (defun eldev--loading-mode (dependency)
   "Get loading mode of package DEPENDENCY.
-DEPENDENCY can be either a name (symbol) or a package
-descriptor."
+DEPENDENCY can be either a name (symbol) or a package descriptor.
+Returns nil if it is neither a project nor a local dependency."
   (let ((dependency-name (if (symbolp dependency) dependency (package-desc-name dependency))))
     (if (eq dependency-name (package-desc-name (eldev-package-descriptor)))
         (or eldev-project-loading-mode 'as-is)
