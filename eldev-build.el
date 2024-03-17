@@ -606,10 +606,14 @@ possible to build arbitrary targets this way."
                                               (with-temp-buffer
                                                 (insert-file-contents source)
                                                 ;; Older versions don't understand `no-mode'.
-                                                (hack-local-variables (when (>= emacs-major-version 26) 'no-mode))))))
+                                                (hack-local-variables (when (>= emacs-major-version 26) 'no-mode))
+                                                no-byte-compile))))
     ;; Don't do anything with `no-byte-compile' files (not even load) unless called
     ;; recursively.  Otherwise we might e.g. attempt loading `define-package' and fail.
-    (unless skip-byte-compilation
+    (if skip-byte-compilation
+        ;; FIXME: Think of a way of not even trying to build such files.  Otherwise the
+        ;;        output ("ELC blabla.el") is confusing.
+        (eldev-verbose "Cancelled byte-compilation of `%s': it has `no-byte-compile' local variable" source)
       (eldev-verbose (if recursive "Byte-compiling file `%s' early as `require'd from another file..." "Byte-compiling file `%s'...")
                      source)
       (eldev-advised ('load :before

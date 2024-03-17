@@ -60,6 +60,15 @@
       (eldev--test-assert-files project-dir preexisting-files "src/project-l.elc" "src/project-l-misc.elc" "src/project-l-util.elc")
       (should (= exit-code 0)))))
 
+(eldev-ert-defargtest eldev-compile-everything-8 (on-demand)
+                      (nil 'normal 'noisy)
+  ;; `project-j' has a file with `no-byte-compile' and autoloads.
+  (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j.elc" "project-j-advanced.elc")
+    (should (member "project-j-uncompilable.el" preexisting-files))
+    (eldev--test-run nil ((eldev--test-on-demand-to-loading-mode-option on-demand) "compile")
+      (eldev--test-assert-files project-dir preexisting-files "project-j-autoloads.el" "project-j.elc" "project-j-advanced.elc")
+      (should (= exit-code 0)))))
+
 
 (ert-deftest eldev-compile-test-files-1 ()
   (eldev--test-without-files "project-a" ("test/project-a.elc")
