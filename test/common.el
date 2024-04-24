@@ -499,6 +499,15 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
     archive-dir))
 
 
+(defun eldev--test-skip-if-missing-tool (exit-code stderr)
+  (unless (= exit-code 0)
+    (let ((lines (eldev--test-line-list stderr)))
+      (while lines
+        (let ((line (pop lines)))
+          (when (and (string-match-p (rx "Emacs version" (+ any) "required" (+ any)) line)
+                     (and lines (string-match-p "required as a development tool" (car lines))))
+            (ert-skip line)))))))
+
 (defun eldev--test-skip-if-missing-linter (exit-code stderr)
   (unless (= exit-code 0)
     (dolist (line (eldev--test-line-list stderr))
