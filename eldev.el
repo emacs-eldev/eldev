@@ -3168,7 +3168,6 @@ for all archives instead."
       ;;
       ;; The hack is disabled for Emacs 27 and up.  I couldn't make it less intrusive.
       (eldev-advised ('epg-context-result-for :around (when (version< emacs-version "27")
-                                                        (eldev-dump emacs-version)
                                                         (lambda (original context name)
                                                           (let ((result (funcall original context name)))
                                                             (when (and (eq name 'verify) (eldev-any-p (eq (epg-signature-status it) 'good) result))
