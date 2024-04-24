@@ -3141,6 +3141,8 @@ for all archives instead."
                                                      (signal 'eldev-error `(:hint ,(eldev-format-message "When updating contents of package archive `%s'" (cdr failure))
                                                                                   ,(error-message-string (car failure))))))))))))))
 
+(declare-function epg-signature-status nil)
+
 (defun eldev--with-pa-access-workarounds (callback &optional call-after-working-around)
   ;; This is only to reduce noise from old Emacs versions a bit.
   (eldev-advised (#'write-region :around (when (< emacs-major-version 25)
@@ -3156,31 +3158,48 @@ for all archives instead."
     (let ((gnutls-algorithm-priority (or gnutls-algorithm-priority
                                          (when (and (version<= emacs-version "26.2") (boundp 'libgnutls-version) (>= libgnutls-version 30603))
                                            "NORMAL:-VERS-TLS1.3"))))
-      (when (catch 'eldev--bad-signature
-              (eldev-advised ('package--check-signature-content :around
-                                                                (lambda (original &rest arguments)
-                                                                  (condition-case nil
-                                                                      (apply original arguments)
-                                                                    ;; If we don't convert it into a thrown tag, the error will be
-                                                                    ;; eaten e.g. in `package--download-and-read-archives'.
-                                                                    (bad-signature (throw 'eldev--bad-signature t)))))
-                (funcall callback))
-              nil)
-        ;; This probably largely defeats the purpose of signatures, but it is basically what
-        ;; `gnu-elpa-keyring-update' itself proposes (only perhaps not in an automated way).
-        (eldev-trace "Installing package `gnu-elpa-keyring-update' to hopefully solve `bad-signature' problem...")
-        (let ((package-check-signature nil))
-          (eldev-using-global-package-archive-cache
-            (package-refresh-contents))
-          (package-install 'gnu-elpa-keyring-update))
-        (when call-after-working-around
-          ;; A lot of information about what's wrong is written to buffer "*Error*" (see
-          ;; Emacs source), but it is normally lost in non-interactive use.  Do extract it
-          ;; here, but only if not debugging (then user prefers to have a stacktrace).
-          (condition-case-unless-debug error
-              (funcall callback)
-            (bad-signature (signal 'eldev-error `(:hint ,(ignore-errors (with-current-buffer "*Error*" (buffer-string)))
-                                                        ,(error-message-string error))))))))))
+      ;; Extremely dirty hack...  The problem is that starting with Emacs 27 they accept a
+      ;; package if it has _at least one_ valid signature, but before that they required
+      ;; _all_ signatures to be valid.  Since their keys have expiration date, this turned
+      ;; out to be a problem.  I guess `.sig' files delivered by GNU ELPA could be updated
+      ;; eventually, but on the other hand it's possible they no longer care about old
+      ;; Emacs versions.  Easier to write a hack than to have another month-long pointless
+      ;; conversation on Emacs-devel.
+      ;;
+      ;; The hack is disabled for Emacs 27 and up.  I couldn't make it less intrusive.
+      (eldev-advised ('epg-context-result-for :around (when (version< emacs-version "27")
+                                                        (eldev-dump emacs-version)
+                                                        (lambda (original context name)
+                                                          (let ((result (funcall original context name)))
+                                                            (when (and (eq name 'verify) (eldev-any-p (eq (epg-signature-status it) 'good) result))
+                                                              ;; Discard invalid signatures if there is at least one valid.
+                                                              (setf result (eldev-filter (memq (epg-signature-status it) '(good no-pubkey)) result)))
+                                                            result))))
+        (when (catch 'eldev--bad-signature
+                (eldev-advised ('package--check-signature-content :around
+                                                                  (lambda (original &rest arguments)
+                                                                    (condition-case nil
+                                                                        (apply original arguments)
+                                                                      ;; If we don't convert it into a thrown tag, the error will be
+                                                                      ;; eaten e.g. in `package--download-and-read-archives'.
+                                                                      (bad-signature (throw 'eldev--bad-signature t)))))
+                  (funcall callback))
+                nil)
+          ;; This probably largely defeats the purpose of signatures, but it is basically what
+          ;; `gnu-elpa-keyring-update' itself proposes (only perhaps not in an automated way).
+          (eldev-trace "Installing package `gnu-elpa-keyring-update' to hopefully solve `bad-signature' problem...")
+          (let ((package-check-signature nil))
+            (eldev-using-global-package-archive-cache
+              (package-refresh-contents))
+            (package-install 'gnu-elpa-keyring-update))
+          (when call-after-working-around
+            ;; A lot of information about what's wrong is written to buffer "*Error*" (see
+            ;; Emacs source), but it is normally lost in non-interactive use.  Do extract it
+            ;; here, but only if not debugging (then user prefers to have a stacktrace).
+            (condition-case-unless-debug error
+                (funcall callback)
+              (bad-signature (signal 'eldev-error `(:hint ,(ignore-errors (with-current-buffer "*Error*" (buffer-string)))
+                                                          ,(error-message-string error)))))))))))
 
 (defun eldev--loading-mode (dependency)
   "Get loading mode of package DEPENDENCY.
