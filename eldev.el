@@ -3174,7 +3174,13 @@ for all archives instead."
             (package-refresh-contents))
           (package-install 'gnu-elpa-keyring-update))
         (when call-after-working-around
-          (funcall callback))))))
+          ;; A lot of information about what's wrong is written to buffer "*Error*" (see
+          ;; Emacs source), but it is normally lost in non-interactive use.  Do extract it
+          ;; here, but only if not debugging (then user prefers to have a stacktrace).
+          (condition-case-unless-debug error
+              (funcall callback)
+            (bad-signature (signal 'eldev-error `(:hint ,(ignore-errors (with-current-buffer "*Error*" (buffer-string)))
+                                                        ,(error-message-string error))))))))))
 
 (defun eldev--loading-mode (dependency)
   "Get loading mode of package DEPENDENCY.
