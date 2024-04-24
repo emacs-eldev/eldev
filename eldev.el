@@ -321,6 +321,7 @@ Since 0.5")
 
 (defvar eldev-known-tool-packages
   '((buttercup    :version "1.24"   :archive  melpa)
+    (doctest                        :archive  melpa)
     (ecukes       :version "0.6.18" :archive  melpa)
     ;; Need GNU ELPA for `let-alist' on older Emacs versions.
     (package-lint :version "0.14"   :archives (melpa gnu-elpa))
@@ -4040,6 +4041,9 @@ At least one of options `--file' and `--open' is required."
 (declare-function eldev-count-buttercup-tests "eldev-buttercup" (selectors))
 (declare-function eldev-run-buttercup-tests "eldev-buttercup" (selectors &optional environment))
 
+(declare-function eldev-test-doctest-preprocess-selectors "eldev-doctest" (selectors))
+(declare-function eldev-run-doctest-tests "eldev-doctest" (files &optional environment))
+
 (declare-function eldev-test-ecukes-preprocess-selectors "eldev-ecukes" (selectors))
 (declare-function eldev-run-ecukes-tests "eldev-ecukes" (feature-files selectors &optional environment))
 
@@ -4174,6 +4178,13 @@ Should normally be specified only from command line.")
                                      (run-tests            . (lambda (selectors _files _runner environment)
                                                                (eldev-run-buttercup-tests selectors environment)))
                                      (profiling-self       . t)))
+                       (doctest   . ((fileset-base         . main)
+                                     (file-description     . "doctest `.el' file%s")
+                                     (packages             . ((:tool doctest)))
+                                     (require              . eldev-doctest)
+                                     (preprocess-selectors . eldev-test-doctest-preprocess-selectors)
+                                     (run-tests            . (lambda (_selectors files _runner environment)
+                                                               (eldev-run-doctest-tests files environment)))))
                        (ecukes    . ((detect               . (lambda () t))  ; if `.feature' files are found, then they must be for Ecukes
                                      (fileset              . "*.feature")
                                      (file-description     . "test `.feature' file%s")
@@ -4254,6 +4265,15 @@ for details."
   :profiling-self t
   (eldev--do-test 'ecukes parameters))
 
+(eldev-defcommand eldev-test-doctest (&rest parameters)
+  "Run project's Doctest regression/unit tests.  See command `test'
+for details."
+  :parameters     "[SELECTOR...]"
+  :aliases        doctest
+  :category       testing
+  :hidden-if      (or (<= (length (eldev-listify eldev-test-framework)) 1) (not (memq 'doctest eldev-test-framework)))
+  (eldev--do-test 'doctest parameters))
+
 (defun eldev--do-test (possible-frameworks parameters)
   (eldev-load-project-dependencies 'test)
   (if possible-frameworks
@@ -4266,7 +4286,8 @@ for details."
           (when unused
             (signal 'eldev-error `(:hint ,(eldev-format-message "%s" (eldev-message-enumerate '("Used framework:" "Used frameworks:") (eldev-listify eldev-test-framework)))
                                          "This project doesn't use %s" ,(eldev-message-enumerate "test framework" (nreverse unused)))))))
-    (setf possible-frameworks (mapcar #'car eldev-test-known-frameworks)))
+    ;; Exclude non-autodetectable frameworks, e.g. Doctest.
+    (setf possible-frameworks (mapcar #'car (eldev-filter (assq 'detect it) eldev-test-known-frameworks))))
   ;; Prepare `eldev-test-stop-on-unexpected' for the actual test functions.
   (let ((eldev-test-stop-on-unexpected (when eldev-test-stop-on-unexpected
                                          (if (and (integerp eldev-test-stop-on-unexpected) (> eldev-test-stop-on-unexpected 0))
@@ -4286,11 +4307,12 @@ for details."
           (push selector filter-patterns)
         (push selector selectors)))
     (dolist (framework possible-frameworks)
-      (let* ((fileset (or (eldev-test-get-framework-entry framework 'fileset) "*.el"))
-             (entry   (cdr (assoc fileset filesets))))
+      (let* ((fileset (cons (or (eldev-test-get-framework-entry framework 'fileset-base) 'test)
+                            (or (eldev-test-get-framework-entry framework 'fileset) "*.el")))
+             (entry   (assoc fileset filesets)))
         (if entry
-            (push framework (car entry))
-          (push (cons fileset (list `(,framework) (or (eldev-test-get-framework-entry framework 'file-description) "test `.el' file%s") t)) filesets))))
+            (push framework (cadr entry))
+          (push (list fileset (list framework) (or (eldev-test-get-framework-entry framework 'file-description) "test `.el' file%s") t) filesets))))
     (setf selectors (nreverse selectors)
           filesets  (nreverse filesets))
     (unwind-protect
@@ -4301,6 +4323,7 @@ for details."
                    (unless (or (and eldev-test-stop-on-unexpected (< eldev-test-stop-on-unexpected 0))
                                (and (eq pass 'count) (>= num-matched-tests eldev-test-expect-at-least)))
                      (let* ((fileset            (car  entry))
+                            (std-el-fileset     (equal fileset '(test . "*.el")))
                             (used-by-frameworks (nth 0 (cdr entry)))
                             (file-description   (nth 1 (cdr entry)))
                             (files              (nth 2 (cdr entry)))
@@ -4314,8 +4337,10 @@ for details."
                              (if fileset
                                  (push fileset framework-filesets)
                                (setf disregard-framework-filesets t))))
-                         (setf files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset 'test) ,fileset ,@(when (and framework-filesets (not disregard-framework-filesets))
-                                                                                                                     `((:or ,@(nreverse framework-filesets)))))
+                         (setf files (eldev-find-and-trace-files `(:and ,(eldev-standard-fileset (car fileset))
+                                                                        ,(cdr fileset)
+                                                                        ,@(when (and framework-filesets (not disregard-framework-filesets))
+                                                                            `((:or ,@(nreverse framework-filesets)))))
                                                                  file-description))
                          (when filter-patterns
                            (setf files (eldev-filter-files files (reverse filter-patterns)))
@@ -4325,18 +4350,10 @@ for details."
                        ;; this `when' is important.
                        (when files
                          (setf found-any-files t)
-                         (when (and (equal fileset "*.el") (not files-looked-up))
+                         ;; Require `.el' files and automatically install used test frameworks.
+                         (when (and std-el-fileset (not files-looked-up))
                            (eldev-autoinstalling-implicit-dependencies t
-                             (dolist (file files)
-                               (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
-                                      (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
-                                 (if already-loaded
-                                     (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
-                                   (eldev-named-step nil (eldev-format-message "loading test file `%s'" file)
-                                     (eldev-trace "%s..." (eldev-current-step-name t))
-                                     ;; Loading the test file can results in evaluation, which might use `eldev-backtrace'.
-                                     (eldev-backtrace-notch 'eldev
-                                       (load absolute-without-el nil t nil t))))))))
+                             (eldev--test-load-files files)))
                          (let* ((runner-name (or eldev-test-runner 'simple))
                                 (runner      (or (cdr (assq runner-name eldev--test-runners))
                                                  (signal 'eldev-error `(:hint ("Check output of `%s test --list-runners'" ,(eldev-shell-command t)) "Unknown test runner `%s'" ,runner-name))))
@@ -4349,7 +4366,7 @@ for details."
                                          (and (eq pass 'count) (>= num-matched-tests eldev-test-expect-at-least)))
                                (let ((already-prepared (memq framework used-frameworks)))
                                  (unless already-prepared
-                                   (unless (equal fileset "*.el")
+                                   (unless std-el-fileset
                                      (eldev--test-maybe-install-framework framework "Installing package(s) of testing framework `%s'..."))
                                    (unless (or (null supported) (memq framework (eldev-listify supported)))
                                      (signal 'eldev-error `(:hint ("Run `%s test --list-runners' for more information" ,(eldev-shell-command t))
@@ -4398,6 +4415,18 @@ for details."
           (eldev-print "No test files to use")))
       (when any-frameworks-failed
         (signal 'eldev-quit 1)))))
+
+(defun eldev--test-load-files (files)
+  (dolist (file files)
+    (let* ((absolute-without-el (replace-regexp-in-string (rx ".el" eos) "" (expand-file-name file eldev-project-dir) t t))
+           (already-loaded      (eldev-any-p (assoc (concat absolute-without-el it) load-history) load-suffixes)))
+      (if already-loaded
+          (eldev-trace "Not loading file `%s': already `require'd by some other file" file)
+        (eldev-named-step nil (eldev-format-message "loading test file `%s'" file)
+          (eldev-trace "%s..." (eldev-current-step-name t))
+          ;; Loading the test file can results in evaluation, which might use `eldev-backtrace'.
+          (eldev-backtrace-notch 'eldev
+            (load absolute-without-el nil t nil t)))))))
 
 (defvar byte-compiler-error-flag)
 (defun eldev--test-autoinstalling-framework (enabled callback)
@@ -4641,7 +4670,9 @@ be silenced."
               (eldev--test-ert-concise-expected . t)))
            (`buttercup
             `((buttercup-reporter-batch-quiet-statuses . (skipped disabled pending passed))
-              (eldev--test-buttercup-concise-expected  . t))))
+              (eldev--test-buttercup-concise-expected  . t)))
+           (`doctest
+            `((eldev--test-doctest-concise-expected . t))))
          (eldev-test-runner-simple-environment framework)))
 
 (defun eldev-test-runner-concise-tick (force-number &optional num-executed num-planned)
