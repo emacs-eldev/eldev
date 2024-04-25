@@ -69,7 +69,7 @@
     ;; Even if unsupported by the framework, at least update the variable so that we can
     ;; stop before running further test types.
     (when eldev-test-stop-on-unexpected
-      (setf eldev-test-stop-on-unexpected (- eldev-test-stop-on-unexpected (assq 'failed state))))
+      (setf eldev-test-stop-on-unexpected (- eldev-test-stop-on-unexpected num-failed)))
     (unless (= num-failed 0)
       (signal 'eldev-error `("%s failed" ,(if (> num-failed 0) (eldev-message-plural num-failed "doctest") "doctest"))))))
 
