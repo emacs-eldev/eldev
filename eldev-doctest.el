@@ -61,13 +61,17 @@
                     (eldev-test-runner-concise-tick t num-total))))
               doctest-after-all-tests-hook))
       (doctest-files files)))
-  (let ((state (doctest-state)))
-    (setf eldev-test-num-passed  (+ eldev-test-num-passed (cdr (assq 'passed state)))
-          eldev-test-num-failed  (+ eldev-test-num-failed (cdr (assq 'failed state))))
+  (let* ((state      (doctest-state))
+         (num-passed (cdr (assq 'passed state)))
+         (num-failed (cdr (assq 'failed state))))
+    (setf eldev-test-num-passed  (+ eldev-test-num-passed num-passed)
+          eldev-test-num-failed  (+ eldev-test-num-failed num-failed))
     ;; Even if unsupported by the framework, at least update the variable so that we can
     ;; stop before running further test types.
     (when eldev-test-stop-on-unexpected
-      (setf eldev-test-stop-on-unexpected (- eldev-test-stop-on-unexpected (assq 'failed state))))))
+      (setf eldev-test-stop-on-unexpected (- eldev-test-stop-on-unexpected (assq 'failed state))))
+    (unless (= num-failed 0)
+      (signal 'eldev-error `("%s failed" ,(if (> num-failed 0) (eldev-message-plural num-failed "doctest") "doctest"))))))
 
 
 (provide 'eldev-doctest)
