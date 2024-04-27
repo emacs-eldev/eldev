@@ -5711,12 +5711,21 @@ be passed to Emacs, else it will most likely fail."
 
 ;; eldev docker
 
-(defvar eldev--docker-gui-args
-  (list "-e" "DISPLAY" "-v" "/tmp/.X11-unix:/tmp/.X11-unix")
-  "Arguments needed to launch dockerized Emacs as a GUI.")
+(defvar eldev-docker-rootless 'detect
+  "Whether Docker is rootless.
+This variable can be either t, nil or symbol `detect' (default).
+In the latter case, Eldev will try to guess.  However, if it
+fails, you can set the variable in file `~/.config/eldev/config'
+to the correct value.
+
+Since 1.10.")
 
 (defvar eldev-docker-run-extra-args nil
   "Extra arguments to pass to \"docker run\".")
+
+(defvar eldev--docker-gui-args
+  (list "-e" "DISPLAY" "-v" "/tmp/.X11-unix:/tmp/.X11-unix")
+  "Arguments needed to launch dockerized Emacs as a GUI.")
 
 (defvar eldev--docker-home-name "docker-home"
   "Name of the home directory of the docker user.")
@@ -5763,6 +5772,19 @@ owned by root."
   (concat (file-name-as-directory (eldev-cache-dir nil t))
           eldev--docker-home-name))
 
+(defun eldev--docker-rootless ()
+  (pcase-exhaustive eldev-docker-rootless
+    (`nil nil)
+    (`t   t)
+    ;; I cannot find a really good way, the one below still feels like a hack.  Also, on
+    ;; Podman `info' takes non-trivial time (0.3 s here), which is annoying.  To be
+    ;; improved when a better way is suggested.
+    (`detect (eldev-call-process (eldev-docker-executable) `("info")
+               :destination '(t nil)
+               (let ((rootless (not (null (re-search-forward (rx "rootless" (0+ space) ":" (0+ space) "true") nil t)))))
+                 (eldev-trace "Determined Docker to be %s" (if rootless "rootless" "“rootful”"))
+                 rootless)))))
+
 (defun eldev--docker-args (img eldev-args &optional as-gui local-eldev)
   "Return command line args to run the docker image IMG.
 
@@ -5788,9 +5810,12 @@ will contain a mount of it at `/eldev'."
     (eldev--docker-create-directories (eldev--docker-home))
     (append (list "run" "--rm"
                   "-e" (format "HOME=%s" container-home)
-                  "-u" (format "%s:%s" (user-uid) (group-gid))
                   "-v" (format "%s:/%s" eldev-project-dir container-project-dir)
                   "-w" (concat "/" container-project-dir))
+            (unless (eldev--docker-rootless)
+              ;; In non-rootless mode this is needed so that the image won't create
+              ;; root-owned files in "outer world".
+              (list "-u" (format "%s:%s" (user-uid) (group-gid))))
             (when as-gui eldev--docker-gui-args)
             (if local-eldev
                 (when (not (string= (directory-file-name eldev-project-dir)
