@@ -5773,7 +5773,7 @@ owned by root."
           eldev--docker-home-name))
 
 (defun eldev--docker-rootless ()
-  (pcase-exhaustive eldev-docker-rootless
+  (eldev-pcase-exhaustive eldev-docker-rootless
     (`nil nil)
     (`t   t)
     ;; I cannot find a really good way, the one below still feels like a hack.  Also, on
