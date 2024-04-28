@@ -3485,7 +3485,7 @@ be used on the command line."
                (eldev-print "Deleted %s" deleted-dirs))
               ((> num-deleted-files 0)
                (eldev-print "Deleted %s" deleted-files)))))
-    (when (= num-deleted-files 0) (= num-deleted-dirs 0)
+    (when (and (= num-deleted-files 0) (= num-deleted-dirs 0))
       (eldev-print-nothing-to-do "Nothing to delete"))))
 
 (defun eldev-clean-fileset ()
