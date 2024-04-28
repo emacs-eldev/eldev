@@ -408,7 +408,7 @@ Try evaluating `(package-buffer-info)' in a buffer with the file")
                                                         ((= num-possible 1)       "replace the existing hook file")
                                                         (t                        "replace existing hook files")))
       (when (= num-processed 0)
-        (eldev-print "Nothing to do")))))
+        (eldev-print-nothing-to-do)))))
 
 ;; FIXME: Rename and move somewhere?  Looks generally useful.
 (defun eldev--githooks-is-copy (file1 file2)

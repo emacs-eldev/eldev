@@ -338,6 +338,21 @@ tools.
 
 Since 0.9.")
 
+(defvar eldev-display-indirect-build-stdout nil
+  "Whether to display standard output of indirect builds.
+For example, if the loading mode is `compiled', such output might
+contain “ELC ...” lines.  This affects the project itself and all
+its local dependencies.  Display of directly-ordered builds (e.g.
+using commands `build', `compile') is always displayed.
+
+Default value is nil since such output might be confused with
+output of the “main” command that triggered the build,
+e.g. `test', especially when it is parsed programmatically.
+However, if this is not a concern in your case, you may want to
+set the variable to t.  It is not controllable from command line.
+
+Since 1.10.")
+
 
 (defvar eldev-force-override nil
   "Set to non-nil to disable all command and option duplicate checks.")
@@ -3251,17 +3266,20 @@ Returns nil if it is neither a project nor a local dependency."
           (eldev-verbose "Preparing to load local dependency `%s' in mode `%s'" dependency-name loading-mode))
         (let ((default-directory dependency-dir))
           (dolist (command commands)
+            (when eldev-display-indirect-build-stdout
+              (setf command `("--setup" "(setf eldev--skip-nothing-to-do-messages t)" ,@command)))
             (eldev-call-process (eldev-shell-command) command
-              :forward-output     'stderr
-              :destination        '(t nil)
+              :forward-output     (if eldev-display-indirect-build-stdout t 'stderr)
+              :destination        (if eldev-display-indirect-build-stdout t '(t nil))
               :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
               :die-on-error       (if project-itself
                                       "child Eldev process"
                                     (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
-              (if (= (point-min) (point-max))
-                  (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
-                (eldev-verbose "(Non-stderr) output of the child Eldev process:")
-                (eldev-verbose (buffer-string)))
+              (unless eldev-display-indirect-build-stdout
+                (if (= (point-min) (point-max))
+                    (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
+                  (eldev-verbose "(Non-stderr) output of the child Eldev process:")
+                  (eldev-verbose (buffer-string))))
               (when (string= (car command) "package")
                 (eldev-discard-ansi-control-sequences)
                 (goto-char (point-max))
@@ -3467,8 +3485,8 @@ be used on the command line."
                (eldev-print "Deleted %s" deleted-dirs))
               ((> num-deleted-files 0)
                (eldev-print "Deleted %s" deleted-files)))))
-    (when (and (= num-deleted-files 0) (= num-deleted-dirs 0))
-      (eldev-print "Nothing to delete"))))
+    (when (= num-deleted-files 0) (= num-deleted-dirs 0)
+      (eldev-print-nothing-to-do "Nothing to delete"))))
 
 (defun eldev-clean-fileset ()
   "Return effective fileset to clean."
@@ -4970,7 +4988,7 @@ least one warning."
           (if (> eldev--lint-num-warnings 0)
               (signal 'eldev-error `("Linting produced warnings"))
             (eldev-print (if (cdr linters) "Linters have %s" "Linter has %s") (eldev-colorize "no complaints" 'success))))
-      (eldev-print "Nothing to do"))))
+      (eldev-print-nothing-to-do))))
 
 (defun eldev-lint-default-p (linter)
   (and (pcase eldev-lint-default

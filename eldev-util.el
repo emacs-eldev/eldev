@@ -635,6 +635,9 @@ Since 1.4.")
 
 (defvar eldev--real-stderr-output nil)
 
+;; Might want to make part of public interface.
+(defvar eldev--skip-nothing-to-do-messages nil)
+
 
 (defalias 'eldev-format-message (if (fboundp 'format-message) 'format-message #'format)
   "Like `format-message' if that is defined.
@@ -1071,6 +1074,15 @@ prefixes.
 Since 1.4."
   (when (> eldev-debugging-output-level 0)
     (make-string (* eldev-debugging-output-level 2) ? )))
+
+(defun eldev-print-nothing-to-do (&optional message)
+  "Print a “Nothing to do” message.
+If MESSAGE is specified, it gets printed instead.  However, its
+meaning should be similar.
+
+Since 1.10."
+  (unless eldev--skip-nothing-to-do-messages
+    (eldev-print "%s" (or message "Nothing to do"))))
 
 
 (defmacro eldev-with-verbosity-level-except (level functions-with-original-level &rest body)

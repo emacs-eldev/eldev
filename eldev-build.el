@@ -421,7 +421,7 @@ This function may only be called while inside the body of a
                     (eldev-build-abort-branch))
                 (eldev-build-target (car entry))))))
         (when (= (hash-table-count eldev--build-results) 0)
-          (eldev-print "Nothing to do"))
+          (eldev-print-nothing-to-do))
         (maphash (lambda (_target status) (unless (eq status 'built) (setf anything-failed t))) eldev--build-results)
         ;; See e.g. test `eldev-loading-modes-3'.  Basically, once we load the main
         ;; project's package (in `as-is' mode), it would never get reloaded later, which

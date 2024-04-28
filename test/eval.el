@@ -180,4 +180,20 @@
     (should (= exit-code 1))))
 
 
+(eldev-ert-defargtest eldev-eval-indirect-build-output (display-output)
+                      (nil t)
+  (let ((eldev--test-project "trivial-project"))
+    (eldev--test-run nil ("clean" "all")
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(setf eldev-display-indirect-build-stdout ,display-output)
+                          "--source" "eval" `1)
+      ;; There must be no "Nothing to..." message even when displaying output.
+      (should (equal (eldev--test-line-list stdout) `("1")))
+      (should (= exit-code 0)))
+    (eldev--test-run nil ("--setup" `(setf eldev-display-indirect-build-stdout ,display-output)
+                          "--byte-compiled" "eval" `1)
+      (should (equal (eldev--test-line-list stdout) `(,@(when display-output '("ELC      trivial-project.el")) "1")))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/eval)

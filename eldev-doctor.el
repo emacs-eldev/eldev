@@ -131,7 +131,7 @@ or “NO”, depending on `ok'."
                           (eldev-format-message "%d of them" num-visibly-failed))
                         (if (= num-visibly-failed 1) "a warning" "warnings"))
             (signal 'eldev-quit 1)))
-      (eldev-print "Nothing to delete"))))
+      (eldev-print-nothing-to-do))))
 
 (defun eldev--doctor-build-sequence (sequence name user-requested &optional dependency-stack)
   ;; A project may disable certain tests.  They still run when non-user-requested
