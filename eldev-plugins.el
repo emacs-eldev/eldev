@@ -125,11 +125,16 @@ out-of-date."
                                                           (nreverse filtered))
                                                       files))))
         (let ((inhibit-message   t)
-              (make-backup-files nil))
+              (make-backup-files nil)
+              (autoloads-file    (expand-file-name target eldev-project-dir)))
           (package-generate-autoloads (package-desc-name (eldev-package-descriptor)) effective-dir)
+          ;; Make sure we don't decide to unnecessarily rebuild it again: if the file
+          ;; hasn't changed, `package-generate-autoloads' won't overwrite it, potentially
+          ;; making it appear outdated compared to source files.
+          (set-file-times autoloads-file)
           ;; Always load the generated file.  Maybe there are cases when we don't need that,
           ;; but most of the time we do.
-          (eldev--load-autoloads-file (expand-file-name target eldev-project-dir))))))
+          (eldev--load-autoloads-file autoloads-file)))))
   (add-hook 'eldev-before-loading-dependencies-hook
             (lambda (type _additional-sets)
               (when (and type (not (eq type 'load-only)))

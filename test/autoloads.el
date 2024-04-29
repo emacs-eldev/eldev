@@ -127,4 +127,20 @@
         (should (= exit-code 0))))))
 
 
+(ert-deftest eldev-autoloads-no-rebuild-after-null-change ()
+  (eldev--test-with-temp-copy "project-j" nil
+    (eldev--test-run nil ("build")
+      (should (string= stdout "AUTOLOADS -> project-j-autoloads.el\n"))
+      (should (= exit-code 0)))
+    ;; After one of the source files is "changed", the autoloads file must be rebuilt.
+    (eldev--test-pretend-source-is-changed "project-j.el")
+    (eldev--test-run nil ("build")
+      (should (string= stdout "AUTOLOADS -> project-j-autoloads.el\n"))
+      (should (= exit-code 0)))
+    ;; But not anymore: it has been successfully rebuilt after all source changes.
+    (eldev--test-run nil ("build")
+      (should (string= stdout "Nothing to do\n"))
+      (should (= exit-code 0)))))
+
+
 (provide 'test/autoloads)
