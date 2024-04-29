@@ -1,4 +1,4 @@
-;;; trivial-project.el --- Trivial test project
+;;; trivial-project.el --- Trivial test project  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 
