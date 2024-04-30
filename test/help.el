@@ -30,6 +30,12 @@
                              stdout))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-help-unknown-command ()
+  (eldev--test-run "empty-project" ("help" "there-is-no-such-command")
+    (should (string-match "there-is-no-such-command" stderr))
+    (should (string-match "list of known commands"   stderr))
+    (should (= exit-code 1))))
+
 (ert-deftest eldev-help-missing-dependency-1 ()
   (eldev--test-run "missing-dependency-a" ("help")
     (should (string-prefix-p (eldev--test-in-project-environment (eldev--test-first-line (eldev--test-capture-output (eldev-help))))

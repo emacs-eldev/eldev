@@ -1124,37 +1124,38 @@ Since 1.0."
   (let* ((command      (intern (car command-line)))
          (real-command (or (cdr (assq command eldev--command-aliases)) command))
          (handler      (cdr (assq real-command eldev--commands))))
-    (if handler
-        (let ((hook (eldev-get handler :command-hook)))
-          (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
-            (signal 'eldev-too-old eldev-too-old))
-          (setf command-line (if (eldev-get handler :custom-parsing)
-                                 (cdr command-line)
-                               (eldev-parse-options (cdr command-line) real-command)))
-          (if (eq real-command command)
-              (eldev-verbose "Executing command `%s'..." command)
-            (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
-          (when eldev-executing-command-hook
-            (eldev-trace "Executing `eldev-executing-command-hook'...")
-            (run-hook-with-args 'eldev-executing-command-hook real-command))
-          (when (symbol-value hook)
-            (eldev-trace "Executing `%s'..." hook)
-            (run-hooks hook))
-          ;; We want `message' output on stdout universally, but
-          ;; older Emacses are very verbose and having additional
-          ;; unexpected messages in our stdout would screw up
-          ;; tests.  So we set the target to stdout only now.
-          (let ((eldev-message-rerouting-destination :stdout))
-            (apply handler command-line)))
-      (eldev--complain-about-missing-command command)
-      (eldev-print "Run `%s help' for a list of supported commands" (eldev-shell-command t)))))
+    (unless handler
+      (eldev--signal-missing-command command "Run `%s help' for a list of supported commands" (eldev-shell-command t)))
+    (let ((hook (eldev-get handler :command-hook)))
+      (when (and eldev-too-old (not (eldev-get handler :works-on-old-eldev)))
+        (signal 'eldev-too-old eldev-too-old))
+      (setf command-line (if (eldev-get handler :custom-parsing)
+                             (cdr command-line)
+                           (eldev-parse-options (cdr command-line) real-command)))
+      (if (eq real-command command)
+          (eldev-verbose "Executing command `%s'..." command)
+        (eldev-verbose "Executing command `%s' (alias for `%s')..." command real-command))
+      (when eldev-executing-command-hook
+        (eldev-trace "Executing `eldev-executing-command-hook'...")
+        (run-hook-with-args 'eldev-executing-command-hook real-command))
+      (when (symbol-value hook)
+        (eldev-trace "Executing `%s'..." hook)
+        (run-hooks hook))
+      ;; We want `message' output on stdout universally, but older Emacses are very
+      ;; verbose and having additional unexpected messages in our stdout would screw up
+      ;; tests.  So we set the target to stdout only now.
+      (let ((eldev-message-rerouting-destination :stdout))
+        (apply handler command-line)))))
 
-(defun eldev--complain-about-missing-command (command)
+(defun eldev--signal-missing-command (command &rest hint)
   ;; FIXME: Generalize.  Not clear how, currently.
-  (let ((plugin (pcase command (`release "maintainer"))))
-    (if plugin
-        (eldev-error "Command `%s' will become available if plugin `%s' is activated" command plugin)
-      (eldev-error "Unknown command `%s'" command))))
+  (let* ((plugin     (pcase command (`(or release update-copyright) "maintainer")))
+         (error-data (if plugin
+                         `("Command `%s' will become available if plugin `%s' is activated" ,command ,plugin)
+                       `("Unknown command `%s'" ,command))))
+    (when hint
+      (setf error-data `(:hint ,(if (cdr hint) hint (car hint)) ,@error-data)))
+    (signal 'eldev-error error-data)))
 
 (defun eldev--maybe-rename-archive (archive external-dir)
   (catch 'renamed-as
@@ -1960,8 +1961,7 @@ show details about that command instead."
               (eldev-help-list-aliases real-command eldev--command-aliases "\n%s" '("Command alias:" "Command aliases:"))
               (eldev-options-help real-command)
               (eldev-output "\n%s" (or (eldev-documentation handler) "Not documented")))
-          (eldev--complain-about-missing-command command)
-          (eldev-print "Run `%s help' for a list of known commands" (eldev-shell-command t))))
+          (eldev--signal-missing-command command "Run `%s help' for a list of known commands" (eldev-shell-command t))))
     (eldev-usage)
     (eldev-output "
 Options before the command are global for Eldev.  Many commands have additional
