@@ -153,13 +153,14 @@
 (ert-deftest eldev-unknown-global-option ()
   (eldev--test-run "empty-project" ("--there-is-no-such-global-option" "info")
     (should (string-match "there-is-no-such-global-option" stderr))
-    (should (string-match "eldev help"                     stderr))
+    ;; `.*' is for Windows, where the executable is named `eldev.bat'.
+    (should (string-match "eldev.* help"                   stderr))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-unknown-command-option ()
   (eldev--test-run "empty-project" ("info" "--there-is-no-such-command-option")
     (should (string-match "there-is-no-such-command-option" stderr))
-    (should (string-match "eldev help info"                 stderr))
+    (should (string-match "eldev.* help info"               stderr))
     (should (= exit-code 1))))
 
 
