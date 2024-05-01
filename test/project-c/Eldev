@@ -1,5 +1,7 @@
 (eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
 
-(setq eldev-docker-run-extra-args
-      `("-v" ,(concat (expand-file-name "../package-archive-a/")
-                      ":/package-archive-a")))
+;; FIXME: Maybe shouldn't be here?
+(setf eldev-docker-run-extra-args
+      (setf eldev-podman-run-extra-args
+            `("-v" ,(concat (expand-file-name "../package-archive-a/")
+                            ":/package-archive-a"))))

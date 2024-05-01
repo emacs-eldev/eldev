@@ -1542,6 +1542,11 @@ through `executable-find' if possible.  Since Eldev 0.8.")
 Can be set explicitly or left to t, in which case it is located
 through `executable-find' if possible.  Since Eldev 0.10.")
 
+(defvar eldev-podman-executable t
+  "Podman executable.
+Can be set explicitly or left to t, in which case it is located
+through `executable-find' if possible.  Since Eldev 1.10.")
+
 (defmacro eldev-find-executable (cache-var not-required finder-form error-message &rest error-arguments)
   "Find and executable using FINDER-FORM.
 The form will usually call `executable-find'.  Result is cached
@@ -1632,10 +1637,17 @@ See also variable `eldev-svnadmin-executable'."
 
 (defun eldev-docker-executable (&optional not-required)
   "Find `docker' executable.
-See also variable `eldev-docker-executable'."
+See also variable `eldev-docker-executable'.  Since 0.10."
   (eldev-find-executable eldev-docker-executable not-required
     (executable-find "docker")
     "Docker is not installed (cannot find `docker' executable)"))
+
+(defun eldev-podman-executable (&optional not-required)
+  "Find `podman' executable.
+See also variable `eldev-podman-executable'.  Since 1.10."
+  (eldev-find-executable eldev-podman-executable not-required
+    (executable-find "podman")
+    "Podman is not installed (cannot find `podman' executable)"))
 
 
 (defun eldev-directory-in-exec-path (directory)

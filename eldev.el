@@ -5727,7 +5727,7 @@ be passed to Emacs, else it will most likely fail."
 
 
 
-;; eldev docker
+;; eldev docker, eldev podman
 
 (defvar eldev-docker-rootless 'detect
   "Whether Docker is rootless.
@@ -5738,72 +5738,83 @@ to the correct value.
 
 Since 1.10.")
 
-(defvar eldev-docker-run-extra-args nil
-  "Extra arguments to pass to \"docker run\".")
+(defvar eldev-podman-rootless 'detect
+  "Whether Podman is rootless.
+See `eldev-docker-rootless' for more information.  Since 1.10.")
 
-(defvar eldev--docker-gui-args
-  (list "-e" "DISPLAY" "-v" "/tmp/.X11-unix:/tmp/.X11-unix")
+(defvar eldev-docker-run-extra-args nil
+  "Extra arguments to pass to `docker run'.")
+
+(defvar eldev-podman-run-extra-args nil
+  "Extra arguments to pass to `podman run'.")
+
+(defvar eldev--container-gui-args (list "-e" "DISPLAY" "-v" "/tmp/.X11-unix:/tmp/.X11-unix")
   "Arguments needed to launch dockerized Emacs as a GUI.")
 
-(defvar eldev--docker-home-name "docker-home"
-  "Name of the home directory of the docker user.")
 
-
-(defun eldev--docker-determine-img (img-string)
-  "Return an appropriate docker image based on IMG-STRING."
+(defun eldev--container-determine-img (img-string)
+  "Return an appropriate Docker image based on IMG-STRING."
   (if (string-match-p ".*/.*" img-string)
       img-string
-    (format "silex/emacs:%s" img-string)))
+    (format "docker.io/silex/emacs:%s" img-string)))
 
-(defun eldev--docker-local-dep-mounts (home)
-  "Return bind mount arguments of local dependencies for docker run.
+(defun eldev--container-local-dep-mounts (type home)
+  "Return mount arguments for local dependencies for container commands.
 
-HOME is the home directory of the container user."
+TYPE must be either `docker' or `podman', HOME is the home
+directory of the container user."
+  (ignore type)
   (eldev-flatten-tree
    (mapcar (lambda (local-dep)
-             (let* ((dir (nth 3 local-dep))
-                    (dir-rel (file-relative-name dir (expand-file-name "~")))
-                    (container-dir
-                     (if (eldev-external-filename dir-rel)
-                         dir
-                       (concat (file-name-as-directory home) dir-rel))))
+             (let* ((dir           (nth 3 local-dep))
+                    (dir-rel       (file-relative-name dir (expand-file-name "~")))
+                    (container-dir (if (eldev-external-filename dir-rel)
+                                       dir
+                                     (concat (file-name-as-directory home) dir-rel))))
                (list "-v" (format "%s:%s" (expand-file-name dir) container-dir))))
            eldev--local-dependencies)))
 
-(defun eldev--docker-create-directories (docker-home)
-  "Make directories required for \"eldev docker\" given DOCKER-HOME.
+(defun eldev--container-make-directories (type)
+  "Make directories required for `eldev docker' or `eldev podman'.
 
 This is necessary since if we mount a volume such that the directory
 on the host does not exist, then it will be created on the container
-owned by root."
-  (unless (file-exists-p docker-home)
-    (make-directory
-     (concat (file-name-as-directory docker-home)
-             (file-name-as-directory eldev-cache-dir)
-             eldev-global-cache-dir)
-     t))
-  (let ((home-bin (concat (file-name-as-directory docker-home) "bin")))
-    (unless (file-exists-p home-bin) (make-directory home-bin))))
+as owned by root."
+  (let ((container-home (eldev--container-home type)))
+    (make-directory (expand-file-name eldev-global-cache-dir (expand-file-name eldev-cache-dir container-home)) t)
+    (make-directory (expand-file-name "bin" container-home) t)))
 
-(defun eldev--docker-home ()
-  "Return the host directory of the container docker home."
-  (concat (file-name-as-directory (eldev-cache-dir nil t))
-          eldev--docker-home-name))
+(defun eldev--container-home-dir (type)
+  "Return the host directory of the container Docker/Podman home."
+  (eldev-pcase-exhaustive type
+    (`docker "docker-home")
+    (`podman "podman-home")))
 
-(defun eldev--docker-rootless ()
-  (eldev-pcase-exhaustive eldev-docker-rootless
+(defun eldev--container-home (type)
+  (expand-file-name (eldev--container-home-dir type) (eldev-cache-dir nil t)))
+
+(defun eldev--container-executable (type)
+  (eldev-pcase-exhaustive type
+    (`docker (eldev-docker-executable))
+    (`podman (eldev-podman-executable))))
+
+(defun eldev--container-rootless (type)
+  (eldev-pcase-exhaustive (eldev-pcase-exhaustive type
+                            (`docker eldev-docker-rootless)
+                            (`podman eldev-podman-rootless))
     (`nil nil)
     (`t   t)
     ;; I cannot find a really good way, the one below still feels like a hack.  Also, on
     ;; Podman `info' takes non-trivial time (0.3 s here), which is annoying.  To be
     ;; improved when a better way is suggested.
-    (`detect (eldev-call-process (eldev-docker-executable) `("info")
+    (`detect (eldev-call-process (eldev--container-executable type)
+                 `("info")
                :destination '(t nil)
                (let ((rootless (not (null (re-search-forward (rx "rootless" (0+ space) ":" (0+ space) "true") nil t)))))
-                 (eldev-trace "Determined Docker to be %s" (if rootless "rootless" "“rootful”"))
+                 (eldev-trace "Determined %s to be %s" (eldev-message-upcase-first (symbol-name type)) (if rootless "rootless" "“rootful”"))
                  rootless)))))
 
-(defun eldev--docker-args (img eldev-args &optional as-gui local-eldev)
+(defun eldev--container-args (type img eldev-args &optional as-gui local-eldev)
   "Return command line args to run the docker image IMG.
 
 ELDEV-ARGS will be appended to the eldev call in the container.
@@ -5816,25 +5827,24 @@ GUI mode.
 
 If LOCAL-ELDEV (a directory) is specified, the returned arguments
 will contain a mount of it at `/eldev'."
-  (let* ((container-project-dir (file-name-nondirectory
-                                 (directory-file-name eldev-project-dir)))
-         (container-home (concat "/"
-                                 (file-name-as-directory container-project-dir)
-                                 (file-name-as-directory eldev-cache-dir)
-                                 eldev--docker-home-name))
-         (container-eldev-cache-dir
-          (concat (file-name-as-directory container-home) eldev-cache-dir))
-         (container-bin (concat (file-name-as-directory container-home) "bin")))
-    (eldev--docker-create-directories (eldev--docker-home))
+  ;; FIXME: Path calculation sort of assumes that both end-user OS and OS inside the
+  ;;        container are UNIX-like.  Not important for now, since Windows is not
+  ;;        supported here.
+  (let* ((container-project-dir     (expand-file-name (file-name-nondirectory (directory-file-name eldev-project-dir)) "/"))
+         (container-home            (expand-file-name (eldev--container-home-dir type)
+                                                      (expand-file-name eldev-cache-dir container-project-dir)))
+         (container-eldev-cache-dir (expand-file-name container-home eldev-cache-dir))
+         (container-bin             (expand-file-name "bin" container-home)))
+    (eldev--container-make-directories type)
     (append (list "run" "--rm"
                   "-e" (format "HOME=%s" container-home)
                   "-v" (format "%s:/%s" eldev-project-dir container-project-dir)
                   "-w" (concat "/" container-project-dir))
-            (unless (eldev--docker-rootless)
+            (unless (eldev--container-rootless type)
               ;; In non-rootless mode this is needed so that the image won't create
               ;; root-owned files in "outer world".
               (list "-u" (format "%s:%s" (user-uid) (group-gid))))
-            (when as-gui eldev--docker-gui-args)
+            (when as-gui eldev--container-gui-args)
             (if local-eldev
                 (when (not (string= (directory-file-name eldev-project-dir)
                                     (directory-file-name local-eldev)))
@@ -5852,15 +5862,17 @@ will contain a mount of it at `/eldev'."
               (list "-v" (format "%s:%s/config"
                                  eldev-user-config-file
                                  container-eldev-cache-dir)))
-            (eldev--docker-local-dep-mounts container-home)
-            eldev-docker-run-extra-args
+            (eldev--container-local-dep-mounts type container-home)
+            (eldev-pcase-exhaustive type
+              (`docker eldev-docker-run-extra-args)
+              (`podman eldev-podman-run-extra-args))
             (cons img eldev-args))))
 
-(defun eldev--docker-container-eldev-cmd (args)
+(defun eldev--container-eldev-cmd (args)
   "Return the eldev command to call in the docker container deduced from ARGS."
   (car (eldev-filter (not (string-prefix-p "-" it)) args)))
 
-(defun eldev--docker-on-supported-os ()
+(defun eldev--container-on-supported-os ()
   "Return t if on a supported OS, else return nil."
   (memq system-type '(gnu/linux gnu/kfreebsd darwin)))
 
@@ -5895,41 +5907,58 @@ Currently only Linux and macOS systems are supported."
   :aliases        emacs-docker
   :category       running
   :custom-parsing t
-  (unless (eldev--docker-on-supported-os)
-    (signal 'eldev-error `("OS `%s' is currently not supported by Eldev's `docker' command" ,system-type)))
+  (eldev--container-run 'docker parameters))
+
+(eldev-defcommand eldev-podman (&rest parameters)
+  "Launch specified Emacs version in a Podman container.
+This will execute given Eldev COMMAND against a specified Emacs
+version with the project loaded with all its dependencies in a
+
+See `eldev helper docker' for more information."
+  :parameters     "{VERSION|IMG-NAME} [GLOBAL-OPTION..] COMMAND [...]"
+  :aliases        emacs-podman
+  :category       running
+  :custom-parsing t
+  (eldev--container-run 'podman parameters))
+
+(defun eldev--container-run (type parameters)
+  (unless (eldev--container-on-supported-os)
+    (signal 'eldev-error `("OS `%s' is currently not supported by Eldev's `%s' command" ,system-type ,type)))
   (unless (car parameters)
     (signal 'eldev-wrong-command-usage `(t "version not specified")))
-  (let* ((img             (eldev--docker-determine-img (car parameters)))
-         (docker-exec     (eldev-docker-executable))
+  (let* ((img             (eldev--container-determine-img (car parameters)))
          ;; We don't pass Eldev's global options, user needs to specify them for the child
          ;; process explicitly if wanted.  But there is one exception: since Docker output
          ;; is sent to the same terminal as the main process' output, it makes sense to
          ;; synchronize coloring (can still be overridden).
          (escaped-params  (mapcar #'eldev-quote-sh-string (cons (eldev--color-setting-option) (cdr parameters))))
-         (container-cmd   (eldev--docker-container-eldev-cmd escaped-params))
+         (container-cmd   (eldev--container-eldev-cmd escaped-params))
          (as-gui          (and (string= "emacs" container-cmd)
                                (not (member "--batch" parameters))))
          (local-eldev     (getenv "ELDEV_LOCAL"))
          (exp-local-eldev (when (> (length local-eldev) 0) (expand-file-name local-eldev)))
          (command-line    (mapconcat #'identity escaped-params " "))
-         (args            (eldev--docker-args img
-                                              ;; The relevant virtual Docker mount is supposed to be added later.
-                                              (if exp-local-eldev
-                                                  `("sh" "-c" ,(format "ELDEV_LOCAL=/eldev /eldev/bin/eldev %s"      command-line))
-                                                `("sh"   "-c" ,(format "export PATH=\"$HOME/bin:$PATH\" && eldev %s" command-line)))
-                                              as-gui exp-local-eldev)))
+         (args            (eldev--container-args type img
+                                                 ;; The relevant virtual Docker mount is supposed to be added later.
+                                                 (if exp-local-eldev
+                                                     `("sh" "-c" ,(format "ELDEV_LOCAL=/eldev /eldev/bin/eldev %s"      command-line))
+                                                   `("sh"   "-c" ,(format "export PATH=\"$HOME/bin:$PATH\" && eldev %s" command-line)))
+                                                 as-gui exp-local-eldev))
+         (type-name       (eldev-message-upcase-first (symbol-name type))))
     (unwind-protect
-        (eldev-call-process docker-exec args
-          :pre-execution (eldev-verbose "Full command line to run a Docker process:\n  %s"
-                                        (eldev-message-command-line executable command-line))
+        (eldev-call-process (eldev--container-executable type) args
+          :pre-execution (eldev-verbose "Full command line to run a %s process:\n  %s"
+                                        type-name (eldev-message-command-line executable command-line))
           :forward-output t
           ;; Using custom code instead of `:die-on-error' because of the hint.
           (when (/= exit-code 0)
             (signal 'eldev-error `(:hint ,(when (string-match-p "unavailable, simulating -nw" (buffer-string))
-                                            '("It appears your X server is not accepting connections from the Docker container"
-                                              "Have you run `xhost +local:root' (remember about security issues, though)?"))
-                                         "Docker process exited with error code %d" ,exit-code))))
-      (delete-directory (eldev--docker-home) t))))
+                                            `(,(format "It appears your X server is not accepting connections from the %s container"
+                                                       "Have you run `xhost +local:root' (remember about security issues, though)?"
+                                                       type-name)))
+                                         ,(format "%s process exited with error code %%d" type-name) ,exit-code))))
+      ;; FIXME: Should we even do that?  Preserving previous semantics for now.
+      (delete-directory (eldev--container-home type) t))))
 
 
 
