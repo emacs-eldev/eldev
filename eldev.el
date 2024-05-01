@@ -5953,9 +5953,9 @@ See `eldev helper docker' for more information."
           ;; Using custom code instead of `:die-on-error' because of the hint.
           (when (/= exit-code 0)
             (signal 'eldev-error `(:hint ,(when (string-match-p "unavailable, simulating -nw" (buffer-string))
-                                            `(,(format "It appears your X server is not accepting connections from the %s container"
-                                                       "Have you run `xhost +local:root' (remember about security issues, though)?"
-                                                       type-name)))
+                                            `(,(concat "It appears your X server is not accepting connections from the %s container\n"
+                                                       "Have you run `xhost +local:root' (remember about security issues, though)?")
+                                              ,type-name))
                                          ,(format "%s process exited with error code %%d" type-name) ,exit-code))))
       ;; FIXME: Should we even do that?  Preserving previous semantics for now.
       (delete-directory (eldev--container-home type) t))))
