@@ -51,7 +51,8 @@ provides only a brief overview.
   setups.
 * Can run on {uri-documentation}#different-emacs-versions[different
   Emacs version] even on the same machine; can also use
-  {uri-documentation}#docker[Docker] for that.
+  {uri-documentation}#docker[Docker] or
+  {uri-documentation}#podman[Podman] for that.
 * There are {uri-documentation}#setup-procedure[_four_ levels of
   configuration] — you can customize most aspects of Eldev for your
   project needs and personal preferences.

@@ -56,11 +56,11 @@ Functions for many of the hooks listed below do receive arguments.
 {since-0-2} `eldev-test-FRAMEWORK-hook (SELECTORS)`::
 
     Called immediately before executing tests with given framework
-    (<<ert,ERT>>, <<buttercup,Buttercup>>, <<ecukes,Ecukes>>).
-    Functions on the hook get passed `SELECTORS` as the only argument.
-    At this point project dependencies and additional set `test` will
-    have been loaded already, so functions can `require` features from
-    the project.
+    (<<ert,ERT>>, <<buttercup,Buttercup>>, <<doctest,Doctest>>,
+    <<ecukes,Ecukes>>).  Functions on the hook get passed `SELECTORS`
+    as the only argument.  At this point project dependencies and
+    additional set `test` will have been loaded already, so functions
+    can `require` features from the project.
 
 === Writing builders
 

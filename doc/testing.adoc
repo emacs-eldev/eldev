@@ -3,9 +3,9 @@
 
 Eldev has built-in support for running regression/unit tests of your
 project.  Currently, Eldev supports {uri-ert}[ERT],
-{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
-frameworks.  Leave a feature request in the issue tracker if you are
-interested in a different library.
+{uri-buttercup}[Buttercup], {uri-doctest}[Doctest] and
+{uri-ecukes}[Ecukes] testing frameworks.  Leave a feature request in
+the issue tracker if you are interested in a different library.
 
 Simply executing
 
@@ -73,9 +73,9 @@ command `test` work.
 `simple`:: Like `standard` with a few Eldev-specific tweaks that I
 feel are useful (see `--list-runners` output for details).  This is
 the default runner.
-`concise`:: {since-1-6} Like `simple`, but progress output for ERT and
-Buttercup is replaced by a single dot per passing test.  Give it a try
-to decide if you like that or not.
+`concise`:: {since-1-6} Like `simple`, but progress output for ERT,
+Buttercup and Doctest is replaced by a single dot per passing test.
+Give it a try to decide if you like that or not.
 
 If you always use a different test runner, it is a good idea to set it
 as the default in file `~/.config/eldev/config`.  Finally, you can
@@ -85,15 +85,16 @@ even write your own runner.
 === Frameworks
 
 As stated above, Eldev supports {uri-ert}[ERT] (Emacs built-in),
-{uri-buttercup}[Buttercup] and {uri-ecukes}[Ecukes] testing
-frameworks.  Normally, you don’t need to specify which framework the
-project uses, as the tool can autodetect that.  But in rare cases you
-may need to set variable `eldev-test-framework` to either `'ert`,
-`'buttercup` or `'ecukes`, as appropriate.  It is also possible to use
-more than one framework in a project, <<multiple-frameworks,see
-below>>.  You don’t need to declare testing package(s) as
-<<additional-dependencies,extra dependencies>>: Eldev will install
-them itself when needed.
+{uri-buttercup}[Buttercup], {uri-doctest}[Doctest] and
+{uri-ecukes}[Ecukes] testing frameworks.  With the exception of
+Doctest, you don’t need to specify which framework the project uses,
+as the tool can autodetect that.  But in some cases (for Doctest —
+always) you may need to set variable `eldev-test-framework` to either
+`'ert`, `'buttercup`, `'doctest` or `'ecukes`, as appropriate.  It is
+also possible to use more than one framework in a project,
+<<multiple-frameworks,see below>>.  You don’t need to declare testing
+package(s) as <<additional-dependencies,extra dependencies>>: Eldev
+will install them itself when needed.
 
 Eldev tries to provide uniform command line interface to the supported
 frameworks, but of course there are many differences between them.
@@ -131,6 +132,30 @@ Things that won’t work with Buttercup at the moment:
 
 Unlike <<ert,ERT>>, Buttercup also has no special selectors that base
 on the previous run’s results.
+
+[#doctest]
+==== Doctest
+
+{since-1-10} {uri-doctest}[Doctest] is a framework that allows you to
+embed test expressions into source code, e.g. function documentation.
+As a result, your unit tests turn into documentation that your users
+can read.
+
+Because the tests are located directly in the source code rather than
+in separate files, there is no robust way to autodetect their
+presence.  For this reason, you must _always_ <<frameworks,declare
+that you use this framework>> using variable `eldev-test-framework`.
+You can also freely mix it with other tests by employing
+<<multiple-frameworks,multiple test frameworks>> in the same project.
+
+Support for Doctest in Eldev is quite limited and many things won’t
+work currently:
+
+* the framework has no notion comparable to selectors, so those will
+  be ignored;
+* Doctest doesn’t print failure backtraces, so relevant options have
+  no effect;
+* option `--stop-on-unexpected` is not supported.
 
 [#ecukes]
 ==== Ecukes

@@ -94,6 +94,38 @@ You can always ask Eldev for a full list:
 
     $ eldev --list-modes
 
+[#indirect-builds]
+=== Indirect build information
+
+When a loading mode require Eldev to do something in order to prepare
+the project or its local dependencies for loading, it tries to do so
+silently in that only stderr is normally displayed.  The purpose is to
+prevent secondary and partially unpredictable (more precisely,
+depending on previous builds) output from interfering with normal
+output.  For example, if you run
+
+    $ eldev eval "(some-project-function)"
+
+it might be confusing if the first line of output is instead
+
+    ELC      some-file.el
+
+if the loading mode is `byte-compiled` and `some-file.elc` doesn’t
+exist or is out-of-date.  In particular, if such output is then parsed
+using some automated tool, this could lead to unexpected errors.
+
+{since-1-10} However, if this is not a concern in your case, you may
+want to set variable `eldev-display-indirect-build-stdout` to t.  This
+is especially useful if your project’s loading mode is `built` and it
+involves some custom non-trivial build steps, like e.g. compilation of
+a helper non-Elisp program.
+
+Unlike with some other settings, the main project ignores values in
+local dependencies.  Instead, `eldev-display-indirect-build-stdout` as
+defined in the main project affects both the project itself and all
+local dependencies at once: only the main project “knows” if it is
+important to avoid indirect build output for it or not.
+
 [#source-directory]
 === Project source directory
 

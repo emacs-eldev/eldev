@@ -5,7 +5,7 @@ Because of Eldev’s trivial installation and built-in support for
 testing, it is a suitable tool for use on continuous integration
 servers.  But of course this only applies if the test framework your
 project uses is already supported (currently <<ert,ERT>>,
-<<buttercup,Buttercup>> and <<ecukes,Ecukes>>).
+<<buttercup,Buttercup>>, <<doctest,Doctest>> and <<ecukes,Ecukes>>).
 
 Eldev will even try to make your CI runs <<robust-mode,more
 reliable>>.
