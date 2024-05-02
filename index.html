@@ -481,6 +481,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#loading-modes">Loading modes</a>
 <ul class="sectlevel2">
+<li><a href="#indirect-builds">Indirect build information</a></li>
 <li><a href="#source-directory">Project source directory</a></li>
 <li><a href="#autoloads">Autoloads</a></li>
 </ul>
@@ -516,7 +517,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#different-emacs-versions">Executing on different Emacs versions</a>
 <ul class="sectlevel2">
-<li><a href="#docker">Using Docker</a></li>
+<li><a href="#docker">Using Docker or Podman</a></li>
 </ul>
 </li>
 <li><a href="#continuous-integration">Continuous integration</a>
@@ -604,7 +605,8 @@ integration</a> setups.</p>
 </li>
 <li>
 <p>Can run on <a href="#different-emacs-versions">different Emacs version</a> even
-on the same machine; can also use <a href="#docker">Docker</a> for that.</p>
+on the same machine; can also use <a href="#docker">Docker</a> or
+<a href="#podman">Podman</a> for that.</p>
 </li>
 <li>
 <p>There are <a href="#setup-procedure"><em>four</em> levels of configuration</a> — you
@@ -1876,6 +1878,49 @@ You can always ask Eldev for a full list:</p>
 </div>
 </div>
 <div class="sect2">
+<h3 id="indirect-builds">Indirect build information</h3>
+<div class="paragraph">
+<p>When a loading mode require Eldev to do something in order to prepare
+the project or its local dependencies for loading, it tries to do so
+silently in that only stderr is normally displayed.  The purpose is to
+prevent secondary and partially unpredictable (more precisely,
+depending on previous builds) output from interfering with normal
+output.  For example, if you run</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>$ eldev eval "(some-project-function)"</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>it might be confusing if the first line of output is instead</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>ELC      some-file.el</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>if the loading mode is <code>byte-compiled</code> and <code>some-file.elc</code> doesn’t
+exist or is out-of-date.  In particular, if such output is then parsed
+using some automated tool, this could lead to unexpected errors.</p>
+</div>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.10-8be" alt="Since 1.10"></span> However, if this is not a concern in your case, you may
+want to set variable <code>eldev-display-indirect-build-stdout</code> to t.  This
+is especially useful if your project’s loading mode is <code>built</code> and it
+involves some custom non-trivial build steps, like e.g. compilation of
+a helper non-Elisp program.</p>
+</div>
+<div class="paragraph">
+<p>Unlike with some other settings, the main project ignores values in
+local dependencies.  Instead, <code>eldev-display-indirect-build-stdout</code> as
+defined in the main project affects both the project itself and all
+local dependencies at once: only the main project “knows” if it is
+important to avoid indirect build output for it or not.</p>
+</div>
+</div>
+<div class="sect2">
 <h3 id="source-directory">Project source directory</h3>
 <div class="paragraph">
 <p><span class="image right"><img src="https://img.shields.io/badge/since-1.8-8be" alt="Since 1.8"></span> Usually Elisp projects contain their source files directly
@@ -2410,9 +2455,9 @@ deleted, without actually deleting it.</p>
 <div class="paragraph">
 <p>Eldev has built-in support for running regression/unit tests of your
 project.  Currently, Eldev supports <a href="https://www.gnu.org/software/emacs/manual/html_node/ert/index.html">ERT</a>,
-<a href="https://github.com/jorgenschaefer/emacs-buttercup">Buttercup</a> and <a href="https://github.com/ecukes/ecukes">Ecukes</a> testing
-frameworks.  Leave a feature request in the issue tracker if you are
-interested in a different library.</p>
+<a href="https://github.com/jorgenschaefer/emacs-buttercup">Buttercup</a>, <a href="https://github.com/ag91/doctest">Doctest</a> and
+<a href="https://github.com/ecukes/ecukes">Ecukes</a> testing frameworks.  Leave a feature request in
+the issue tracker if you are interested in a different library.</p>
 </div>
 <div class="paragraph">
 <p>Simply executing</p>
@@ -2509,9 +2554,9 @@ the default runner.</p>
 </dd>
 <dt class="hdlist1"><code>concise</code></dt>
 <dd>
-<p><span class="image right"><img src="https://img.shields.io/badge/since-1.6-8be" alt="Since 1.6"></span> Like <code>simple</code>, but progress output for ERT and
-Buttercup is replaced by a single dot per passing test.  Give it a try
-to decide if you like that or not.</p>
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.6-8be" alt="Since 1.6"></span> Like <code>simple</code>, but progress output for ERT,
+Buttercup and Doctest is replaced by a single dot per passing test.
+Give it a try to decide if you like that or not.</p>
 </dd>
 </dl>
 </div>
@@ -2524,15 +2569,16 @@ even write your own runner.</p>
 <h3 id="frameworks">Frameworks</h3>
 <div class="paragraph">
 <p>As stated above, Eldev supports <a href="https://www.gnu.org/software/emacs/manual/html_node/ert/index.html">ERT</a> (Emacs built-in),
-<a href="https://github.com/jorgenschaefer/emacs-buttercup">Buttercup</a> and <a href="https://github.com/ecukes/ecukes">Ecukes</a> testing
-frameworks.  Normally, you don’t need to specify which framework the
-project uses, as the tool can autodetect that.  But in rare cases you
-may need to set variable <code>eldev-test-framework</code> to either <code>'ert</code>,
-<code>'buttercup</code> or <code>'ecukes</code>, as appropriate.  It is also possible to use
-more than one framework in a project, <a href="#multiple-frameworks">see
-below</a>.  You don’t need to declare testing package(s) as
-<a href="#additional-dependencies">extra dependencies</a>: Eldev will install
-them itself when needed.</p>
+<a href="https://github.com/jorgenschaefer/emacs-buttercup">Buttercup</a>, <a href="https://github.com/ag91/doctest">Doctest</a> and
+<a href="https://github.com/ecukes/ecukes">Ecukes</a> testing frameworks.  With the exception of
+Doctest, you don’t need to specify which framework the project uses,
+as the tool can autodetect that.  But in some cases (for Doctest —
+always) you may need to set variable <code>eldev-test-framework</code> to either
+<code>'ert</code>, <code>'buttercup</code>, <code>'doctest</code> or <code>'ecukes</code>, as appropriate.  It is
+also possible to use more than one framework in a project,
+<a href="#multiple-frameworks">see below</a>.  You don’t need to declare testing
+package(s) as <a href="#additional-dependencies">extra dependencies</a>: Eldev
+will install them itself when needed.</p>
 </div>
 <div class="paragraph">
 <p>Eldev tries to provide uniform command line interface to the supported
@@ -2583,6 +2629,42 @@ will always work as if 80 was specified.</p>
 <div class="paragraph">
 <p>Unlike <a href="#ert">ERT</a>, Buttercup also has no special selectors that base
 on the previous run’s results.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="doctest">Doctest</h4>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.10-8be" alt="Since 1.10"></span> <a href="https://github.com/ag91/doctest">Doctest</a> is a framework that allows you to
+embed test expressions into source code, e.g. function documentation.
+As a result, your unit tests turn into documentation that your users
+can read.</p>
+</div>
+<div class="paragraph">
+<p>Because the tests are located directly in the source code rather than
+in separate files, there is no robust way to autodetect their
+presence.  For this reason, you must <em>always</em> <a href="#frameworks">declare
+that you use this framework</a> using variable <code>eldev-test-framework</code>.
+You can also freely mix it with other tests by employing
+<a href="#multiple-frameworks">multiple test frameworks</a> in the same project.</p>
+</div>
+<div class="paragraph">
+<p>Support for Doctest in Eldev is quite limited and many things won’t
+work currently:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>the framework has no notion comparable to selectors, so those will
+be ignored;</p>
+</li>
+<li>
+<p>Doctest doesn’t print failure backtraces, so relevant options have
+no effect;</p>
+</li>
+<li>
+<p>option <code>--stop-on-unexpected</code> is not supported.</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect3">
@@ -3382,12 +3464,12 @@ in the same directory is hard-coded in various places in Emacs.</p>
 don’t forget to clean the directory.</p>
 </div>
 <div class="sect2">
-<h3 id="docker">Using Docker</h3>
+<h3 id="docker">Using Docker or Podman</h3>
 <div class="paragraph">
 <p>Alternatively, if you are on a Linux or macOS system and have
-<a href="https://www.docker.com/">Docker</a> installed, you can run arbitrary Eldev commands
-within containers based on the images distributed by
-<a href="https://github.com/Silex/docker-emacs">docker-emacs</a>.  For example:</p>
+<a href="https://www.docker.com/">Docker</a> or (since 1.10) <a href="https://podman.io/">Podman</a> installed,
+you can run arbitrary Eldev commands within containers based on the
+images distributed by <a href="https://github.com/Silex/docker-emacs">docker-emacs</a>.  For example:</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -3398,6 +3480,16 @@ within containers based on the images distributed by
 <p>will start an Emacs 27.2 container and run <code>eldev emacs --eval
 '(insert (format "Emacs version: %s" emacs-version))'</code> in it.</p>
 </div>
+<div id="podman" class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.10-8be" alt="Since 1.10"></span> Podman, from Eldev’s point of view, works just the
+same.  There is a special command for it, but it is basically
+indistinguishable (except for the name):</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>$ eldev podman 27.2 emacs --eval '(insert (format "Emacs version: %s" emacs-version))'</pre>
+</div>
+</div>
 <div class="admonitionblock note">
 <table>
 <tr>
@@ -3406,8 +3498,8 @@ within containers based on the images distributed by
 </td>
 <td class="content">
 You may have to run <code>xhost +local:root</code> which allows the Docker
-container to make connections to the host X server.  However, this
-does come with some security considerations, see <code>man xhost</code>.
+(Podman) container to make connections to the host X server.  However,
+this does come with some security considerations, see <code>man xhost</code>.
 </td>
 </tr>
 </table>
@@ -3431,12 +3523,12 @@ older editor version:</p>
 </div>
 </div>
 <div class="paragraph">
-<p>Docker’s output is forwarded to normal Eldev output, however, because
-of <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745">Elisp limitations</a>, it all ends up on
-Eldev’s stdout!  There might also be unwieldy delays, so that output
-doesn’t come smoothly as generated by the process inside Docker, but
-instead in larger chunks.  Before Eldev 1.2 the output would instead
-only appear when Docker has exited.</p>
+<p>Docker’s (Podman’s) output is forwarded to normal Eldev output,
+however, because of <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745">Elisp limitations</a>, it all
+ends up on Eldev’s stdout!  There might also be unwieldy delays, so
+that output doesn’t come smoothly as generated by the process inside
+Docker, but instead in larger chunks.  Before Eldev 1.2 the output
+would instead only appear when Docker has exited.</p>
 </div>
 <div class="paragraph">
 <p>It is also possible to use a custom image.  For this, replace Emacs
@@ -3446,7 +3538,8 @@ supported by Eldev (i.e. 24.4 and up), but not Eldev itself.</p>
 </div>
 <div class="paragraph">
 <p>Additionally, <code>docker run</code> arguments are customisable via the variable
-<code>eldev-docker-run-extra-args</code>.  For example, adding the following to
+<code>eldev-docker-run-extra-args</code> (and likewise for Podman:
+<code>eldev-podman-run-extra-args</code>).  For example, adding the following to
 your project’s <code>Eldev</code>:</p>
 </div>
 <div class="literalblock">
@@ -3468,7 +3561,7 @@ your project’s <code>Eldev</code>:</p>
 testing, it is a suitable tool for use on continuous integration
 servers.  But of course this only applies if the test framework your
 project uses is already supported (currently <a href="#ert">ERT</a>,
-<a href="#buttercup">Buttercup</a> and <a href="#ecukes">Ecukes</a>).</p>
+<a href="#buttercup">Buttercup</a>, <a href="#doctest">Doctest</a> and <a href="#ecukes">Ecukes</a>).</p>
 </div>
 <div class="paragraph">
 <p>Eldev will even try to make your CI runs <a href="#robust-mode">more
@@ -4618,11 +4711,11 @@ all three hooks.</p>
 <dt class="hdlist1"><span class="image right"><img src="https://img.shields.io/badge/since-0.2-8be" alt="Since 0.2"></span> <code>eldev-test-FRAMEWORK-hook (SELECTORS)</code></dt>
 <dd>
 <p>Called immediately before executing tests with given framework
-(<a href="#ert">ERT</a>, <a href="#buttercup">Buttercup</a>, <a href="#ecukes">Ecukes</a>).
-Functions on the hook get passed <code>SELECTORS</code> as the only argument.
-At this point project dependencies and additional set <code>test</code> will
-have been loaded already, so functions can <code>require</code> features from
-the project.</p>
+(<a href="#ert">ERT</a>, <a href="#buttercup">Buttercup</a>, <a href="#doctest">Doctest</a>,
+<a href="#ecukes">Ecukes</a>).  Functions on the hook get passed <code>SELECTORS</code>
+as the only argument.  At this point project dependencies and
+additional set <code>test</code> will have been loaded already, so functions
+can <code>require</code> features from the project.</p>
 </dd>
 </dl>
 </div>
@@ -5149,7 +5242,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2024-03-05 22:22:24 UTC
+Last updated 2024-05-02 16:01:05 UTC
 </div>
 </div>
 </body>
