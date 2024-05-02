@@ -38,6 +38,7 @@
 :uri-travis: https://travis-ci.org/
 :uri-circle: https://circleci.com/
 :uri-docker: https://www.docker.com/
+:uri-podman: https://podman.io/
 :uri-coveralls: https://coveralls.io/
 :uri-setup-emacs: https://github.com/jcs090218/setup-emacs
 :uri-setup-eldev: https://github.com/emacs-eldev/setup-eldev

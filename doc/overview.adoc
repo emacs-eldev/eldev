@@ -9,7 +9,8 @@ Eldev features:
 * Blends nicely into <<continuous-integration,continuous
   integration>> setups.
 * Can run on <<different-emacs-versions,different Emacs version>> even
-  on the same machine; can also use <<docker,Docker>> for that.
+  on the same machine; can also use <<docker,Docker>> or
+  <<podman,Podman>> for that.
 * There are <<setup-procedure,_four_ levels of configuration>> — you
   can customize most aspects of Eldev for your project needs and
   personal preferences.
