@@ -96,7 +96,8 @@
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-local-dependency-fixes-missing-dependency-2 ()
+(eldev-ert-defargtest eldev-local-dependency-fixes-missing-dependency-2 (display-stdout)
+                      (nil t)
   (eldev--test-run "dependency-a" ("clean")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -108,16 +109,18 @@
     ;; In `byte-compiled' loading mode `byte-code-function-p' must
     ;; always return t, i.e. dependency must be compiled implicitly.
     (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a" 'byte-compiled)
+                          "--setup" `(setf eldev-display-indirect-build-stdout ,display-stdout)
                           "eval" `(dependency-a-stable) `(byte-code-function-p (symbol-function 'dependency-a-stable))
                           `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
-      (should (string= stdout (eldev--test-lines "nil" "t" "(1 0 99)")))
+      (should (string= stdout (eldev--test-lines (when display-stdout '("ELC      dependency-a.el")) "nil" "t" "(1 0 99)")))
       (should (= exit-code 0)))
     (eldev--test-run nil ("eval" `(dependency-a-stable))
       (should (string-match-p "dependency-a" stderr))
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-local-dependency-fixes-missing-dependency-3 ()
+(eldev-ert-defargtest eldev-local-dependency-fixes-missing-dependency-3 (display-stdout)
+                      (nil t)
   (eldev--test-run "dependency-a" ("compile")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -130,16 +133,18 @@
     ;; return nil, i.e. dependency must be cleaned even if compiled
     ;; before.
     (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a" 'source)
+                          "--setup" `(setf eldev-display-indirect-build-stdout ,display-stdout)
                           "eval" `(dependency-a-stable) `(byte-code-function-p (symbol-function 'dependency-a-stable))
                           `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
-      (should (string= stdout (eldev--test-lines "nil" "nil" "(1 0 99)")))
+      (should (string= stdout (eldev--test-lines (when display-stdout '("Deleted 1 file")) "nil" "nil" "(1 0 99)")))
       (should (= exit-code 0)))
     (eldev--test-run nil ("eval" `(dependency-a-stable))
       (should (string-match-p "dependency-a" stderr))
       (should (string= stdout ""))
       (should (= exit-code 1)))))
 
-(ert-deftest eldev-local-dependency-fixes-missing-dependency-4 ()
+(eldev-ert-defargtest eldev-local-dependency-fixes-missing-dependency-4 (display-stdout)
+                      (nil t)
   (eldev--test-run "dependency-a" ("clean")
     (should (= exit-code 0)))
   (let ((eldev--test-project "missing-dependency-a"))
@@ -152,6 +157,7 @@
     ;; return t, i.e. dependency must be compiled when installed as a
     ;; package.  FIXME: Probably could use a better check.
     (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a" 'packaged)
+                          "--setup" `(setf eldev-display-indirect-build-stdout ,display-stdout)
                           "eval" `(dependency-a-stable) `(byte-code-function-p (symbol-function 'dependency-a-stable))
                           `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
       (should (string= stdout (eldev--test-lines "nil" "t" "(1 0 99)")))

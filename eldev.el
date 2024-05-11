@@ -3279,31 +3279,36 @@ Returns nil if it is neither a project nor a local dependency."
           (eldev-verbose "Preparing to load local dependency `%s' in mode `%s'" dependency-name loading-mode))
         (let ((default-directory dependency-dir))
           (dolist (command commands)
-            (when eldev-display-indirect-build-stdout
-              (setf command `("--setup" "(setf eldev--skip-nothing-to-do-messages t)" ,@command)))
-            (eldev-call-process (eldev-shell-command) command
-              :forward-output     (if eldev-display-indirect-build-stdout t 'stderr)
-              :destination        (if eldev-display-indirect-build-stdout t '(t nil))
-              :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
-              :die-on-error       (if project-itself
-                                      "child Eldev process"
-                                    (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
-              (unless eldev-display-indirect-build-stdout
-                (if (= (point-min) (point-max))
-                    (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
-                  (eldev-verbose "(Non-stderr) output of the child Eldev process:")
-                  (eldev-verbose (buffer-string))))
-              (when (string= (car command) "package")
-                (eldev-discard-ansi-control-sequences)
-                (goto-char (point-max))
-                (forward-line -2)
-                (let ((point (point)))
-                  (end-of-line)
-                  (let ((file (buffer-substring-no-properties point (point))))
-                    (forward-line)
-                    (unless (looking-at (rx bol (or "up-to-date" "generated") eol))
-                      (error "Unable to parse child Eldev process output:\n%s" (buffer-string)))
-                    (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-dependency-packages))))))))
+            (let* ((packaging      (string= (car command) "package"))
+                   ;; When packaging, we request the nested Eldev to produce some output
+                   ;; meant for internal purposes, so stdout forwarding is suppressed.
+                   ;; FIXME: Not good enough if packaging results in some other build steps...
+                   (display-stdout (and eldev-display-indirect-build-stdout (not packaging))))
+              (when display-stdout
+                (setf command `("--setup" "(setf eldev--skip-nothing-to-do-messages t)" ,@command)))
+              (eldev-call-process (eldev-shell-command) command
+                :forward-output     (if display-stdout t 'stderr)
+                :destination        (if display-stdout t '(t nil))
+                :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
+                :die-on-error       (if project-itself
+                                        "child Eldev process"
+                                      (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
+                (unless display-stdout
+                  (if (= (point-min) (point-max))
+                      (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
+                    (eldev-verbose "(Non-stderr) output of the child Eldev process:")
+                    (eldev-verbose (buffer-string))))
+                (when packaging
+                  (eldev-discard-ansi-control-sequences)
+                  (goto-char (point-max))
+                  (forward-line -2)
+                  (let ((point (point)))
+                    (end-of-line)
+                    (let ((file (buffer-substring-no-properties point (point))))
+                      (forward-line)
+                      (unless (looking-at (rx bol (or "up-to-date" "generated") eol))
+                        (error "Unable to parse child Eldev process output:\n%s" (buffer-string)))
+                      (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-dependency-packages)))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 
 ;; This is a hackish function only working for packages loaded in `as-is' and similar
