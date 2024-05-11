@@ -2709,7 +2709,19 @@ Since 0.2."
                                                                                            (boundp 'url-http-open-connections)
                                                                                            (hash-table-p url-http-open-connections))
                                                                                   (clrhash url-http-open-connections))
-                                                                                (package-install-from-archive dependency))
+                                                                                ;; This really weird workaround was crafted against a bug seen only on GitHub CI and only in test
+                                                                                ;; `eldev-container-test-1/podman', which would fail with an error "Doing chmod: Operation not
+                                                                                ;; permitted, /project-c/.eldev/28.2/packages/dependency-a-1.0/dependency-a-autoloads.eliLIjiV"
+                                                                                ;; coming from inside Podman process.  I have no idea why, what and where was wrong, but as I digged
+                                                                                ;; through it and found a workaround anyway, let's have it.  `errno' from Fset_file_modes() in Emacs
+                                                                                ;; source could maybe tell more, but I have no idea how to get it, so fuck it.  Running `chmod'
+                                                                                ;; instead of calling Emacs function would succeed, by the way, but on the other hand it doesn't
+                                                                                ;; have a `nofollow' option, so that doesn't say much.
+                                                                                (eldev-advised ('set-file-modes :around (lambda (original filename mode &optional flag)
+                                                                                                                          (when (and flag (not (file-symlink-p filename)))
+                                                                                                                            (setf flag nil))
+                                                                                                                          (funcall original filename mode flag)))
+                                                                                  (package-install-from-archive dependency)))
                                                                             (when (eq dependency-name 'eldev)
                                                                               ;; Reload the current package again, so that we
                                                                               ;; don't mix old and new function invocations.
