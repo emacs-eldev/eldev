@@ -1,4 +1,4 @@
-;;; dependency-a.el --- Dependency test package A
+;;; dependency-a.el --- Dependency test package A  -*- lexical-binding: t -*-
 
 ;; Version: 1.0.99
 
