@@ -2717,10 +2717,11 @@ Since 0.2."
                                                                                 ;; source could maybe tell more, but I have no idea how to get it, so fuck it.  Running `chmod'
                                                                                 ;; instead of calling Emacs function would succeed, by the way, but on the other hand it doesn't
                                                                                 ;; have a `nofollow' option, so that doesn't say much.
-                                                                                (eldev-advised ('set-file-modes :around (lambda (original filename mode &optional flag)
-                                                                                                                          (when (and flag (not (file-symlink-p filename)))
-                                                                                                                            (setf flag nil))
-                                                                                                                          (funcall original filename mode flag)))
+                                                                                (eldev-advised ('set-file-modes :around (when (>= emacs-major-version 28)
+                                                                                                                          (lambda (original filename mode &optional flag)
+                                                                                                                            (when (and flag (not (file-symlink-p filename)))
+                                                                                                                              (setf flag nil))
+                                                                                                                            (funcall original filename mode flag))))
                                                                                   (package-install-from-archive dependency)))
                                                                             (when (eq dependency-name 'eldev)
                                                                               ;; Reload the current package again, so that we
