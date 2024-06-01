@@ -5968,13 +5968,22 @@ See `eldev helper docker' for more information."
           :pre-execution (eldev-verbose "Full command line to run a %s process:\n  %s"
                                         type-name (eldev-message-command-line executable command-line))
           :forward-output t
-          ;; Using custom code instead of `:die-on-error' because of the hint.
+          :destination    t
+          ;; Using custom code instead of `:die-on-error' because of the hints.
           (when (/= exit-code 0)
-            (signal 'eldev-error `(:hint ,(when (string-match-p "unavailable, simulating -nw" (buffer-string))
-                                            `(,(concat "It appears your X server is not accepting connections from the %s container\n"
-                                                       "Have you run `xhost +local:root' (remember about security issues, though)?")
-                                              ,type-name))
-                                         ,(format "%s process exited with error code %%d" type-name) ,exit-code))))
+            ;; Only hint about potential errors in the last few lines of output, others
+            ;; are likely not a direct cause of the failure.
+            (let ((failure-output (save-excursion (goto-char (point-max)) (forward-line -5) (buffer-substring-no-properties (point) (point-max)))))
+              (signal 'eldev-error `(:hint ,(cond ((string-match-p "no such file or directory" failure-output)
+                                                   `(,(concat "When running inside a %s container, using files outside the project,\n"
+                                                              "including via symbol links, might not work properly.  Local dependencies should\n"
+                                                              "still work, though.")
+                                                     ,type-name))
+                                                  ((string-match-p "unavailable, simulating -nw" failure-output)
+                                                   `(,(concat "It appears your X server is not accepting connections from the %s container\n"
+                                                              "Have you run `xhost +local:root' (remember about security issues, though)?")
+                                                     ,type-name)))
+                                           ,(format "%s process exited with error code %%d" type-name) ,exit-code)))))
       ;; FIXME: Should we even do that?  Preserving previous semantics for now.
       (delete-directory (eldev--container-home type) t))))
 
