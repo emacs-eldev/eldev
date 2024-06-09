@@ -1842,17 +1842,19 @@ Since 1.2:
                   (when (and (eq forward-output 'stderr) (null stderr-buffer))
                     (setf stderr-buffer (generate-new-buffer " *stderr*")))
                   (unwind-protect
-                      (progn
+                      (let ((main-process-live t)
+                            stderr-process-live)
                         ;; When forwarding only stdout, we create a dummy pipe for stderr
                         ;; only to discard it.
                         (setf stderr-pipe (when (or stderr-buffer (eq forward-output 'stdout))
+                                            (setf stderr-process-live t)
                                             (make-pipe-process :name     (format "%s stderr" executable)
                                                                :buffer   stderr-buffer
                                                                :filter   (when (eq forward-output 'stderr)
                                                                            (lambda (process string)
                                                                              (eldev--do-stderr-output string)
                                                                              (internal-default-process-filter process string)))
-                                                               :sentinel #'ignore
+                                                               :sentinel (lambda (process &rest _) (setf stderr-process-live (process-live-p process)))
                                                                :noquery  t))
                               process     (make-process :name     executable
                                                         :command  `(,executable ,@command-line)
@@ -1862,16 +1864,18 @@ Since 1.2:
                                                                       (princ string)
                                                                       (internal-default-process-filter process string)))
                                                         :stderr   stderr-pipe
-                                                        ;; Default would write some useless message.
-                                                        :sentinel #'ignore
+                                                        :sentinel (lambda (process &rest _) (setf main-process-live (process-live-p process)))
                                                         :noquery  t))
                         (when infile
                           (with-temp-buffer
                             (insert-file-contents-literally infile)
                             (process-send-string process (buffer-string))))
                         (unless dont-wait
-                          (while (let ((wait-on (cond ((process-live-p process)     process)
-                                                      ((process-live-p stderr-pipe) stderr-pipe))))
+                          ;; It seems important to check on variables updated from process sentinels rather
+                          ;; than just calling `process-live-p' here.  Otherwise in rare circumstances we'd
+                          ;; lose some last chunk(s) of process output, see test `eldev-call-process-4'.
+                          (while (let ((wait-on (cond (main-process-live   process)
+                                                      (stderr-process-live stderr-pipe))))
                                    (when wait-on
                                      ;; Having nil for the timeout would make the function return right away
                                      ;; rather than wait "forever".  In principle, I'd replace the timeout
@@ -1880,13 +1884,6 @@ Since 1.2:
                                      ;; is important for making it return quickly if the process dies.
                                      (accept-process-output wait-on 1.0)
                                      t)))
-                          ;; Emacs (or maybe this is not Emacs-specific, not sure) can declare processes
-                          ;; finished even if there is still some not-yet-accepted output, which we'd lose
-                          ;; without the following loop (see test `eldev-call-process-4').  However, the
-                          ;; preceding loop is still important to have, as the following never waits (process
-                          ;; is dead by now, cannot generate yet more), whereas the previous loop runs for as
-                          ;; long as the process is alive.
-                          (while (accept-process-output))
                           (process-exit-status process)))
                     (when (buffer-live-p stdout-buffer)
                       (with-current-buffer stdout-buffer
