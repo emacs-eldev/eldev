@@ -485,6 +485,11 @@ error status, signal an error, probably a `eldev-error'."
 (defmacro eldev-defoption (name arguments &rest body)
   "Define an Eldev option (for a command or a global one).
 Option's handler function is visible to Elisp under given NAME.
+It will be invoked each time the option is specified on the
+command line, but not otherwise.  Therefore, you may need to take
+additional steps to ensure that affected variables etc. are
+properly initialized for the default state.
+
 BODY can contain the following keywords:
 
     :options OPTIONS (required)
@@ -515,14 +520,16 @@ BODY can contain the following keywords:
     :if-default FORM
 
         Evaluate given FORM to determine if the option is the
-        default.  Since in Eldev everything is customizable in
-        different ways, result should not be hardcoded.
+        default (for the help screen).  Since in Eldev everything
+        is customizable in different ways, result should not be
+        hardcoded.
 
     :default-value FORM
 
-        Evaluate given FORM to determine default value for the
-        option.  Special case: if the form evaluates to symbol
-        `:no-default', don't print anything.
+        Evaluate given FORM to determine the default value of the
+        option for displaying on the help screen.  Special case:
+        if the form evaluates to symbol `:no-default', don't
+        print anything.
 
     :hidden-if FORM or :hidden-if :default
 
