@@ -325,7 +325,7 @@ Since 0.5")
     (ecukes       :version "0.6.18" :archive  melpa)
     ;; Need GNU ELPA for `let-alist' on older Emacs versions.
     (package-lint :version "0.14"   :archives (melpa gnu-elpa))
-    (relint       :version "1.18"   :archive  gnu-elpa)
+    (relint       :version "2.0"    :archive  gnu-elpa)
     ;; Need GNU ELPA for `let-alist' on older Emacs versions.
     (elisp-lint                     :archives (melpa gnu-elpa))
     ;; This is for a plugin, but probably no reason not to have it unconditionally.
@@ -5188,7 +5188,8 @@ least one warning."
   (package-read-all-archive-contents))
 
 
-(declare-function relint-file "relint")
+(declare-function relint-file 'relint)
+(declare-function relint-diag-severity 'relint)
 
 (eldev-deflinter eldev-linter-re ()
   "Find errors, deprecated syntax etc. in regular expressions."
@@ -5199,9 +5200,10 @@ least one warning."
     (eldev-load-extra-dependencies 'runtime))
   (eldev--require-external-feature 'relint)
   ;; I see no way to avoid diving into internals.
-  (eldev-advised ('relint--output-report :around (lambda (original error-buffer file complaint &rest etc)
-                                                   (eldev-lint-printing-warning (if (eq (nth 5 complaint) 'error) :error :warning)
-                                                     (apply original error-buffer file complaint etc))))
+  (eldev-advised ('relint--output-complaint :around (lambda (original &rest args)
+                                                      ;; Use `ignore-errors' to avoid dying if relint's internals change.
+                                                      (eldev-lint-printing-warning (if (ignore-errors (eq (relint-diag-severity (nth 2 args)) 'error)) :error :warning)
+                                                        (apply original args))))
     ;; Suppress totals from `relint' as we print them ourselves.
     (eldev-advised ('relint--finish :around (lambda (original &rest arguments)
                                               (let ((inhibit-message t))
