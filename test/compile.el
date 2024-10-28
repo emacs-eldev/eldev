@@ -72,7 +72,7 @@
 
 (eldev-ert-defargtest eldev-compile-test-files-1 (everything)
                       (nil t)
-  (eldev--test-without-files "project-a" (:eval `(,@(when everything '("project-a.elc")) "test/project-a.elc"))
+  (eldev--test-without-files "project-a" ("project-a.elc" "test/project-a.elc")
     (eldev--test-run nil ("compile" "--set" (if everything "all" "test"))
       (eldev--test-assert-files project-dir preexisting-files (when everything "project-a.elc") "test/project-a.elc")
       (should (= exit-code 0)))))
@@ -80,12 +80,24 @@
 (eldev-ert-defargtest eldev-compile-test-files-2 (everything)
                       (nil t)
   ;; This project has an additional loading root for tests.
-  (eldev--test-without-files "project-g" (:eval `(,@(when everything '("project-g.elc" "project-g-util.elc"))
-                                                  "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc"))
+  (eldev--test-without-files "project-g" ("project-g.elc" "project-g-util.elc"
+                                          "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
     (eldev--test-run nil ("compile" "--set" (if everything "all" "test"))
       (eldev--test-assert-files project-dir preexisting-files
                                 (when everything '("project-g.elc" "project-g-util.elc"))
                                 "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
+      (should (= exit-code 0)))))
+
+(eldev-ert-defargtest eldev-compile-test-files-3 (everything)
+                      (nil t)
+  ;; This project has an additional dependency for tests.  It is needed not only to run,
+  ;; but also to compile them.
+  (eldev--test-without-files "project-j" ("project-j-autoloads.el" "project-j.elc" "project-j-advanced.elc"
+                                          "test/project-j.elc")
+    (eldev--test-run nil ("compile" "--set" (if everything "all" "test"))
+      (eldev--test-assert-files project-dir preexisting-files
+                                (when everything '("project-j-autoloads.el" "project-j.elc" "project-j-advanced.elc"))
+                                "test/project-j.elc")
       (should (= exit-code 0)))))
 
 

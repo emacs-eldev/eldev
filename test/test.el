@@ -53,6 +53,14 @@
     (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 0))))
 
+(ert-deftest eldev-test-project-j-1 ()
+  ;; Only one passing test.  Most importantly, there is a test-only dependency in the
+  ;; project's file `Eldev' without which the test wouldn't run.
+  (eldev--test-run "project-j" ("test")
+    (should (string-match-p "passed.+project-j-test-dependency" stdout))
+    (should (string-match-p "Ran 1 test" stdout))
+    (should (= exit-code 0))))
+
 (eldev-ert-defargtest eldev-test-project-l-1 (loading-mode)
                       ('source 'byte-compiled 'packaged)
   ;; Project with special source directories.  One of the tests needs a resource located

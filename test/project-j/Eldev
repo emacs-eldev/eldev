@@ -1,3 +1,5 @@
 (eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
 
 (eldev-use-plugin 'autoloads)
+
+(eldev-add-extra-dependencies 'test 'dependency-a)

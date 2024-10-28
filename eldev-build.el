@@ -381,12 +381,14 @@ This function may only be called while inside the body of a
   (unless eldev-normal-dependency-management
     (setf dont-touch-packages t))
   (unless dont-touch-packages
-    (let ((eldev-project-loading-mode 'as-is))
-      ;; FIXME: Is root injection actually needed here?  It will also be done from the
-      ;;        call to `eldev-build-find-targets' just a few lines below.
+    (let ((eldev-project-loading-mode 'as-is)
+          (extra-dependencies         '(build)))
       (when (memq 'test (eldev--effective-standard-filesets eldev-build-sets))
+        (push 'test extra-dependencies)
+        ;; FIXME: Is root injection actually needed here?  It will also be done from the
+        ;;        call to `eldev-build-find-targets' just a few lines below.
         (eldev--inject-loading-roots 'test))
-      (eldev-load-project-dependencies 'build nil t)))
+      (eldev-load-project-dependencies extra-dependencies nil t)))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))
         target-list
         target-fileset
