@@ -397,14 +397,19 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 (defmacro eldev--test-without-files (test-project files-to-delete &rest body)
   (declare (indent 2)
            (debug (stringp sexp body)))
-  `(let ((eldev--test-project (or ,test-project eldev--test-project)))
-     (eldev--test-delete-quietly nil ',files-to-delete)
-     (let* ((project-dir       (eldev--test-project-dir))
-            (preexisting-files (eldev--test-find-files project-dir)))
-       (ignore preexisting-files)
-       (unwind-protect
-           (progn ,@body)
-         (eldev--test-delete-quietly nil ',files-to-delete)))))
+  (let ((files                  (make-symbol "$files"))
+        (actual-files-to-delete `(list ,@(eldev-listify files-to-delete))))
+    (pcase files-to-delete
+      (`(:eval ,expression) (setf actual-files-to-delete expression)))
+    `(let ((,files              ,actual-files-to-delete)
+           (eldev--test-project (or ,test-project eldev--test-project)))
+       (eldev--test-delete-quietly nil ,files)
+       (let* ((project-dir       (eldev--test-project-dir))
+              (preexisting-files (eldev--test-find-files project-dir)))
+         (ignore preexisting-files)
+         (unwind-protect
+             (progn ,@body)
+           (eldev--test-delete-quietly nil ,files))))))
 
 (declare-function directory-files-recursively "subr" t)
 

@@ -54,8 +54,7 @@ the following keys, in no particular order:
 Returned hash table doesn't contain cross-target dependency
 information past the list of sources.  For this, use function
 `eldev-get-target-dependencies'."
-  (when (or (null standard-filesets) (memq 'all standard-filesets))
-    (setf standard-filesets (mapcar #'car eldev-filesets)))
+  (setf standard-filesets (eldev--effective-standard-filesets standard-filesets))
   (when (memq 'test standard-filesets)
     (eldev--inject-loading-roots 'test))
   (let ((new-filesets (eldev-filter (not (memq it eldev--targets-prepared-for)) standard-filesets)))
@@ -104,6 +103,11 @@ information past the list of sources.  For this, use function
   (unless (gethash ":default" eldev--build-targets)
     (eldev--build-target-entries '(":default") nil nil nil))
   eldev--build-targets)
+
+(defun eldev--effective-standard-filesets (standard-filesets)
+  (if (or (null standard-filesets) (memq 'all standard-filesets))
+      (mapcar #'car eldev-filesets)
+    standard-filesets))
 
 (defun eldev--build-find-builder-invocations (sources builder builder-name)
   (let ((target-rule (eldev-get builder :targets))
@@ -378,7 +382,9 @@ This function may only be called while inside the body of a
     (setf dont-touch-packages t))
   (unless dont-touch-packages
     (let ((eldev-project-loading-mode 'as-is))
-      (when (memq 'test eldev-build-sets)
+      ;; FIXME: Is root injection actually needed here?  It will also be done from the
+      ;;        call to `eldev-build-find-targets' just a few lines below.
+      (when (memq 'test (eldev--effective-standard-filesets eldev-build-sets))
         (eldev--inject-loading-roots 'test))
       (eldev-load-project-dependencies 'build nil t)))
   (let ((all-targets (apply #'eldev-build-find-targets (or eldev-build-sets '(main))))

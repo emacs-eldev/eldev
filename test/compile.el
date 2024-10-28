@@ -70,17 +70,22 @@
       (should (= exit-code 0)))))
 
 
-(ert-deftest eldev-compile-test-files-1 ()
-  (eldev--test-without-files "project-a" ("test/project-a.elc")
-    (eldev--test-run nil ("compile" "--set" "test")
-      (eldev--test-assert-files project-dir preexisting-files "test/project-a.elc")
+(eldev-ert-defargtest eldev-compile-test-files-1 (everything)
+                      (nil t)
+  (eldev--test-without-files "project-a" (:eval `(,@(when everything '("project-a.elc")) "test/project-a.elc"))
+    (eldev--test-run nil ("compile" "--set" (if everything "all" "test"))
+      (eldev--test-assert-files project-dir preexisting-files (when everything "project-a.elc") "test/project-a.elc")
       (should (= exit-code 0)))))
 
-(ert-deftest eldev-compile-test-files-2 ()
+(eldev-ert-defargtest eldev-compile-test-files-2 (everything)
+                      (nil t)
   ;; This project has an additional loading root for tests.
-  (eldev--test-without-files "project-g" ("test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
-    (eldev--test-run nil ("compile" "--set" "test")
-      (eldev--test-assert-files project-dir preexisting-files "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
+  (eldev--test-without-files "project-g" (:eval `(,@(when everything '("project-g.elc" "project-g-util.elc"))
+                                                  "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc"))
+    (eldev--test-run nil ("compile" "--set" (if everything "all" "test"))
+      (eldev--test-assert-files project-dir preexisting-files
+                                (when everything '("project-g.elc" "project-g-util.elc"))
+                                "test/test-g-1.elc" "test/test-g-integration.elc" "test/test-g-util.elc")
       (should (= exit-code 0)))))
 
 
