@@ -55,6 +55,12 @@
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-version-0 ()
+  ;; Issue #107: Eldev wouldn't work with a project that declared version 0.0.
+  (eldev--test-run "version-0-0" ("eval" 1)
+    (should (string= stdout "1\n"))
+    (should (= exit-code 0))))
+
 
 ;; Not a bug, just doesn't seem to fit anywhere else.  Test that
 ;; `eldev-known-tool-packages' can be customized.

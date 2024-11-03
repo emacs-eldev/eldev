@@ -3026,10 +3026,13 @@ Since 0.2."
               (when (and upgrading (null best-version) already-installed-version)
                 ;; Should be caught at an upper level, unless the package archive is gone.
                 (signal 'eldev-missing-dependency `("Dependency `%s' was once installed, but is not available anymore" ,package-name)))
-              (unless (or (version-list-< already-installed-version best-version)
-                          already-installed-too-old
-                          (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
-                (setf package already-installed))
+              ;; Version check alone is not enough: it gives a false negative if already-installed-version is
+              ;; nil (i.e. nothing is installed) and best-version = 0.0 (issue #107).
+              (when already-installed
+                (unless (or (version-list-< already-installed-version best-version)
+                            already-installed-too-old
+                            (and eldev-upgrade-downgrade-mode best-version (not (version-list-= already-installed-version best-version))))
+                  (setf package already-installed)))
               (unless package
                 (when optional
                   (eldev-verbose "Dependency `%s' is not available, but as it is optional, just continuing" package-name)
