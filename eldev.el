@@ -1609,7 +1609,12 @@ Since 1.5."
 
 ;; Functions for `Eldev' and `Eldev-local'.
 
-(defvar eldev--extra-dependencies nil)
+(defvar eldev--extra-dependencies nil
+  "Alist of BUILD-SET to a list of extended package plist.
+BUILD-SET is a symbol.  For list elements see documentation,
+section `Extended dependency format', and function
+`eldev--create-package-plist'")
+
 (defvar eldev--local-dependencies nil)
 (defvar eldev--local-dependency-packages nil)
 (defvar eldev--loading-roots nil)
@@ -1820,7 +1825,7 @@ for details."
   (dolist (set (eldev-listify sets))
     (let ((set-dependencies (or (assq set eldev--extra-dependencies) (car (push `(,set . nil) eldev--extra-dependencies)))))
       (dolist (dependency dependencies)
-        (push (if (symbolp dependency) (list dependency) dependency) (cdr set-dependencies))))))
+        (push (eldev--create-package-plist dependency) (cdr set-dependencies))))))
 
 (defmacro eldev-saving-dependency-lists (&rest body)
   "Save dependency lists and execute BODY.
@@ -1857,7 +1862,7 @@ Since 0.5."
 (defvar eldev--know-installed-runtime-dependencies nil)
 
 (defun eldev--load-installed-runtime-dependencies ()
-  (eldev-do-load-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 1
+  (eldev-do-load-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 2
     (apply #'eldev-add-extra-dependencies 'runtime (cdr (assq 'dependencies contents))))
   (setf eldev--know-installed-runtime-dependencies t))
 
@@ -1865,7 +1870,7 @@ Since 0.5."
   (let ((eldev--extra-dependencies eldev--extra-dependencies))
     (unless eldev--know-installed-runtime-dependencies
       (eldev--load-installed-runtime-dependencies))
-    (eldev-do-save-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 1
+    (eldev-do-save-cache-file (expand-file-name "runtime-dependency.set" (eldev-cache-dir t)) "list of installed runtime dependencies" 2
       `((dependencies . ,(cdr (assq 'runtime eldev--extra-dependencies)))))))
 
 
@@ -2577,7 +2582,7 @@ Since 0.2."
                                                   (plist-get it :optional) (memq dependency-name (funcall uninstallable)))
                                          (eldev-verbose "Dependency `%s' is optional and has been found uninstallable before, skipping" dependency-name)
                                          (setf not-retrying-optionals t))))
-                                (mapcar #'eldev--create-package-plist extra-dependencies)))
+                                extra-dependencies))
             (when not-retrying-optionals
               (eldev-trace "Use `eldev upgrade' to force checking if the skipped dependencies are still uninstallable"))
             (when extra-dependencies
@@ -3690,11 +3695,13 @@ or evaluating (`eval') registered in the project's `Eldev' file."
       (setf have-dependencies t))
     (dolist (set additional-sets)
       (dolist (dependency (cdr (assq set eldev--extra-dependencies)))
-        (if (and (package-built-in-p (car dependency)) (not eldev-dependencies-list-built-ins))
-            (eldev-trace "Omitting extra dependency for set `%s' as a built in: %s %s" set (car dependency) (eldev-message-version (cadr dependency)))
-          (eldev-output "%s %s%s" (eldev-colorize (car dependency) 'name) (eldev-message-version (cadr dependency) t)
-                        (or (eldev-unless-quiet (eldev-format-message "    [for `%s']" set)) ""))
-          (setf have-non-built-in-dependencies t))
+        (let ((name    (plist-get dependency :package))
+              (version (plist-get dependency :version)))
+          (if (and (package-built-in-p name) (not eldev-dependencies-list-built-ins))
+              (eldev-trace "Omitting extra dependency for set `%s' as a built in: %s %s" set name (eldev-message-version version))
+            (eldev-output "%s %s%s" (eldev-colorize name 'name) (eldev-message-version version t)
+                          (or (eldev-unless-quiet (eldev-format-message "    [for `%s']" set)) ""))
+            (setf have-non-built-in-dependencies t)))
         (setf have-dependencies t)))
     (if have-dependencies
         (unless have-non-built-in-dependencies
@@ -3718,7 +3725,9 @@ or evaluating (`eval') registered in the project's `Eldev' file."
       (eldev--do-dependency-tree (package-desc-name package) (package-desc-version package) package 0 listed)
       (dolist (set additional-sets)
         (dolist (dependency (cdr (assq set eldev--extra-dependencies)))
-          (eldev--do-dependency-tree (car dependency) (cadr dependency) (eldev-find-package-descriptor (car dependency) (cadr dependency)) 0 listed set))))))
+        (let ((name    (plist-get dependency :package))
+              (version (plist-get dependency :version)))
+          (eldev--do-dependency-tree name version (eldev-find-package-descriptor name version) 0 listed set)))))))
 
 (eldev-defbooloptions eldev-dependencies-list-built-ins eldev-dependencies-omit-built-ins eldev-dependencies-list-built-ins
   ("Also list dependencies that are Emacs built-ins"

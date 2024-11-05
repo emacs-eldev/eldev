@@ -38,5 +38,11 @@
       (should (string= stdout "dependency-a 0.1\n"))
       (should (= exit-code 0)))))
 
+(eldev-ert-defargtest eldev-dependencies-extra-1 (dependency)
+                      ('dependency-b '(:package dependency-b))
+  (eldev--test-run "project-a" ("--setup" `(eldev-add-extra-dependencies 'build ',dependency) "dependencies" "build")
+    (should (string= stdout (eldev--test-lines "dependency-a 0.9" "dependency-b (any)    [for `build']")))
+    (should (= exit-code 0))))
+
 
 (provide 'test/dependencies)

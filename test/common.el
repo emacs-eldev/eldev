@@ -356,6 +356,7 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (replace-regexp-in-string (rx bos (0+ nonl) (group (0+ anything)) eos) "" text t t 1))
 
 (defun eldev--test-lines (&rest arguments)
+  "Join specified lines (expected output) into one string."
   (if arguments
       (let ((formatter   nil)
             (trailing-lf "\n"))

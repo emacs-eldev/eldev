@@ -13,20 +13,28 @@
 
 (ert-deftest eldev-dependency-tree-2 ()
   (eldev--test-run "project-a" ("--quiet" "dependency-tree")
-    (should (or (string= stdout "project-a 1.0\n    dependency-a 0.9\n")
-                (string= stdout "project-a 1.0\n    dependency-a 0.9    [1.0 installed]\n")))
+    (should (or (string= stdout (eldev--test-lines "project-a 1.0"
+                                                   "    dependency-a 0.9"))
+                (string= stdout (eldev--test-lines "project-a 1.0"
+                                                   "    dependency-a 0.9    [1.0 installed]"))))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-dependency-tree-3 ()
   (eldev--test-run "project-b" ("--quiet" "dependency-tree")
-    (should (or (string= stdout "project-b 1.0\n    dependency-b (any)\n        dependency-a (any)\n")
-                (string= stdout "project-b 1.0\n    dependency-b (any)    [1.0 installed]\n        dependency-a (any)    [1.0 installed]\n")))
+    (should (or (string= stdout (eldev--test-lines "project-b 1.0"
+                                                   "    dependency-b (any)"
+                                                   "        dependency-a (any)"))
+                (string= stdout (eldev--test-lines "project-b 1.0"
+                                                   "    dependency-b (any)    [1.0 installed]"
+                                                   "        dependency-a (any)    [1.0 installed]"))))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-dependency-tree-4 ()
   (eldev--test-run "project-c" ("--quiet" "dependency-tree")
-    (should (or (string= stdout "project-c 1.0\n    dependency-a (any)\n")
-                (string= stdout "project-c 1.0\n    dependency-a (any)    [1.0 installed]\n")))
+    (should (or (string= stdout (eldev--test-lines "project-c 1.0"
+                                                   "    dependency-a (any)"))
+                (string= stdout (eldev--test-lines "project-c 1.0"
+                                                   "    dependency-a (any)    [1.0 installed]"))))
     (should (= exit-code 0))))
 
 (ert-deftest eldev-dependency-tree-missing-dependency-1 ()
@@ -35,8 +43,27 @@
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
     (eldev--test-run nil ("--quiet" "dependency-tree")
-      (should (string= stdout "missing-dependency-a 1.0\n    dependency-a 0.1    [UNAVAILABLE]\n"))
+      (should (string= stdout (eldev--test-lines "missing-dependency-a 1.0"
+                                                 "    dependency-a 0.1    [UNAVAILABLE]")))
       (should (= exit-code 0)))))
+
+(eldev-ert-defargtest eldev-dependency-tree-extra-1 (dependency)
+                      ('dependency-b '(:package dependency-b))
+  (eldev--test-run "project-a" ("--setup" `(eldev-add-extra-dependencies 'build ',dependency) "dependency-tree" "build")
+    (should (or (string= stdout (eldev--test-lines "project-a 1.0"
+                                                   "    dependency-a 0.9"
+                                                   "dependency-b (any)    [for `build']"
+                                                   "    dependency-a (any)"))
+                (string= stdout (eldev--test-lines "project-a 1.0"
+                                                   "    dependency-a 0.9    [1.0 installed]"
+                                                   "dependency-b (any)    [for `build'; 1.0 installed]"
+                                                   "    dependency-a (any)    [1.0 installed]"))
+                ;; Some test could upgrade installed dependencies using `archive-b'.
+                (string= stdout (eldev--test-lines "project-a 1.0"
+                                                   "    dependency-a 0.9    [1.1 installed]"
+                                                   "dependency-b (any)    [for `build'; 1.1 installed]"
+                                                   "    dependency-a 1.1"))))
+    (should (= exit-code 0))))
 
 
 (provide 'test/dependency-tree)
