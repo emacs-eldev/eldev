@@ -34,6 +34,9 @@ export ELDEV_TTY
 
 $ELDEV_EMACS --batch --no-site-file --no-site-lisp                                                     \
              --execute '(let ((eldev--emacs-version (format "%s.%s" emacs-major-version emacs-minor-version))
+      (when (and (= emacs-major-version 24)
+                 (< emacs-minor-version 3))
+        (require '\''cl))
       (eldev--dir           (getenv "ELDEV_DIR"))
       ;; This is intentional.  First, this is in case ELDEV_LOCAL is
       ;; defined, second, this is just Eldev default for packages.

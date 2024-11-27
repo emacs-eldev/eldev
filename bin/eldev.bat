@@ -43,6 +43,9 @@ REM the newline variable above MUST be followed by two empty lines.
   ;; so `condition-case-unless-debug'. !NL!^
   (unless (and (fboundp 'version^<=) (version^<= """24.1""" eldev--emacs-version)) !NL!^
     (error """Eldev requires Emacs 24.1 or newer""")) !NL!^
+  (when (and (= emacs-major-version 24) !NL!^
+             (^< emacs-minor-version 3)) !NL!^
+    (require 'cl)) !NL!^
   (setf package-user-dir !NL!^
         (expand-file-name """bootstrap""" !NL!^
                           (expand-file-name eldev--emacs-version !NL!^
