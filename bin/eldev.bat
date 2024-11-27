@@ -41,8 +41,8 @@ REM the newline variable above MUST be followed by two empty lines.
   ;; Setting `debug-on-error' would be useful, but it can break many !NL!^
   ;; `package-*' functions, since those use `with-demoted-errors' and !NL!^
   ;; so `condition-case-unless-debug'. !NL!^
-  (unless (and (fboundp 'version^<=) (version^<= """24.1""" eldev--emacs-version)) !NL!^
-    (error """Eldev requires Emacs 24.1 or newer""")) !NL!^
+  (unless (and (fboundp 'version^<=) (version^<= """24.4""" eldev--emacs-version)) !NL!^
+    (error """Eldev requires Emacs 24.4 or newer""")) !NL!^
   (setf package-user-dir !NL!^
         (expand-file-name """bootstrap""" !NL!^
                           (expand-file-name eldev--emacs-version !NL!^

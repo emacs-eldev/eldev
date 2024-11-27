@@ -2,7 +2,7 @@
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/
-;; Package-Requires: ((emacs "24.1") (dependency-a "0.1"))
+;; Package-Requires: ((emacs "24.4") (dependency-a "0.1"))
 
 ;;; Commentary:
 
