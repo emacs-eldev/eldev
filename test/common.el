@@ -183,10 +183,44 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   (format "EMACSLOADPATH=%s" (mapconcat #'identity (append extras load-path) path-separator)))
 
 
+(defmacro eldev--test-and-delete-temp-directory (directory-var description &rest body)
+  (declare (indent 2) (debug (symbolp stringp body)))
+  (let ((directory-form directory-var))
+    (while (keywordp (car body))
+      (eldev-pcase-exhaustive (pop body)
+        (:directory-form (setf directory-form (pop body)))))
+    `(unwind-protect
+         (prog1 (progn ,@body)
+           ;; Delete the copy if there are no errors.
+           (when ,directory-var
+             (ignore-errors (delete-directory ,directory-form t))
+             (setf ,directory-var nil)))
+       (when ,directory-var
+         (eldev-warn (format "%s left intact for investigation: `%%s'" ,description) ,directory-form)))))
+
 (defun eldev--test-force-bootstrapping-now ()
   (eldev-call-process eldev--test-shell-command nil :die-on-error t))
 
+(defun eldev--test-file-name-parent-directory (filename)
+  (if (fboundp 'file-name-parent-directory)
+      (with-no-warnings (file-name-parent-directory filename)))
+  ;; In 2024 they finally decided this would be a useful function.  Have to backport.
+  (let* ((expanded-filename (expand-file-name filename))
+         (parent (file-name-directory (directory-file-name expanded-filename))))
+    (cond ((or (null parent) (equal parent expanded-filename))
+           nil)
+          ((not (file-name-absolute-p filename))
+           (file-relative-name parent))
+          (t
+           parent))))
+
 (defmacro eldev--test-with-temp-copy (test-project vc-backend &rest body)
+  "Execute BODY in a temporary copy of TEST-PROJECT.
+The copy will be made with the specified VC-BACKEND; if it is not
+available, test is skipped automatically.
+
+Inside BODY, `eldev--test-project' will be bound to the temporary
+copied directory, not to the one specified by TEST-PROJECT."
   (declare (indent 2) (debug (stringp sexp body)))
   (let ((ignores :std)
         after-copy)
@@ -198,12 +232,18 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
             (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores
                                                              ,(when after-copy `(lambda () ,@(reverse after-copy))))))
        (unless eldev--test-project
-         (ert-skip (eldev-format-message "%s couldn't be found" vc-backend)))
-       (prog1 (progn ,@body)
-         ;; Delete the copy if there are no errors.
-         (ignore-errors (delete-directory eldev--test-project t))))))
+         (ert-skip (eldev-format-message "%s couldn't be found" (eldev-vc-full-name vc-backend))))
+       (eldev--test-and-delete-temp-directory eldev--test-project (format "%s copy" (eldev-vc-full-name vc-backend))
+         :directory-form (eldev--test-file-name-parent-directory eldev--test-project)
+         ,@body))))
 
 (defun eldev--test-make-temp-copy (test-project vc-backend ignores after-copy)
+  "Create a copy of the TEST-PROJECT with given VC-BACKEND.
+The backend may be nil, in which case the copy is not versioned.
+
+Returns a new project directory.  The caller may assume that its
+parent is the real temporary root (it may be used to create
+copies of something external to the project)."
   (unless (memq vc-backend '(nil Git Hg SVN))
     (error "Cannot create temporary VC copy for backend `%s'" vc-backend))
   (let* ((svnadmin   (when (eq vc-backend 'SVN) (eldev-svnadmin-executable t)))
@@ -222,11 +262,10 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
            (copy-dir       (file-name-as-directory (expand-file-name test-project copy-base-dir)))
            (repository-dir (when svnadmin
                              (file-name-as-directory (make-temp-file "eldev-" t "-test-svnrepo"))))
-           (repository-url  (format "file://%s%s"
-                                    ;; windows file paths require the
-                                    ;; extra root node at the front
-                                    (if (eq system-type 'windows-nt) "/" "")
-                                    repository-dir)))
+           (repository-url (format "file://%s%s"
+                                   ;; Windows file paths require the extra root node at the front.
+                                   (if (eq system-type 'windows-nt) "/" "")
+                                   repository-dir)))
       ;; To avoid copying generated files.
       (eldev--test-run test-project ("clean" "everything")
         (should (= exit-code 0)))
@@ -277,7 +316,8 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
   `(let* ((temp-script-dir           (make-temp-file "eldev-" t "-test-bin"))
           (eldev--test-shell-command (expand-file-name "bin/eldev" temp-script-dir)))
      (copy-directory (expand-file-name "bin" eldev-project-dir) (file-name-as-directory temp-script-dir))
-     ,@body))
+     (eldev--test-and-delete-temp-directory temp-script-dir "Temporary copy of script directory"
+       ,@body)))
 
 (defun eldev--test-switch-vc-branch (vc-backend branch-name)
   (unless (eldev-external-or-absolute-filename (file-relative-name (eldev--test-project-dir) eldev-project-dir))
@@ -294,6 +334,13 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
 
 
 (defmacro eldev--test-with-external-dir (test-project packages &rest body)
+  "Execute BODY with a directory containing copies of the PACKAGES.
+The directory is meant to simulate `~/.emacs.d/elpa' for testing
+option `--external'.  Variable named `external-dir' will be
+visible inside BODY.
+
+If the BODY starts with keyword `:enabled' with a nil value
+afterwards, directory creation is skipped."
   (declare (indent 2) (debug (stringp sexp body)))
   (let ((enabled t))
     (while (keywordp (car body))
@@ -303,12 +350,11 @@ beginning.  Exit code of the process is bound as EXIT-CODE."
             (external-dir        (when ,enabled (eldev--test-create-external-dir ,packages)))
             ;; User-accessible variable so that it can be modified.
             (preexisting-files   (when external-dir (eldev--test-find-files external-dir))))
-       (prog1 (progn ,@body)
-         ;; Eldev must not modify contents of the external directory.
-         (when external-dir
-           (eldev--test-assert-files external-dir preexisting-files))
-         ;; Delete the directory if there are no errors.
-         (ignore-errors (when external-dir (delete-directory external-dir t)))))))
+       (eldev--test-and-delete-temp-directory external-dir "External directory"
+         (prog1 ,@body
+           (when external-dir
+             ;; Eldev must not modify contents of the external directory.
+             (eldev--test-assert-files external-dir preexisting-files)))))))
 
 (defun eldev--test-create-external-dir (packages)
   (setf packages (eldev-listify packages))
