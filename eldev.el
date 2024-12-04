@@ -1407,23 +1407,23 @@ Returns COMMAND-LINE with options removed.  See also
   (plist-get (eldev-parse-command-line command-line :command command :stop-on-non-option stop-on-non-option :allow-unknown allow-unknown)
              :without-options))
 
+(defmacro eldev--get-or-create-dir (dir ensure-exists)
+  `(let ((dir ,dir))
+     (when ,ensure-exists
+       (make-directory dir t))
+     dir))
+
 (defun eldev-global-cache-dir (&optional ensure-exists)
   "Return `eldev-dir', possibly ensuring that it exists.
 This function always returns an absolute path, even if the value
 of `eldev-dir' is not absolute.  Since 1.4."
-  (let ((cache-dir (expand-file-name eldev-dir)))
-    (when ensure-exists
-      (make-directory cache-dir t))
-    cache-dir))
+  (eldev--get-or-create-dir (expand-file-name eldev-dir) ensure-exists))
 
 (defun eldev-global-package-archive-cache-dir (&optional ensure-exists)
   "Return the `global-archive' subdirectory of `eldev-dir'.
 If instructed, this function also makes sure that the directory
 exists.  Since 1.4."
-  (let ((cache-dir (expand-file-name eldev-global-cache-dir (eldev-global-cache-dir))))
-    (when ensure-exists
-      (make-directory cache-dir t))
-    cache-dir))
+  (eldev--get-or-create-dir (expand-file-name eldev-global-cache-dir (eldev-global-cache-dir)) ensure-exists))
 
 (defun eldev-cache-dir (emacs-version-specific &optional ensure-exists)
   "Get the directory where various internal caches should be stored.
@@ -1436,23 +1436,15 @@ exist yet."
   (let ((cache-dir (file-name-as-directory (expand-file-name eldev-cache-dir eldev-project-dir))))
     (when emacs-version-specific
       (setf cache-dir (expand-file-name (format "%s.%s" emacs-major-version emacs-minor-version) cache-dir)))
-    (when ensure-exists
-      (make-directory cache-dir t))
-    cache-dir))
+    (eldev--get-or-create-dir cache-dir ensure-exists)))
 
 (defun eldev-user-emacs-dir (&optional ensure-exists)
   ;; Intentionally not called `.emacs.d' as an additional test for projects.
-  (let ((emacs-dir (file-name-as-directory (expand-file-name "emacs-dir" (eldev-cache-dir t)))))
-    (when ensure-exists
-      (make-directory emacs-dir t))
-    emacs-dir))
+  (eldev--get-or-create-dir (file-name-as-directory (expand-file-name "emacs-dir" (eldev-cache-dir t))) ensure-exists))
 
 (defun eldev-dist-dir (&optional ensure-exists)
   "Get the directory where to generate package tarballs."
-  (let ((dist-dir (file-name-as-directory (expand-file-name (or eldev-dist-dir "") eldev-project-dir))))
-    (when ensure-exists
-      (make-directory dist-dir t))
-    dist-dir))
+  (eldev--get-or-create-dir (file-name-as-directory (expand-file-name (or eldev-dist-dir "") eldev-project-dir)) ensure-exists))
 
 (defmacro eldev-do-load-cache-file (file description expected-version &rest body)
   "Load data from a cache FILE.
@@ -3111,10 +3103,7 @@ Since 0.2."
                 (eldev-print "Upgraded script `%s'" abbreviated)))))))))
 
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
-  (let ((dir (eldev--package-archive-dir eldev--internal-pseudoarchive)))
-    (when ensure-exists
-      (make-directory dir t))
-    dir))
+  (eldev--get-or-create-dir (eldev--package-archive-dir eldev--internal-pseudoarchive) ensure-exists))
 
 (defun eldev--package-archive-dir (archive &optional base-dir)
   (expand-file-name archive (expand-file-name "archives" (or base-dir package-user-dir))))
