@@ -949,6 +949,12 @@ Since 1.7.")
 (defvar backtrace-line-length)
 (defvar emacs-repository-branch)
 
+(defvar eldev--vc-dependencies nil
+  "Alist of package names to plists describing VC dependencies.")
+
+(defvar eldev--vc-dependency-packages nil
+  "Alist of `(NAME . PKG-DESCRIPTOR).")
+
 
 (defun eldev-start-up ()
   "Prepare Eldev.
@@ -1619,12 +1625,6 @@ LOADING-MODE)'.")
   "Alist of local dependency package sources.
 Each element is `(NAME FILE UP-TO-DATE)', where FILE is the
 tarball and UP-TO-DATE is a boolean value.")
-
-(defvar eldev--vc-dependencies nil
-  "Alist of package names to plists describing VC dependencies.")
-
-(defvar eldev--vc-dependency-packages nil
-  "Alist of `(NAME . PKG-DESCRIPTOR).")
 
 (defvar eldev--loading-roots nil)
 
