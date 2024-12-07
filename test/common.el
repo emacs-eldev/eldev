@@ -45,6 +45,7 @@
         (no-errors           (make-symbol "$no-errors"))
         (discard-ansi        t)
         (robust-mode         'propagate)
+        description
         process-input-form
         important-values
         important-files
@@ -53,6 +54,7 @@
       (`(:eval ,expression) (setf actual-command-line expression)))
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
+        (:description     (setf description        (pop body)))
         (:process-input   (setf process-input-form (pop body)))
         (:discard-ansi    (setf discard-ansi       (pop body)))
         (:robust-mode     (unless (equal program-name "Eldev")
@@ -86,6 +88,7 @@
                                      :executable   executable
                                      :command-line command-line
                                      :directory    default-directory
+                                     :description  ,description
                                      :input        process-input
                                      :stdout       stdout
                                      :stderr       stderr
@@ -116,6 +119,8 @@
          (ignore-errors (delete-file stderr-file))))))
 
 (defun eldev--test-call-process-show (call)
+  (when (plist-get call :description)
+    (eldev-warn "%s" (eldev-colorize (apply #'eldev-format-message (eldev-listify (plist-get call :description))) 'error)))
   (eldev-warn "Ran %s as `%s' in directory `%s'"
               (plist-get call :program)
               (eldev-message-command-line (plist-get call :executable) (plist-get call :command-line))

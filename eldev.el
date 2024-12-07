@@ -88,7 +88,8 @@
                                         eldev-release-validate-version eldev-release-validate-vcs eldev-release-only-from-main-branch eldev-release-validate-files
                                         eldev-release-test-project eldev-release-maybe-fail)
                        ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev--vc-set-up-buffer eldev-vc-synchronize-dir
-                                        eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name)
+                                        eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name
+                                        eldev--vc-fetch-repository)
                        ("eldev-doctor"  eldev-defdoctest)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))
@@ -133,6 +134,7 @@ Since 1.4 function `eldev-global-package-archive-cache-dir' can
 be used instead.")
 
 (defvar eldev--internal-pseudoarchive "--eldev--")
+(defvar eldev--internal-vc-pseudoarchive "--eldev-vc--")
 
 (defvar eldev--loading-modes
   '((as-is
@@ -1037,7 +1039,9 @@ Used by Eldev startup script."
                                   (when external-dir
                                     (dolist (entry package-archives)
                                       (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
-                                    (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete))
+                                    (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete)
+                                    (when eldev--vc-dependencies
+                                      (push (setf eldev--internal-vc-pseudoarchive (eldev--maybe-rename-archive eldev--internal-vc-pseudoarchive external-dir)) archive-files-to-delete)))
                                   (setf command (intern (car command-line)))
                                   (unwind-protect
                                       (eldev-advised (#'load :before (when compile-on-demand-sources
@@ -1407,11 +1411,10 @@ Returns COMMAND-LINE with options removed.  See also
   (plist-get (eldev-parse-command-line command-line :command command :stop-on-non-option stop-on-non-option :allow-unknown allow-unknown)
              :without-options))
 
-(defmacro eldev--get-or-create-dir (dir ensure-exists)
-  `(let ((dir ,dir))
-     (when ,ensure-exists
-       (make-directory dir t))
-     dir))
+(defun eldev--get-or-create-dir (dir ensure-exists)
+  (when ensure-exists
+    (make-directory dir t))
+  dir)
 
 (defun eldev-global-cache-dir (&optional ensure-exists)
   "Return `eldev-dir', possibly ensuring that it exists.
@@ -1607,8 +1610,22 @@ BUILD-SET is a symbol.  For list elements see documentation,
 section `Extended dependency format', and function
 `eldev--create-package-plist'")
 
-(defvar eldev--local-dependencies nil)
-(defvar eldev--local-dependency-packages nil)
+(defvar eldev--local-dependencies nil
+  "Alist of local dependencies to use.
+Each element is `(NAME PKG-DESCRIPTOR DIR ABSOLUTE-DIR
+LOADING-MODE)'.")
+
+(defvar eldev--local-dependency-packages nil
+  "Alist of local dependency package sources.
+Each element is `(NAME FILE UP-TO-DATE)', where FILE is the
+tarball and UP-TO-DATE is a boolean value.")
+
+(defvar eldev--vc-dependencies nil
+  "Alist of package names to plists describing VC dependencies.")
+
+(defvar eldev--vc-dependency-packages nil
+  "Alist of `(NAME . PKG-DESCRIPTOR).")
+
 (defvar eldev--loading-roots nil)
 
 (eval-and-compile
@@ -1725,8 +1742,8 @@ two variants."
   (and (listp archive) (plist-get archive :stable) (plist-get archive :unstable)))
 
 (defun eldev--do-use-package-archive (archive priority)
-  (when (string= (car archive) eldev--internal-pseudoarchive)
-    (error "Package archive name `%s' is reserved for internal use" eldev--internal-pseudoarchive))
+  (when (string-suffix-p "--eldev" (car archive))
+    (error "Package archive name `%s' is reserved for internal use" (car archive)))
   (let ((existing (assoc (car archive) package-archives)))
     (if existing
         (progn
@@ -1784,6 +1801,32 @@ in `package-archives', it returns VALUE-IF-NOT-USED."
                    (setf (car (assoc name        priorities)) counterpart))
                   ((and priority2 (> priority2 0))
                    (setf (car (assoc counterpart priorities)) name)))))))))
+
+
+(cl-defun eldev-use-vc-dependency (package-name &key git github setup &allow-other-keys)
+  "Use a VC-retrieved dependency.
+Currently only Git is supported, so either GIT or GITHUB
+parameter is required.  If GIT is specified, it must be the full
+URL to the repository, as string.  Instead, you can specify
+GITHUB, which should be in the format \"USERNAME/REPONAME\".
+
+Form SETUP, if used, will be passed to the child Eldev process
+(see option `--setup') whenever a package needs to be built.
+
+Since 1.11."
+  (if git
+      (when github
+        (error "Arguments `:git' and `:github' may not be used together"))
+    (if github
+        (setf git (format "https://github.com/%s.git" github))
+      (error "Either of `:git' or `:github' is required")))
+  (let ((registered (assq package-name eldev--vc-dependencies)))
+    (when registered
+      (error "Duplicate VC dependency `%s' with URL `%s': already registered with URL `%s'" package-name git (plist-get (cdr registered) :git))))
+  (unless eldev-normal-dependency-management
+    ;; But still add it into the list in case dependency management get reenabled in time somehow.
+    (eldev-warn "Normal dependency management is disabled; VC dependencies will not be used"))
+  (push `(,package-name :git ,git :github ,github :setup ,setup) eldev--vc-dependencies))
 
 
 (defun eldev-use-local-dependency (dir &optional loading-mode)
@@ -2491,6 +2534,9 @@ Since 0.2."
 ;; `package-compute-transaction' and friends are not enough in our case, mostly because of
 ;; local dependencies that can change unpredictably and also requirement that certain
 ;; dependencies are installed only from certain archives.  Roll our own.
+;;
+;; Called each time when loading dependencies (e.g. for command `test' or `eval') and also
+;; when upgrading.
 (defun eldev--install-or-upgrade-dependencies (core additional-sets to-be-upgraded dry-run activate main-command-effect &optional no-error-if-missing)
   ;; This would be an internal error, as the function must not be even called then.
   (unless eldev-normal-dependency-management
@@ -2562,6 +2608,9 @@ Since 0.2."
                 all-packages     '((:package eldev)))
         (eldev--create-internal-pseudoarchive-descriptor)
         (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
+        (when eldev--vc-dependencies
+          (eldev--create-or-update-internal-vc-pseudoarchive-descriptor)
+          (push `(,eldev--internal-vc-pseudoarchive . ,(file-name-as-directory (eldev--internal-vc-pseudoarchive-dir))) package-archives))
         (setf default-archives package-archives)
         (when (eq core 'project)
           (push `(:package ,package-name :archives ,default-archives) all-packages))
@@ -2589,7 +2638,7 @@ Since 0.2."
                   (dolist (archive (eldev--package-plist-get-archives plist))
                     (eldev-use-package-archive archive))))))))
       (eldev--adjust-stable/unstable-archive-priorities)
-      (let ((archive-statuses     (or (unless external-dir (eldev--determine-archives-to-fetch to-be-upgraded t)) '((nil . t))))
+      (let ((archive-statuses     (or (unless external-dir (eldev--determine-archives-to-fetch t to-be-upgraded t)) '((nil . t))))
             (all-package-archives package-archives))
         (while (catch 'refetch-archives
                  (package-load-all-descriptors)
@@ -2605,7 +2654,15 @@ Since 0.2."
                    (while pass-archive-statuses
                      (let ((next-archive (pop pass-archive-statuses)))
                        (unless (cdr next-archive)
-                         (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)
+                         (pcase (car next-archive)
+                           (`(:vc ,dependency)
+                            (eldev--assq-set (car dependency)
+                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr dependency) :git) (eldev--vc-dependency-dir dependency)
+                                                                         (or (eq to-be-upgraded t) (memq (car dependency) to-be-upgraded)))
+                                             eldev--vc-dependency-packages)
+                            (eldev--create-or-update-internal-vc-pseudoarchive-descriptor))
+                           (_
+                            (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)))
                          (setf (cdr next-archive) 'fetched-now))
                        ;; Don't use archives we haven't fetched yet.
                        (setf package-archives (eldev-filter (not (assoc it pass-archive-statuses)) all-package-archives))
@@ -2680,75 +2737,111 @@ Since 0.2."
                    (dolist (dependency planned-packages)
                      (let* ((previous-version (cdr dependency))
                             (dependency       (car dependency))
-                            (dependency-name  (package-desc-name dependency)))
+                            (dependency-name  (package-desc-name dependency))
+                            (vc-dependency    (assq dependency-name eldev--vc-dependencies)))
                        (if (and (not self) (eldev--loading-mode dependency))
                            (eldev--load-local-dependency dependency)
                          (setf dependency-index (1+ dependency-index))
-                         (if previous-version
-                             (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
-                                                      "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
-                                                    "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
+                         (let ((source (eldev-colorize (package-desc-archive dependency) 'name)))
+                           (when (string= source eldev--internal-vc-pseudoarchive)
+                             (setf source (eldev--vc-repository-name vc-dependency t)))
+                           (if previous-version
+                               (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
+                                                        "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
+                                                      "[%d/%d] Upgrading package `%s' (%s -> %s) from `%s'...")
+                                            dependency-index non-local-plan-size
+                                            (eldev-colorize dependency-name 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
+                                            source)
+                             (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
                                           dependency-index non-local-plan-size
-                                          (eldev-colorize dependency-name 'name) (eldev-message-version previous-version t) (eldev-message-version dependency t)
-                                          (package-desc-archive dependency))
-                           (eldev-print :stderr "[%d/%d] Installing package `%s' %s from `%s'..."
-                                        dependency-index non-local-plan-size
-                                        (eldev-colorize dependency-name 'name) (eldev-message-version dependency t t) (package-desc-archive dependency)))
+                                          (eldev-colorize dependency-name 'name) (eldev-message-version dependency t t) source)))
                          (unless dry-run
-                           (let ((inhibit-message t))
-                             (eldev--with-pa-access-workarounds (lambda ()
-                                                                  (eldev-using-global-package-archive-cache
-                                                                    (condition-case error
-                                                                        (let ((original-load-path load-path))
-                                                                          (unwind-protect
-                                                                              (progn
-                                                                                ;; See `eldev-upgrade-self-new-macros-1'.
+                           (eldev-named-step nil (eldev-format-message "installing dependency package `%s'" dependency-name)
+                             (let ((inhibit-message t))
+                               (if (string= (package-desc-archive dependency) eldev--internal-vc-pseudoarchive)
+                                   ;; Unlike with local dependencies, for VC-originated we generate and install Emacs
+                                   ;; package here rather than when loading.  The reason is that the source checkout is
+                                   ;; controlled by Eldev and thus shouldn't outside.
+                                   (let ((tmp-package-dir (make-temp-file "eldev-vc-" t)))
+                                     (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name vc-dependency))
+                                     (let ((default-directory (eldev--vc-dependency-dir vc-dependency))
+                                           (display-stdout    eldev-display-indirect-build-stdout)
+                                           ;; Not using `--print-filename' here so that output can be better forwarded to
+                                           ;; stdout if `eldev-display-indirect-build-stdout' asks for that.
+                                           (command-line      `("package" "--output-dir" ,tmp-package-dir))
+                                           (setup             (plist-get (cdr vc-dependency) :setup)))
+                                       (when setup
+                                         (setf command-line (append `("--setup" ,(prin1-to-string setup)) command-line)))
+                                       (eldev-call-process (eldev-shell-command) command-line
+                                         :forward-output     (if display-stdout t 'stderr)
+                                         :destination        (if display-stdout t '(t nil))
+                                         :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
+                                         :die-on-error       (eldev-format-message "child Eldev process for VC dependency `%s'" dependency-name))
+                                       (unless display-stdout
+                                         (if (= (point-min) (point-max))
+                                             (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
+                                           (eldev-verbose "(Non-stderr) output of the child Eldev process:")
+                                           (eldev-verbose (buffer-string))))
+                                       (let ((generated (eldev-find-files '("./*.tar" "./*.el") t tmp-package-dir)))
+                                         (if generated
+                                             (if (cdr generated)
+                                                 (error "Child Eldev process seems to have generated more than one (package) file")
+                                               (package-install-file (car generated)))
+                                           (error "Child Eldev process succeeded, but apparently didn't generate a package")))
+                                       (ignore-errors (delete-directory tmp-package-dir t))))
+                                 (eldev--with-pa-access-workarounds (lambda ()
+                                                                      (eldev-using-global-package-archive-cache
+                                                                        (condition-case error
+                                                                            (let ((original-load-path load-path))
+                                                                              (unwind-protect
+                                                                                  (progn
+                                                                                    ;; See `eldev-upgrade-self-new-macros-1'.
+                                                                                    (when (eq dependency-name 'eldev)
+                                                                                      (eldev--unload-self))
+                                                                                    ;; Ugly workaround for receiving 400 Bad Request responses from GNU
+                                                                                    ;; ELPA in poorly understood circumstances, see issue #52.
+                                                                                    ;; FIXME: Find a better workaround?
+                                                                                    (eval-and-compile (require 'url-http))
+                                                                                    (when (and (< emacs-major-version 27)
+                                                                                               (boundp 'url-http-open-connections)
+                                                                                               (hash-table-p url-http-open-connections))
+                                                                                      (clrhash url-http-open-connections))
+                                                                                    ;; This really weird workaround was crafted against a bug seen only on GitHub CI and only in test
+                                                                                    ;; `eldev-container-test-1/podman', which would fail with an error "Doing chmod: Operation not
+                                                                                    ;; permitted, /project-c/.eldev/28.2/packages/dependency-a-1.0/dependency-a-autoloads.eliLIjiV"
+                                                                                    ;; coming from inside Podman process.  I have no idea why, what and where was wrong, but as I digged
+                                                                                    ;; through it and found a workaround anyway, let's have it.  `errno' from Fset_file_modes() in Emacs
+                                                                                    ;; source could maybe tell more, but I have no idea how to get it, so fuck it.  Running `chmod'
+                                                                                    ;; instead of calling Emacs function would succeed, by the way, but on the other hand it doesn't
+                                                                                    ;; have a `nofollow' option, so that doesn't say much.
+                                                                                    (eldev-advised ('set-file-modes :around (when (>= emacs-major-version 28)
+                                                                                                                              (lambda (original filename mode &optional flag)
+                                                                                                                                (when (and flag (not (file-symlink-p filename)))
+                                                                                                                                  (setf flag nil))
+                                                                                                                                (funcall original filename mode flag))))
+                                                                                      (package-install-from-archive dependency)))
                                                                                 (when (eq dependency-name 'eldev)
-                                                                                  (eldev--unload-self))
-                                                                                ;; Ugly workaround for receiving 400 Bad Request responses from GNU
-                                                                                ;; ELPA in poorly understood circumstances, see issue #52.
-                                                                                ;; FIXME: Find a better workaround?
-                                                                                (eval-and-compile (require 'url-http))
-                                                                                (when (and (< emacs-major-version 27)
-                                                                                           (boundp 'url-http-open-connections)
-                                                                                           (hash-table-p url-http-open-connections))
-                                                                                  (clrhash url-http-open-connections))
-                                                                                ;; This really weird workaround was crafted against a bug seen only on GitHub CI and only in test
-                                                                                ;; `eldev-container-test-1/podman', which would fail with an error "Doing chmod: Operation not
-                                                                                ;; permitted, /project-c/.eldev/28.2/packages/dependency-a-1.0/dependency-a-autoloads.eliLIjiV"
-                                                                                ;; coming from inside Podman process.  I have no idea why, what and where was wrong, but as I digged
-                                                                                ;; through it and found a workaround anyway, let's have it.  `errno' from Fset_file_modes() in Emacs
-                                                                                ;; source could maybe tell more, but I have no idea how to get it, so fuck it.  Running `chmod'
-                                                                                ;; instead of calling Emacs function would succeed, by the way, but on the other hand it doesn't
-                                                                                ;; have a `nofollow' option, so that doesn't say much.
-                                                                                (eldev-advised ('set-file-modes :around (when (>= emacs-major-version 28)
-                                                                                                                          (lambda (original filename mode &optional flag)
-                                                                                                                            (when (and flag (not (file-symlink-p filename)))
-                                                                                                                              (setf flag nil))
-                                                                                                                            (funcall original filename mode flag))))
-                                                                                  (package-install-from-archive dependency)))
-                                                                            (when (eq dependency-name 'eldev)
-                                                                              ;; Reload the current package again, so that we
-                                                                              ;; don't mix old and new function invocations.
-                                                                              (eldev--unload-self)
-                                                                              (let ((load-path original-load-path))
-                                                                                (require 'eldev)))))
-                                                                      (file-error (let ((url (eldev--guess-url-from-file-error error)))
-                                                                                    (when (stringp url)
-                                                                                      (dolist (archive archive-statuses)
-                                                                                        (when (and (string= (caar archive) (package-desc-archive dependency))
-                                                                                                   (string-prefix-p (cdar archive) url))
-                                                                                          ;; It is possible that package archive contents is cached and is deemed
-                                                                                          ;; up-to-date, but some packages cannot be fetched.  In this case, refresh the
-                                                                                          ;; contents file (but don't do it more than once).
-                                                                                          (when (eq (cdr archive) 'fetched-now)
-                                                                                            (signal 'eldev-error `(:hint ,(eldev-format-message "When accessing package archive `%s'" (caar archive))
-                                                                                                                         "%s" ,(error-message-string error))))
-                                                                                          (eldev-print :stderr "Contents of package archive `%s' seems out-of-date, will refetch..." (caar archive))
-                                                                                          (setf (cdr archive) nil)
-                                                                                          (throw 'refetch-archives t)))))
-                                                                                  (signal (car error) (cdr error))))))
-                                                                t))))))
+                                                                                  ;; Reload the current package again, so that we
+                                                                                  ;; don't mix old and new function invocations.
+                                                                                  (eldev--unload-self)
+                                                                                  (let ((load-path original-load-path))
+                                                                                    (require 'eldev)))))
+                                                                          (file-error (let ((url (eldev--guess-url-from-file-error error)))
+                                                                                        (when (stringp url)
+                                                                                          (dolist (archive archive-statuses)
+                                                                                            (when (and (string= (caar archive) (package-desc-archive dependency))
+                                                                                                       (string-prefix-p (cdar archive) url))
+                                                                                              ;; It is possible that package archive contents is cached and is deemed
+                                                                                              ;; up-to-date, but some packages cannot be fetched.  In this case, refresh the
+                                                                                              ;; contents file (but don't do it more than once).
+                                                                                              (when (eq (cdr archive) 'fetched-now)
+                                                                                                (signal 'eldev-error `(:hint ,(eldev-format-message "When accessing package archive `%s'" (caar archive))
+                                                                                                                             "%s" ,(error-message-string error))))
+                                                                                              (eldev-print :stderr "Contents of package archive `%s' seems out-of-date, will refetch..." (caar archive))
+                                                                                              (setf (cdr archive) nil)
+                                                                                              (throw 'refetch-archives t)))))
+                                                                                      (signal (car error) (cdr error))))))
+                                                                    t))))))))
                    (if (> non-local-plan-size 0)
                        (when (memq 'runtime (eldev-listify additional-sets))
                          (eldev--save-installed-runtime-dependencies))
@@ -2762,7 +2855,7 @@ Since 0.2."
                        (let ((inhibit-message t)
                              (num-deleted     0))
                          (dolist (dependency planned-packages)
-                           (unless (or (null (cdr dependency)) (and (not self) (eldev--loading-mode (car dependency))))
+                           (unless (or (null (cdr dependency)) (and (not self) (eldev--loading-mode (car dependency) t)))
                              ;; Argument FORCE was added only in 25.x.  Always force package
                              ;; deletion, otherwise package manager won't let us downgrade
                              ;; dependencies when we choose to do so.
@@ -2807,11 +2900,13 @@ Since 0.2."
                                          (description     (eldev-format-message "%s package `%s'"
                                                                                 (cond ((eq dependency-name package-name)               "project")
                                                                                       ((or recursing (eldev--loading-mode dependency)) "local dependency")
+                                                                                      ((assq dependency-name eldev--vc-dependencies)   "VC dependency")
                                                                                       (t                                               "dependency"))
                                                                                 dependency-name))
-                                         (loading-mode    (unless recursing (eldev--loading-mode dependency))))
+                                         (loading-mode    (unless recursing (eldev--loading-mode dependency t))))
                                     (eldev-pcase-exhaustive loading-mode
-                                      (`nil
+                                      ;; VC-managed dependencies are currently installed just as normal ones.
+                                      ((or `nil `vc)
                                        (eldev-trace "Activating %s..." description)
                                        (or (let ((inhibit-message t))
                                              (apply original dependency rest))
@@ -2955,7 +3050,7 @@ Since 0.2."
       (when (or (not (package-built-in-p package-name required-version))
                 ;; See issue 102.  Do replace built-in packages with the project itself
                 ;; and local dependencies.  See `local' below.
-                (and (not self) (eldev--loading-mode package-name)))
+                (and (not self) (eldev--loading-mode package-name t)))
         (when (eq package-name 'emacs)
           (when optional
             (eldev-verbose "Emacs version %s (this is %s) is %s; skipping the optional dependency"
@@ -2964,6 +3059,7 @@ Since 0.2."
           (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint t)
                                                     "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
+               (from-vc                   (unless local (assq package-name eldev--vc-dependencies)))
                (already-installed         (unless local (eldev-find-package-descriptor package-name)))
                (already-installed-version (when already-installed (package-desc-version already-installed)))
                (already-installed-too-old (version-list-< already-installed-version required-version))
@@ -2991,9 +3087,9 @@ Since 0.2."
                   ;; Make sure we don't install a package from a wrong archive.  In
                   ;; particular, if using preinstalled dependencies (external-dir), only
                   ;; "install" local dependencies listed in the internal pseudoarchive.
-                  (when (if (or local external-dir)
-                            (string= archive eldev--internal-pseudoarchive)
-                          (or (null archives) (eldev--find-simple-archive archives archive)))
+                  (when (cond ((or local external-dir) (string= archive eldev--internal-pseudoarchive))
+                              (from-vc                 (string= archive eldev--internal-vc-pseudoarchive))
+                              (t                       (or (null archives) (eldev--find-simple-archive archives archive))))
                     (cond ((version-list-< version required-version)
                            (when (version-list-< best-version version)
                              (setf best-version version)))
@@ -3102,11 +3198,14 @@ Since 0.2."
                                                       (list (eldev-format-message "When updating script `%s': %s" abbreviated (error-message-string error)))))))
                 (eldev-print "Upgraded script `%s'" abbreviated)))))))))
 
+(defun eldev--package-archive-dir (archive &optional base-dir)
+  (expand-file-name archive (expand-file-name "archives" (or base-dir package-user-dir))))
+
 (defun eldev--internal-pseudoarchive-dir (&optional ensure-exists)
   (eldev--get-or-create-dir (eldev--package-archive-dir eldev--internal-pseudoarchive) ensure-exists))
 
-(defun eldev--package-archive-dir (archive &optional base-dir)
-  (expand-file-name archive (expand-file-name "archives" (or base-dir package-user-dir))))
+(defun eldev--internal-vc-pseudoarchive-dir (&optional ensure-exists)
+  (eldev--get-or-create-dir (eldev--package-archive-dir eldev--internal-vc-pseudoarchive) ensure-exists))
 
 (defun eldev--create-internal-pseudoarchive-descriptor ()
   ;; Create our fake pseudoarchive.  We do each time anew to avoid tracking local
@@ -3124,16 +3223,68 @@ Since 0.2."
              (current-buffer))
       (insert "\n"))))
 
-(defun eldev--determine-archives-to-fetch (&optional refetch-contents return-all)
+(defun eldev--create-or-update-internal-vc-pseudoarchive-descriptor ()
+  ;; Create fake pseudoarchive for VC dependencies or update it if already exists.
+  (let ((archive-file (expand-file-name "archive-contents" (eldev--internal-vc-pseudoarchive-dir t)))
+        previous-contents)
+    (ignore-errors
+      (with-temp-buffer
+        (insert-file-contents archive-file)
+        (let ((contents (read (current-buffer))))
+          (when (>= (car contents) package-archive-version)
+            (setf previous-contents (cdr contents))))))
+    (with-temp-file archive-file
+      (prin1 `(,package-archive-version
+               ,@(let (entries)
+                   (dolist (vc-dependency eldev--vc-dependencies)
+                     (let* ((name    (car vc-dependency))
+                            (package (cdr (assq name eldev--vc-dependency-packages))))
+                       (if package
+                           (push `(,(package-desc-name package) . ,(package-make-ac-desc (package-desc-version package) (package-desc-reqs package) nil 'single nil)) entries)
+                         (let ((previous (assq name previous-contents)))
+                           (when previous
+                             (push previous entries))))))
+                   entries))
+             (current-buffer))
+      (insert "\n"))))
+
+(defun eldev--vc-dependency-cache-dir (&optional ensure-exists)
+  ;; It is theoretically possible that VC dependency configuration is different for
+  ;; different versions, but I guess that can be ignored for the potential performance
+  ;; improvement.  So, let's not make this cache Emacs-version-specific.
+  (eldev--get-or-create-dir (expand-file-name "git" (eldev-cache-dir nil)) ensure-exists))
+
+(defun eldev--vc-dependency-dir (vc-dependency)
+  (expand-file-name (url-hexify-string (symbol-name (car vc-dependency))) (eldev--vc-dependency-cache-dir)))
+
+(defun eldev--vc-repository-name (vc-dependency &optional colorized)
+  (let ((github (plist-get (cdr vc-dependency) :github)))
+    (if github
+        (format "%s %s" (eldev-maybe-colorize "[GitHub]" colorized 'details) github)
+      (eldev-maybe-colorize (plist-get (cdr vc-dependency) :git) colorized 'url))))
+
+(defun eldev--determine-archives-to-fetch (&optional include-vc refetch-contents return-all)
   "Return a list of archives that need to be (re)fetched.
 If RETURN-ALL is non-nil, return a list of (ARCHIVE . UP-TO-DATE)
 for all archives instead."
   (let (result)
+    (when include-vc
+      (dolist (vc-dependency eldev--vc-dependencies)
+        (let (up-to-date)
+          (when (file-exists-p (expand-file-name ".git/config" (eldev--vc-dependency-dir vc-dependency)))
+            (if refetch-contents
+                (eldev-trace "Will refetch VC repository `%s' in case it has changed" (eldev--vc-repository-name vc-dependency))
+              (setf up-to-date t)
+              (eldev-trace "Contents of VC repository `%s' has been fetched already" (eldev--vc-repository-name vc-dependency))))
+          (if return-all
+              (push `((:vc ,vc-dependency) . ,up-to-date) result)
+            (unless up-to-date
+              (push `(:vc ,vc-dependency) result))))))
     (dolist (archive (sort (copy-sequence package-archives)
                            (lambda (a b) (or (and (eldev--stable/unstable-preferred-archive a)
                                                   (not (eldev--stable/unstable-preferred-archive b)))
                                              (> (eldev-package-archive-priority (car a)) (eldev-package-archive-priority (car b)))))))
-      (unless (string= (car archive) eldev--internal-pseudoarchive)
+      (unless (member (car archive) (list eldev--internal-pseudoarchive eldev--internal-vc-pseudoarchive))
         (let (up-to-date)
           ;; I don't see a way to find if package archive contents is fetched already
           ;; without going into internals.
@@ -3232,7 +3383,7 @@ for all archives instead."
               (bad-signature (signal 'eldev-error `(:hint ,(ignore-errors (with-current-buffer "*Error*" (buffer-string)))
                                                           ,(error-message-string error)))))))))))
 
-(defun eldev--loading-mode (dependency)
+(defun eldev--loading-mode (dependency &optional handle-vc-dependencies)
   "Get loading mode of package DEPENDENCY.
 DEPENDENCY can be either a name (symbol) or a package descriptor.
 Returns nil if it is neither a project nor a local dependency."
@@ -3242,8 +3393,10 @@ Returns nil if it is neither a project nor a local dependency."
       (let ((entry (assq dependency-name eldev--local-dependencies)))
         (if entry
             (or (nth 4 entry) 'as-is)
-          (unless (or (symbolp dependency) (not (string= (package-desc-archive dependency) eldev--internal-pseudoarchive)))
-            (error "Unexpected local dependency `%s'" dependency-name)))))))
+          (if (and handle-vc-dependencies (assq dependency-name eldev--vc-dependencies))
+              'vc
+            (unless (or (symbolp dependency) (not (string= (package-desc-archive dependency) eldev--internal-pseudoarchive)))
+              (error "Unexpected local dependency `%s'" dependency-name))))))))
 
 (defun eldev--load-autoloads-file (file)
   (when (file-exists-p file)
@@ -5186,6 +5339,8 @@ least one warning."
   ;; Issue #19: otherwise the linter will complain about local dependencies that are not
   ;; available from "normal" package archives.
   (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
+  (when eldev--vc-dependencies
+    (push `(,eldev--internal-vc-pseudoarchive . ,(file-name-as-directory (eldev--internal-vc-pseudoarchive-dir))) package-archives))
   (package-read-all-archive-contents))
 
 

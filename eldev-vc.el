@@ -193,6 +193,51 @@ Since 1.2."
 
 
 
+;; Working with VC dependencies.
+
+(defun eldev--vc-fetch-repository (vc-backend url dir &optional update)
+  (unless (eq vc-backend 'Git)
+    (error "Only Git is supported currently"))
+  ;; Git ignores `--depth' for local clones, but we need a consistent behavior, if only for tests.
+  (when (file-name-absolute-p url)
+    (setf url (format "file://%s" url)))
+  (let (reused-existing
+        stable)
+    (when (file-exists-p (expand-file-name ".git/config" dir))
+      (let ((default-directory dir))
+        (if (string= url (eldev-call-process (eldev-git-executable) '("config" "--get" "remote.origin.url")
+                           :destination  '(t nil)
+                           :discard-ansi t
+                           :die-on-error t
+                           (string-trim (buffer-string))))
+            (progn (eldev-trace "Reusing existing Git clone of `%s'..." url)
+                   (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
+                     :die-on-error t)
+                   (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
+                     :die-on-error t)
+                   (setf reused-existing t))
+          (eldev-trace "Discarding existing Git clone at `%s': wrong remote URL" dir)
+          (ignore-errors (delete-directory dir t)))))
+    (unless reused-existing
+      (eldev-verbose "Cloning Git repository `%s'..." url)
+      (eldev-call-process (eldev-git-executable) `("clone" ,url "--single-branch" "--depth=1" ,dir)
+        :die-on-error t))
+    (let ((package (eldev-package-descriptor dir)))
+      (unless stable
+        (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
+          :destination  '(t nil)
+          :discard-ansi t
+          :die-on-error t
+          (let ((date-string (string-trim (buffer-string))))
+            ;; Don't match the whole, but just a bit of assertion here.
+            (when (string-match (rx bos (group (= 4 num)) "-" (group (= 2 num)) "-" (group (= 2 num)) "T" (group (= 2 num)) ":" (group (= 2 num))) date-string)
+              (setf (package-desc-version package)
+                    (append (package-desc-version package) `(,(string-to-number (format "%s%s%s" (match-string 1 date-string) (match-string 2 date-string) (match-string 3 date-string)))
+                                                             ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
+      package)))
+
+
+
 ;; Real work of `eldev init' command is moved here to make Eldev startup slightly faster:
 ;; the command is rarely needed and this file is not loaded by default.
 

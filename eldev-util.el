@@ -743,9 +743,16 @@ PROMPT.  More can be added later (preserving semantics).  Since
                                     ((symbolp string) (symbol-name string))
                                     ;; We get here e.g. if `eldev-debug' is mixed up with `eldev-dump'.
                                     (t                (error "Expected a string or a symbol, got %S instead" string)))))
-  (when types
+  (when (setf types (remq nil types))
     (add-face-text-property 0 (length string) types nil string))
   string)
+
+(defun eldev-maybe-colorize (string colorize &rest types)
+  "Optionally apply given Eldev colorizing to STRING.
+Since 1.11."
+  (if colorize
+      (apply #'eldev-colorize string types)
+    string))
 
 (defsubst eldev-output-colorized-p ()
   "Determine if output should be colorized.
