@@ -210,18 +210,24 @@ Since 1.2."
                            :discard-ansi t
                            :die-on-error t
                            (string-trim (buffer-string))))
-            (progn (eldev-trace "Reusing existing Git clone of `%s'..." url)
-                   (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
-                     :die-on-error t)
-                   (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
-                     :die-on-error t)
-                   (setf reused-existing t))
+            (when update
+              (eldev-trace "Reusing existing Git clone of `%s'..." dir)
+              (eldev-verbose "Fetching upgrades from `%s'..." url)
+              (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
+                :die-on-error t)
+              (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
+                :die-on-error t)
+              (setf reused-existing t))
           (eldev-trace "Discarding existing Git clone at `%s': wrong remote URL" dir)
           (ignore-errors (delete-directory dir t)))))
     (unless reused-existing
       (eldev-verbose "Cloning Git repository `%s'..." url)
       (eldev-call-process (eldev-git-executable) `("clone" ,url "--single-branch" "--depth=1" ,dir)
         :die-on-error t))
+    ;; FIXME: Try to build stable versions from tags.
+    (when t
+      (setf stable nil))
+    (eldev-dump dir url default-directory)
     (let ((package (eldev-package-descriptor dir)))
       (unless stable
         (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
