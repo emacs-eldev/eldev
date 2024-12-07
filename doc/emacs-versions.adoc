@@ -81,7 +81,13 @@ would instead only appear when Docker has exited.
 It is also possible to use a custom image.  For this, replace Emacs
 version argument (26.3 in the last example above) with the full image
 name.  The image must contain a preinstalled Emacs of a version
-supported by Eldev (i.e. 24.4 and up), but not Eldev itself.
+supported by Eldev (i.e. 24.4 and up), but not Eldev itself.  Eldev
+itself uses the smallest available image provided by Silex.  This may
+be too restrictive, for example it doesn’t include Git.  But you can
+easily tell Eldev to use any other {uri-docker-emacs-images}[Silex
+image] (or an image provided elsewhere):
+
+    $ eldev docker silex/emacs:28-ci eval "(eldev-git-executable)"
 
 Additionally, `docker run` arguments are customisable via the variable
 `eldev-docker-run-extra-args` (and likewise for Podman:

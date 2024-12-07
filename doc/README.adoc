@@ -48,6 +48,7 @@
 :uri-logview: https://github.com/doublep/logview
 :uri-datetime: https://github.com/doublep/datetime
 :uri-docker-emacs: https://github.com/Silex/docker-emacs
+:uri-docker-emacs-images: https://github.com/Silex/docker-emacs#images
 :uri-release-it: https://github.com/release-it/release-it
 :uri-emacs-forwarding: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=56745
 :uri-guix: https://guix.gnu.org/
