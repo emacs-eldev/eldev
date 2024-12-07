@@ -3255,7 +3255,8 @@ Since 0.2."
   (eldev--get-or-create-dir (expand-file-name "git" (eldev-cache-dir nil)) ensure-exists))
 
 (defun eldev--vc-dependency-dir (vc-dependency)
-  (expand-file-name (url-hexify-string (symbol-name (car vc-dependency))) (eldev--vc-dependency-cache-dir)))
+  ;; `file-name-as-directory' is important at least on Emacs 24.
+  (file-name-as-directory (expand-file-name (url-hexify-string (symbol-name (car vc-dependency))) (eldev--vc-dependency-cache-dir))))
 
 (defun eldev--vc-repository-name (vc-dependency &optional colorized)
   (let ((github (plist-get (cdr vc-dependency) :github)))
