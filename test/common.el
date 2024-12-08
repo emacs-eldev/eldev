@@ -596,6 +596,18 @@ only with modification time."
       (sleep-for 0.1))))
 
 
+(defun eldev--test-unstable-version-rx (version &optional full-string)
+  "Create a regexp to match VERSION plus typical snapshot suffix.
+I.e. plus “YYYYMMDD.HHMM” of the last commit.  VERSION can be
+either a string or a list."
+  (let ((regexp (if (stringp version)
+                    (rx-to-string `(seq ,version ".2" (= 7 digit) "." (** 1 4 digit)))
+                  (rx-to-string `(seq ,(substring (prin1-to-string version) 0 -1) " 2" (= 7 digit) " " (** 1 4 digit) ")")))))
+    (when full-string
+      (setf regexp (format "\\`%s\\'" regexp)))
+    regexp))
+
+
 (defmacro eldev-ert-defargtest (name arguments values &rest body)
   "Define a parameterized test with given NAME.
 This is a poor-man's substitute for functionality missing from

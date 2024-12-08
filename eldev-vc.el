@@ -227,7 +227,6 @@ Since 1.2."
     ;; FIXME: Try to build stable versions from tags.
     (when t
       (setf stable nil))
-    (eldev-dump dir url default-directory)
     (let ((package (eldev-package-descriptor dir)))
       (unless stable
         (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
@@ -241,6 +240,45 @@ Since 1.2."
                     (append (package-desc-version package) `(,(string-to-number (format "%s%s%s" (match-string 1 date-string) (match-string 2 date-string) (match-string 3 date-string)))
                                                              ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
       package)))
+
+(defun eldev--vc-install-as-package (vc-dependency)
+  ;; Unlike with local dependencies, for VC-originated we generate and install Emacs
+  ;; package here rather than when loading.  The reason is that the source checkout is
+  ;; controlled by Eldev and thus shouldn't outside.
+  (let ((tmp-package-dir (make-temp-file "eldev-vc-" t))
+        (package         (cdr (assq (car vc-dependency) eldev--vc-dependency-packages))))
+    (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name vc-dependency))
+    (let ((default-directory (eldev--vc-dependency-dir vc-dependency))
+          (display-stdout    eldev-display-indirect-build-stdout)
+          ;; Not using `--print-filename' here so that output can be better forwarded to
+          ;; stdout if `eldev-display-indirect-build-stdout' asks for that.
+          (command-line      `("package" "--output-dir" ,tmp-package-dir
+                               "--force-version" ,(package-version-join (package-desc-version package))))
+          (setup             (plist-get (cdr vc-dependency) :setup)))
+      (when setup
+        (setf command-line (append `("--setup" ,(prin1-to-string setup)) command-line)))
+      (eldev-call-process (eldev-shell-command) command-line
+        :forward-output     (if display-stdout t 'stderr)
+        :destination        (if display-stdout t '(t nil))
+        :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
+        :die-on-error       (eldev-format-message "child Eldev process for VC dependency `%s'" (car vc-dependency)))
+      (unless display-stdout
+        (if (= (point-min) (point-max))
+            (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
+          (eldev-verbose "(Non-stderr) output of the child Eldev process:")
+          (eldev-verbose (buffer-string))))
+      (let ((generated (eldev-find-files '("./*.tar" "./*.el") t tmp-package-dir)))
+        (unless generated
+          (error "Child Eldev process succeeded, but apparently didn't generate a package"))
+        (when (cdr generated)
+          (error "Child Eldev process seems to have generated more than one (package) file"))
+        ;; Not using `package-install-file' as it would ignore the forced version.
+        (let ((tmp-package (copy-sequence package)))
+          (setf (package-desc-kind tmp-package) (if (string-suffix-p ".tar" (car generated)) 'tar 'single))
+          (with-temp-buffer
+            (insert-file-contents (car generated))
+            (package-unpack tmp-package))))
+      (ignore-errors (delete-directory tmp-package-dir t)))))
 
 
 

@@ -89,7 +89,7 @@
                                         eldev-release-test-project eldev-release-maybe-fail)
                        ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev--vc-set-up-buffer eldev-vc-synchronize-dir
                                         eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name
-                                        eldev--vc-fetch-repository)
+                                        eldev--vc-fetch-repository eldev--vc-install-as-package)
                        ("eldev-doctor"  eldev-defdoctest)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))
@@ -2759,36 +2759,7 @@ Since 0.2."
                            (eldev-named-step nil (eldev-format-message "installing dependency package `%s'" dependency-name)
                              (let ((inhibit-message t))
                                (if (string= (package-desc-archive dependency) eldev--internal-vc-pseudoarchive)
-                                   ;; Unlike with local dependencies, for VC-originated we generate and install Emacs
-                                   ;; package here rather than when loading.  The reason is that the source checkout is
-                                   ;; controlled by Eldev and thus shouldn't outside.
-                                   (let ((tmp-package-dir (make-temp-file "eldev-vc-" t)))
-                                     (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name vc-dependency))
-                                     (let ((default-directory (eldev--vc-dependency-dir vc-dependency))
-                                           (display-stdout    eldev-display-indirect-build-stdout)
-                                           ;; Not using `--print-filename' here so that output can be better forwarded to
-                                           ;; stdout if `eldev-display-indirect-build-stdout' asks for that.
-                                           (command-line      `("package" "--output-dir" ,tmp-package-dir))
-                                           (setup             (plist-get (cdr vc-dependency) :setup)))
-                                       (when setup
-                                         (setf command-line (append `("--setup" ,(prin1-to-string setup)) command-line)))
-                                       (eldev-call-process (eldev-shell-command) command-line
-                                         :forward-output     (if display-stdout t 'stderr)
-                                         :destination        (if display-stdout t '(t nil))
-                                         :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
-                                         :die-on-error       (eldev-format-message "child Eldev process for VC dependency `%s'" dependency-name))
-                                       (unless display-stdout
-                                         (if (= (point-min) (point-max))
-                                             (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
-                                           (eldev-verbose "(Non-stderr) output of the child Eldev process:")
-                                           (eldev-verbose (buffer-string))))
-                                       (let ((generated (eldev-find-files '("./*.tar" "./*.el") t tmp-package-dir)))
-                                         (if generated
-                                             (if (cdr generated)
-                                                 (error "Child Eldev process seems to have generated more than one (package) file")
-                                               (package-install-file (car generated)))
-                                           (error "Child Eldev process succeeded, but apparently didn't generate a package")))
-                                       (ignore-errors (delete-directory tmp-package-dir t))))
+                                   (eldev--vc-install-as-package vc-dependency)
                                  (eldev--with-pa-access-workarounds (lambda ()
                                                                       (eldev-using-global-package-archive-cache
                                                                         (condition-case error
