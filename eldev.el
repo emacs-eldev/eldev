@@ -949,10 +949,10 @@ Since 1.7.")
 (defvar backtrace-line-length)
 (defvar emacs-repository-branch)
 
-(defvar eldev--vc-dependencies nil
-  "Alist of package names to plists describing VC dependencies.")
+(defvar eldev--vc-repositories nil
+  "Alist of package names to plists describing used VC repositories.")
 
-(defvar eldev--vc-dependency-packages nil
+(defvar eldev--vc-repository-packages nil
   "Alist of `(NAME . PKG-DESCRIPTOR).")
 
 
@@ -1046,7 +1046,7 @@ Used by Eldev startup script."
                                     (dolist (entry package-archives)
                                       (push (setf (car entry) (eldev--maybe-rename-archive (car entry) external-dir)) archive-files-to-delete))
                                     (push (setf eldev--internal-pseudoarchive (eldev--maybe-rename-archive eldev--internal-pseudoarchive external-dir)) archive-files-to-delete)
-                                    (when eldev--vc-dependencies
+                                    (when eldev--vc-repositories
                                       (push (setf eldev--internal-vc-pseudoarchive (eldev--maybe-rename-archive eldev--internal-vc-pseudoarchive external-dir)) archive-files-to-delete)))
                                   (setf command (intern (car command-line)))
                                   (unwind-protect
@@ -1803,15 +1803,15 @@ in `package-archives', it returns VALUE-IF-NOT-USED."
                    (setf (car (assoc counterpart priorities)) name)))))))))
 
 
-(cl-defun eldev-use-vc-dependency (package-name &key git github setup &allow-other-keys)
-  "Use a VC-retrieved dependency.
+(cl-defun eldev-use-vc-repository (package &key git github setup &allow-other-keys)
+  "Use a VC repository for fetching given PACKAGE.
 Currently only Git is supported, so either GIT or GITHUB
 parameter is required.  If GIT is specified, it must be the full
-URL to the repository, as string.  Instead, you can specify
-GITHUB, which should be in the format \"USERNAME/REPONAME\".
+URL to the repository, as a string.  You can specify GITHUB
+instead, which must be in the format \"USERNAME/REPONAME\".
 
 Form SETUP, if used, will be passed to the child Eldev process
-(see option `--setup') whenever a package needs to be built.
+(see option `--setup') whenever the package needs to be built.
 
 Since 1.11."
   (if git
@@ -1820,13 +1820,13 @@ Since 1.11."
     (if github
         (setf git (format "https://github.com/%s.git" github))
       (error "Either of `:git' or `:github' is required")))
-  (let ((registered (assq package-name eldev--vc-dependencies)))
+  (let ((registered (assq package eldev--vc-repositories)))
     (when registered
-      (error "Duplicate VC dependency `%s' with URL `%s': already registered with URL `%s'" package-name git (plist-get (cdr registered) :git))))
+      (error "Duplicate VC-retrieved package `%s' with URL `%s': already registered with URL `%s'" package git (plist-get (cdr registered) :git))))
   (unless eldev-normal-dependency-management
     ;; But still add it into the list in case dependency management get reenabled in time somehow.
-    (eldev-warn "Normal dependency management is disabled; VC dependencies will not be used"))
-  (push `(,package-name :git ,git :github ,github :setup ,setup) eldev--vc-dependencies))
+    (eldev-warn "Normal dependency management is disabled; VC repositories will not be used"))
+  (push `(,package :git ,git :github ,github :setup ,setup) eldev--vc-repositories))
 
 
 (defun eldev-use-local-dependency (dir &optional loading-mode)
@@ -2608,7 +2608,7 @@ Since 0.2."
                 all-packages     '((:package eldev)))
         (eldev--create-internal-pseudoarchive-descriptor)
         (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
-        (when eldev--vc-dependencies
+        (when eldev--vc-repositories
           (eldev--create-or-update-internal-vc-pseudoarchive-descriptor)
           (push `(,eldev--internal-vc-pseudoarchive . ,(file-name-as-directory (eldev--internal-vc-pseudoarchive-dir))) package-archives))
         (setf default-archives package-archives)
@@ -2655,11 +2655,11 @@ Since 0.2."
                      (let ((next-archive (pop pass-archive-statuses)))
                        (unless (cdr next-archive)
                          (pcase (car next-archive)
-                           (`(:vc ,dependency)
-                            (eldev--assq-set (car dependency)
-                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr dependency) :git) (eldev--vc-dependency-dir dependency)
-                                                                         (or (eq to-be-upgraded t) (memq (car dependency) to-be-upgraded)))
-                                             eldev--vc-dependency-packages)
+                           (`(:vc ,repository)
+                            (eldev--assq-set (car repository)
+                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr repository) :git) (eldev--vc-clone-dir repository)
+                                                                         (or (eq to-be-upgraded t) (memq (car repository) to-be-upgraded)))
+                                             eldev--vc-repository-packages)
                             (eldev--create-or-update-internal-vc-pseudoarchive-descriptor))
                            (_
                             (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)))
@@ -2738,13 +2738,13 @@ Since 0.2."
                      (let* ((previous-version (cdr dependency))
                             (dependency       (car dependency))
                             (dependency-name  (package-desc-name dependency))
-                            (vc-dependency    (assq dependency-name eldev--vc-dependencies)))
+                            (repository       (assq dependency-name eldev--vc-repositories)))
                        (if (and (not self) (eldev--loading-mode dependency))
                            (eldev--load-local-dependency dependency)
                          (setf dependency-index (1+ dependency-index))
                          (let ((source (eldev-colorize (package-desc-archive dependency) 'name)))
                            (when (string= source eldev--internal-vc-pseudoarchive)
-                             (setf source (eldev--vc-repository-name vc-dependency t)))
+                             (setf source (eldev--vc-repository-name repository t)))
                            (if previous-version
                                (eldev-print :stderr (if (version-list-< (package-desc-version dependency) (package-desc-version previous-version))
                                                         "[%d/%d] Downgrading package `%s' (%s -> %s) from `%s' (to use a better package archive)..."
@@ -2759,7 +2759,7 @@ Since 0.2."
                            (eldev-named-step nil (eldev-format-message "installing dependency package `%s'" dependency-name)
                              (let ((inhibit-message t))
                                (if (string= (package-desc-archive dependency) eldev--internal-vc-pseudoarchive)
-                                   (eldev--vc-install-as-package vc-dependency)
+                                   (eldev--vc-install-as-package repository)
                                  (eldev--with-pa-access-workarounds (lambda ()
                                                                       (eldev-using-global-package-archive-cache
                                                                         (condition-case error
@@ -2871,12 +2871,12 @@ Since 0.2."
                                          (description     (eldev-format-message "%s package `%s'"
                                                                                 (cond ((eq dependency-name package-name)               "project")
                                                                                       ((or recursing (eldev--loading-mode dependency)) "local dependency")
-                                                                                      ((assq dependency-name eldev--vc-dependencies)   "VC dependency")
+                                                                                      ((assq dependency-name eldev--vc-repositories)   "VC-fetched dependency")
                                                                                       (t                                               "dependency"))
                                                                                 dependency-name))
                                          (loading-mode    (unless recursing (eldev--loading-mode dependency t))))
                                     (eldev-pcase-exhaustive loading-mode
-                                      ;; VC-managed dependencies are currently installed just as normal ones.
+                                      ;; VC-fetched packages are currently installed just as normal ones.
                                       ((or `nil `vc)
                                        (eldev-trace "Activating %s..." description)
                                        (or (let ((inhibit-message t))
@@ -3030,7 +3030,7 @@ Since 0.2."
           (signal 'eldev-missing-dependency `(:hint ,(funcall required-by-hint t)
                                                     "Emacs version %s is required (this is version %s)" ,(eldev-message-version required-version) ,emacs-version)))
         (let* ((local                     (and (not self) (eldev--loading-mode package-name)))
-               (from-vc                   (unless local (assq package-name eldev--vc-dependencies)))
+               (from-vc                   (unless local (assq package-name eldev--vc-repositories)))
                (already-installed         (unless local (eldev-find-package-descriptor package-name)))
                (already-installed-version (when already-installed (package-desc-version already-installed)))
                (already-installed-too-old (version-list-< already-installed-version required-version))
@@ -3195,7 +3195,7 @@ Since 0.2."
       (insert "\n"))))
 
 (defun eldev--create-or-update-internal-vc-pseudoarchive-descriptor ()
-  ;; Create fake pseudoarchive for VC dependencies or update it if already exists.
+  ;; Create fake pseudoarchive for VC-fetched packages or update it if already exists.
   (let ((archive-file (expand-file-name "archive-contents" (eldev--internal-vc-pseudoarchive-dir t)))
         previous-contents)
     (ignore-errors
@@ -3207,9 +3207,9 @@ Since 0.2."
     (with-temp-file archive-file
       (prin1 `(,package-archive-version
                ,@(let (entries)
-                   (dolist (vc-dependency eldev--vc-dependencies)
-                     (let* ((name    (car vc-dependency))
-                            (package (cdr (assq name eldev--vc-dependency-packages))))
+                   (dolist (repository eldev--vc-repositories)
+                     (let* ((name    (car repository))
+                            (package (cdr (assq name eldev--vc-repository-packages))))
                        (if package
                            (push `(,(package-desc-name package) . ,(package-make-ac-desc (package-desc-version package) (package-desc-reqs package) nil 'single nil)) entries)
                          (let ((previous (assq name previous-contents)))
@@ -3219,21 +3219,21 @@ Since 0.2."
              (current-buffer))
       (insert "\n"))))
 
-(defun eldev--vc-dependency-cache-dir (&optional ensure-exists)
-  ;; It is theoretically possible that VC dependency configuration is different for
+(defun eldev--vc-repository-cache-dir (&optional ensure-exists)
+  ;; It is theoretically possible that VC repository configuration is different for
   ;; different versions, but I guess that can be ignored for the potential performance
   ;; improvement.  So, let's not make this cache Emacs-version-specific.
   (eldev--get-or-create-dir (expand-file-name "git" (eldev-cache-dir nil)) ensure-exists))
 
-(defun eldev--vc-dependency-dir (vc-dependency)
+(defun eldev--vc-clone-dir (repository)
   ;; `file-name-as-directory' is important at least on Emacs 24.
-  (file-name-as-directory (expand-file-name (url-hexify-string (symbol-name (car vc-dependency))) (eldev--vc-dependency-cache-dir))))
+  (file-name-as-directory (expand-file-name (url-hexify-string (symbol-name (car repository))) (eldev--vc-repository-cache-dir))))
 
-(defun eldev--vc-repository-name (vc-dependency &optional colorized)
-  (let ((github (plist-get (cdr vc-dependency) :github)))
+(defun eldev--vc-repository-name (repository &optional colorized)
+  (let ((github (plist-get (cdr repository) :github)))
     (if github
         (format "%s %s" (eldev-maybe-colorize "[GitHub]" colorized 'details) github)
-      (eldev-maybe-colorize (plist-get (cdr vc-dependency) :git) colorized 'url))))
+      (eldev-maybe-colorize (plist-get (cdr repository) :git) colorized 'url))))
 
 (defun eldev--determine-archives-to-fetch (&optional include-vc refetch-contents return-all)
   "Return a list of archives that need to be (re)fetched.
@@ -3241,17 +3241,17 @@ If RETURN-ALL is non-nil, return a list of (ARCHIVE . UP-TO-DATE)
 for all archives instead."
   (let (result)
     (when include-vc
-      (dolist (vc-dependency eldev--vc-dependencies)
+      (dolist (repository eldev--vc-repositories)
         (let (up-to-date)
-          (when (file-exists-p (expand-file-name ".git/config" (eldev--vc-dependency-dir vc-dependency)))
+          (when (file-exists-p (expand-file-name ".git/config" (eldev--vc-clone-dir repository)))
             (if refetch-contents
-                (eldev-trace "Will refetch VC repository `%s' in case it has changed" (eldev--vc-repository-name vc-dependency))
+                (eldev-trace "Will refetch VC repository `%s' in case it has changed" (eldev--vc-repository-name repository))
               (setf up-to-date t)
-              (eldev-trace "Contents of VC repository `%s' has been fetched already" (eldev--vc-repository-name vc-dependency))))
+              (eldev-trace "Contents of VC repository `%s' has been fetched already" (eldev--vc-repository-name repository))))
           (if return-all
-              (push `((:vc ,vc-dependency) . ,up-to-date) result)
+              (push `((:vc ,repository) . ,up-to-date) result)
             (unless up-to-date
-              (push `(:vc ,vc-dependency) result))))))
+              (push `(:vc ,repository) result))))))
     (dolist (archive (sort (copy-sequence package-archives)
                            (lambda (a b) (or (and (eldev--stable/unstable-preferred-archive a)
                                                   (not (eldev--stable/unstable-preferred-archive b)))
@@ -3355,7 +3355,7 @@ for all archives instead."
               (bad-signature (signal 'eldev-error `(:hint ,(ignore-errors (with-current-buffer "*Error*" (buffer-string)))
                                                           ,(error-message-string error)))))))))))
 
-(defun eldev--loading-mode (dependency &optional handle-vc-dependencies)
+(defun eldev--loading-mode (dependency &optional handle-vc-repositories)
   "Get loading mode of package DEPENDENCY.
 DEPENDENCY can be either a name (symbol) or a package descriptor.
 Returns nil if it is neither a project nor a local dependency."
@@ -3365,7 +3365,7 @@ Returns nil if it is neither a project nor a local dependency."
       (let ((entry (assq dependency-name eldev--local-dependencies)))
         (if entry
             (or (nth 4 entry) 'as-is)
-          (if (and handle-vc-dependencies (assq dependency-name eldev--vc-dependencies))
+          (if (and handle-vc-repositories (assq dependency-name eldev--vc-repositories))
               'vc
             (unless (or (symbolp dependency) (not (string= (package-desc-archive dependency) eldev--internal-pseudoarchive)))
               (error "Unexpected local dependency `%s'" dependency-name))))))))
@@ -5311,7 +5311,7 @@ least one warning."
   ;; Issue #19: otherwise the linter will complain about local dependencies that are not
   ;; available from "normal" package archives.
   (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
-  (when eldev--vc-dependencies
+  (when eldev--vc-repositories
     (push `(,eldev--internal-vc-pseudoarchive . ,(file-name-as-directory (eldev--internal-vc-pseudoarchive-dir))) package-archives))
   (package-read-all-archive-contents))
 

@@ -193,7 +193,7 @@ Since 1.2."
 
 
 
-;; Working with VC dependencies.
+;; Working with VC repositories to fetch packages.
 
 (defun eldev--vc-fetch-repository (vc-backend url dir &optional update)
   (unless (eq vc-backend 'Git)
@@ -241,27 +241,27 @@ Since 1.2."
                                                              ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
       package)))
 
-(defun eldev--vc-install-as-package (vc-dependency)
-  ;; Unlike with local dependencies, for VC-originated we generate and install Emacs
-  ;; package here rather than when loading.  The reason is that the source checkout is
-  ;; controlled by Eldev and thus shouldn't outside.
+(defun eldev--vc-install-as-package (repository)
+  ;; Unlike with local dependencies, for VC-fetched we generate and install Emacs package
+  ;; here rather than when loading.  The reason is that the source checkout is controlled
+  ;; by Eldev and thus shouldn't outside.
   (let ((tmp-package-dir (make-temp-file "eldev-vc-" t))
-        (package         (cdr (assq (car vc-dependency) eldev--vc-dependency-packages))))
-    (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name vc-dependency))
-    (let ((default-directory (eldev--vc-dependency-dir vc-dependency))
+        (package         (cdr (assq (car repository) eldev--vc-repository-packages))))
+    (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name repository))
+    (let ((default-directory (eldev--vc-clone-dir repository))
           (display-stdout    eldev-display-indirect-build-stdout)
           ;; Not using `--print-filename' here so that output can be better forwarded to
           ;; stdout if `eldev-display-indirect-build-stdout' asks for that.
           (command-line      `("package" "--output-dir" ,tmp-package-dir
                                "--force-version" ,(package-version-join (package-desc-version package))))
-          (setup             (plist-get (cdr vc-dependency) :setup)))
+          (setup             (plist-get (cdr repository) :setup)))
       (when setup
         (setf command-line (append `("--setup" ,(prin1-to-string setup)) command-line)))
       (eldev-call-process (eldev-shell-command) command-line
         :forward-output     (if display-stdout t 'stderr)
         :destination        (if display-stdout t '(t nil))
         :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
-        :die-on-error       (eldev-format-message "child Eldev process for VC dependency `%s'" (car vc-dependency)))
+        :die-on-error       (eldev-format-message "child Eldev process for VC-fetched package `%s'" (car repository)))
       (unless display-stdout
         (if (= (point-min) (point-max))
             (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
