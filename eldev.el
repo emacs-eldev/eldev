@@ -260,7 +260,8 @@ Since 1.9.")
 If this value is nil (default), Eldev will manage and install
 dependencies as needed.  If a directory is specified, Eldev never
 installs anything and will fail if a dependency is missing.
-Local dependencies will still be loaded from their directories.
+Local-source packages will still be loaded from the specified
+directories.
 
 If value of this variable is t, load from the standard Emacs
 location, i.e. `~/.emacs.d/elpa'.
@@ -344,8 +345,9 @@ Since 0.9.")
   "Whether to display standard output of indirect builds.
 For example, if the loading mode is `compiled', such output might
 contain “ELC ...” lines.  This affects the project itself and all
-its local dependencies.  Display of directly-ordered builds (e.g.
-using commands `build', `compile') is always displayed.
+its dependencies coming from local sources (see function
+`eldev-use-local-source').  Display of directly-ordered builds
+(e.g.  using commands `build', `compile') is always displayed.
 
 Default value is nil since such output might be confused with
 output of the “main” command that triggered the build,
@@ -1616,13 +1618,13 @@ BUILD-SET is a symbol.  For list elements see documentation,
 section `Extended dependency format', and function
 `eldev--create-package-plist'")
 
-(defvar eldev--local-dependencies nil
-  "Alist of local dependencies to use.
+(defvar eldev--local-sources nil
+  "Alist of local sources to use.
 Each element is `(NAME PKG-DESCRIPTOR DIR ABSOLUTE-DIR
 LOADING-MODE)'.")
 
-(defvar eldev--local-dependency-packages nil
-  "Alist of local dependency package sources.
+(defvar eldev--local-source-packages nil
+  "Alist of built local source packages.
 Each element is `(NAME FILE UP-TO-DATE)', where FILE is the
 tarball and UP-TO-DATE is a boolean value.")
 
@@ -1829,29 +1831,34 @@ Since 1.11."
   (push `(,package :git ,git :github ,github :setup ,setup) eldev--vc-repositories))
 
 
-(defun eldev-use-local-dependency (dir &optional loading-mode)
-  "Use local dependency found in DIR.
-See the manual for more information about local dependencies."
+;; Don't remove, just keep the old name working indefinitely.
+(define-obsolete-function-alias 'eldev-use-local-dependency #'eldev-use-local-sources "1.11")
+
+(defun eldev-use-local-sources (dir &optional loading-mode)
+  "Use local sources found in DIR.
+Packages found locally override all other ways of locating
+(dependency) packages, e.g. package archives or VC repositories.
+See the manual for more information."
   (unless eldev-normal-dependency-management
     ;; But still add it into the list in case dependency management get reenabled in time somehow.
-    (eldev-warn "Normal dependency management is disabled; local dependencies will not be used"))
+    (eldev-warn "Normal dependency management is disabled; local sources will not be used"))
   (if loading-mode
       (progn (unless (assq loading-mode eldev--loading-modes)
-               (error "Unsupported local dependency mode `%s'; see Eldev documentation" loading-mode))
+               (error "Unknown loading mode `%s' for local sources; see Eldev documentation" loading-mode))
              (when (memq loading-mode '(compiled-on-demand noisy-compiled-on-demand))
-               (error "Loading mode `%s' is not supported for local dependencies" loading-mode)))
+               (error "Loading mode `%s' is not supported for local sources" loading-mode)))
     (setf loading-mode 'as-is))
-  (eldev-named-step nil (eldev-format-message "using local dependency in directory `%s'" dir)
+  (eldev-named-step nil (eldev-format-message "using local sources in directory `%s'" dir)
     (setf dir (file-name-as-directory dir))
     (let* ((absolute-dir (expand-file-name dir eldev-project-dir))
            (dependency   (eldev-package-descriptor absolute-dir))
            (name         (package-desc-name dependency)))
       (when (eq name (package-desc-name (eldev-package-descriptor)))
-        (error "Local dependency in directory `%s' is the same package as that being built: `%s'" dir name))
-      (when (assq name eldev--local-dependencies)
-        (error "Duplicate local dependency `%s' in directory `%s': already registered in directory `%s'" name dir (nth 1 (assq name eldev--local-dependencies))))
-      (push `(,name ,dependency ,dir ,absolute-dir ,loading-mode) eldev--local-dependencies)
-      (eldev-trace "Will use directory `%s' as local dependency `%s' with loading mode `%s'" dir name loading-mode))))
+        (error "Local sources in directory `%s' are the same package as that being built: `%s'" dir name))
+      (when (assq name eldev--local-sources)
+        (error "Duplicate local sources `%s' in directory `%s': already registered in directory `%s'" name dir (nth 1 (assq name eldev--local-sources))))
+      (push `(,name ,dependency ,dir ,absolute-dir ,loading-mode) eldev--local-sources)
+      (eldev-trace "Will use directory `%s' as local sources `%s' with loading mode `%s'" dir name loading-mode))))
 
 (defun eldev-add-extra-dependencies (sets &rest dependencies)
   "Additionally use DEPENDENCIES for given SETS.
@@ -2313,12 +2320,12 @@ upgraded.  However, you can list names of packages to be
 upgraded.  Requirements of these package will be upgraded if
 needed too.
 
-Note that local dependencies are never installed or upgraded from
-remote package archives.  If you sometimes use an “official”
-release of a package and sometimes its local copy and want the
-remote copy to be upgraded, make it non-local first (e.g. by
-commenting out `eldev-use-local-dependency' in `Eldev-local')
-before upgrading."
+Note that packages available from local sources are never
+installed or upgraded from package archives or VC repositories.
+If you sometimes use an “official” release of a package and
+sometimes its local copy and want the remote copy to be upgraded,
+make it non-local first (for example, by commenting out
+`eldev-use-local-sources' in `Eldev-local') before upgrading."
   :parameters     "[PACKAGE...]"
   :category       dependencies
   (when (eldev-external-package-dir)
@@ -2531,9 +2538,10 @@ Since 0.2."
       (unless (string-suffix-p ".sig" cache-path)
         (ignore-errors (delete-file (concat cache-path ".sig")))))))
 
-;; `package-compute-transaction' and friends are not enough in our case, mostly because of
-;; local dependencies that can change unpredictably and also requirement that certain
-;; dependencies are installed only from certain archives.  Roll our own.
+;; `package-compute-transaction' and friends are not enough in our case, originally
+;; because of local sources that can change unpredictably and also requirement that
+;; certain dependencies are installed only from certain archives (and likely yet more
+;; reasons added later).  Roll our own.
 ;;
 ;; Called each time when loading dependencies (e.g. for command `test' or `eval') and also
 ;; when upgrading.
@@ -2643,11 +2651,11 @@ Since 0.2."
         (while (catch 'refetch-archives
                  (package-load-all-descriptors)
                  (unless self
-                   ;; This removes local dependencies that have been installed as packages
-                   ;; (e.g. because `Eldev-local' used to be different) from
-                   ;; `package-alist'.  Otherwise package manager will prefer the installed
-                   ;; versions even if we pin the packages to our pseudoarchive.  This
-                   ;; doesn't quite feel right, but I don't see a better way.
+                   ;; This removes packages installed from local sources (e.g. because
+                   ;; `Eldev-local' used to be different) from `package-alist'.  Otherwise
+                   ;; package manager will prefer the installed versions even if we pin
+                   ;; the packages to our pseudoarchive.  This doesn't quite feel right,
+                   ;; but I don't see a better way.
                    (setf package-alist (eldev-filter (null (eldev--loading-mode (car it))) package-alist)))
                  ;; Retry for as long as we have archives to fetch contents of.
                  (let ((pass-archive-statuses archive-statuses))
@@ -2740,7 +2748,7 @@ Since 0.2."
                             (dependency-name  (package-desc-name dependency))
                             (repository       (assq dependency-name eldev--vc-repositories)))
                        (if (and (not self) (eldev--loading-mode dependency))
-                           (eldev--load-local-dependency dependency)
+                           (eldev--load-from-local-sources dependency)
                          (setf dependency-index (1+ dependency-index))
                          (let ((source (eldev-colorize (package-desc-archive dependency) 'name)))
                            (when (string= source eldev--internal-vc-pseudoarchive)
@@ -2870,7 +2878,7 @@ Since 0.2."
                                          (recursing       (memq dependency-name recursing-for))
                                          (description     (eldev-format-message "%s package `%s'"
                                                                                 (cond ((eq dependency-name package-name)               "project")
-                                                                                      ((or recursing (eldev--loading-mode dependency)) "local dependency")
+                                                                                      ((or recursing (eldev--loading-mode dependency)) "dependency from local sources")
                                                                                       ((assq dependency-name eldev--vc-repositories)   "VC-fetched dependency")
                                                                                       (t                                               "dependency"))
                                                                                 dependency-name))
@@ -2884,11 +2892,11 @@ Since 0.2."
                                            (progn (setf missing-dependency dependency-name)
                                                   nil)))
                                       ;; In all these modes dependency is activated in exactly the same way,
-                                      ;; the difference is in `eldev--load-local-dependency'.  Special
+                                      ;; the difference is in `eldev--load-from-local-sources'.  Special
                                       ;; handling of mode `compiled-on-demand' is performed elsewhere.
                                       ((or `as-is `source `byte-compiled `compiled-on-demand `noisy-compiled-on-demand `built `built-and-compiled `built-source)
                                        (when (and (memq loading-mode '(compiled-on-demand noisy-compiled-on-demand)) (not (eq dependency-name package-name)))
-                                         (error "Loading mode `%s' is not supported for local dependencies" loading-mode))
+                                         (error "Loading mode `%s' is not supported for local sources" loading-mode))
                                        (dolist (requirement (package-desc-reqs dependency))
                                          (unless (package-activate (car requirement))
                                            (throw 'exit nil)))
@@ -2896,8 +2904,8 @@ Since 0.2."
                                               (dependency-dir   (if (eq dependency-name package-name)
                                                                     eldev-project-dir
                                                                   ;; 2 and 3 stand for directory name and its absolute path.
-                                                                  (eldev-trace "Activating %s in directory `%s'" description (nth 2 (assq dependency-name eldev--local-dependencies)))
-                                                                  (nth 3 (assq dependency-name eldev--local-dependencies))))
+                                                                  (eldev-trace "Activating %s in directory `%s'" description (nth 2 (assq dependency-name eldev--local-sources)))
+                                                                  (nth 3 (assq dependency-name eldev--local-sources))))
                                               (source-dirs      (eldev--cross-project-internal-eval dependency-dir '(eldev-project-source-dirs) t)))
                                          ;; Use package's autoloads file if it is present.  At this stage we
                                          ;; never generate anything: only use existing files.
@@ -2919,9 +2927,9 @@ Since 0.2."
                                        (push dependency-name package-activated-list)
                                        t)
                                       (`packaged
-                                       (let ((generated-package (assq dependency-name eldev--local-dependency-packages)))
+                                       (let ((generated-package (assq dependency-name eldev--local-source-packages)))
                                          (unless generated-package
-                                           (error "Package for local dependency `%s' must have been generated by this point" dependency-name))
+                                           (error "Local-source package `%s' must have been generated by this point" dependency-name))
                                          (push dependency-name recursing-for)
                                          (let* ((package-user-dir (expand-file-name "local/packages" (eldev-cache-dir t)))
                                                 (up-to-date-desc  (when (nth 2 generated-package)
@@ -3020,7 +3028,7 @@ Since 0.2."
     (unless (and considered-before (version-list-<= required-version considered-version))
       (when (or (not (package-built-in-p package-name required-version))
                 ;; See issue 102.  Do replace built-in packages with the project itself
-                ;; and local dependencies.  See `local' below.
+                ;; and anything defined in local sources.  See `local' below.
                 (and (not self) (eldev--loading-mode package-name t)))
         (when (eq package-name 'emacs)
           (when optional
@@ -3057,7 +3065,7 @@ Since 0.2."
                        (disabled  (package-disabled-p package-name version)))
                   ;; Make sure we don't install a package from a wrong archive.  In
                   ;; particular, if using preinstalled dependencies (external-dir), only
-                  ;; "install" local dependencies listed in the internal pseudoarchive.
+                  ;; "install" from local sources listed in the internal pseudoarchive.
                   (when (cond ((or local external-dir) (string= archive eldev--internal-pseudoarchive))
                               (from-vc                 (string= archive eldev--internal-vc-pseudoarchive))
                               (t                       (or (null archives) (eldev--find-simple-archive archives archive))))
@@ -3190,7 +3198,7 @@ Since 0.2."
                ,@(mapcar (lambda (entry)
                            (let ((dependency (nth 1 entry)))
                              `(,(package-desc-name dependency) . ,(package-make-ac-desc (package-desc-version dependency) (package-desc-reqs dependency) nil 'single nil))))
-                         eldev--local-dependencies))
+                         eldev--local-sources))
              (current-buffer))
       (insert "\n"))))
 
@@ -3358,17 +3366,18 @@ for all archives instead."
 (defun eldev--loading-mode (dependency &optional handle-vc-repositories)
   "Get loading mode of package DEPENDENCY.
 DEPENDENCY can be either a name (symbol) or a package descriptor.
-Returns nil if it is neither a project nor a local dependency."
+Returns nil if it is neither the project itself nor a package
+from local sources."
   (let ((dependency-name (if (symbolp dependency) dependency (package-desc-name dependency))))
     (if (eq dependency-name (package-desc-name (eldev-package-descriptor)))
         (or eldev-project-loading-mode 'as-is)
-      (let ((entry (assq dependency-name eldev--local-dependencies)))
+      (let ((entry (assq dependency-name eldev--local-sources)))
         (if entry
             (or (nth 4 entry) 'as-is)
           (if (and handle-vc-repositories (assq dependency-name eldev--vc-repositories))
               'vc
             (unless (or (symbolp dependency) (not (string= (package-desc-archive dependency) eldev--internal-pseudoarchive)))
-              (error "Unexpected local dependency `%s'" dependency-name))))))))
+              (error "Unexpected local sources `%s'" dependency-name))))))))
 
 (defun eldev--load-autoloads-file (file)
   (when (file-exists-p file)
@@ -3377,18 +3386,18 @@ Returns nil if it is neither a project nor a local dependency."
       (load file nil t)
       (push file eldev--loaded-autoloads-files))))
 
-(defun eldev--load-local-dependency (dependency)
+(defun eldev--load-from-local-sources (dependency)
   (let* ((loading-mode    (eldev--loading-mode dependency))
          (dependency-name (package-desc-name dependency))
          (package-name    (package-desc-name (eldev-package-descriptor)))
          (project-itself  (eq dependency-name package-name))
-         (dependency-dir  (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-dependencies))))
+         (dependency-dir  (if project-itself eldev-project-dir (nth 3 (assq dependency-name eldev--local-sources))))
          ;; For the project itself autoloads are handled differently.  For other loading
          ;; modes they get built without special care.
          (build-autoloads (when (and (not project-itself) (memq loading-mode '(as-is source byte-compiled compiled-on-demand noisy-compiled-on-demand)))
                             (eldev--cross-project-internal-eval dependency-dir '(not (null (memq 'autoloads (eldev-active-plugins)))) t))))
     (when (cdr (assq dependency-name package-alist))
-      (error "Local dependency `%s' is already listed in `package-alist'" dependency-name))
+      (error "Local-source package `%s' is already listed in `package-alist'" dependency-name))
     ;; FIXME: Special-case project itself: no need to launch separate process(es) for it.
     ;; I don't want to move this into an alist, to avoid fixing the way it works.
     (let ((commands (eldev-pcase-exhaustive loading-mode
@@ -3405,7 +3414,7 @@ Returns nil if it is neither a project nor a local dependency."
       (when commands
         (if project-itself
             (eldev-verbose "Preparing to load the project in mode `%s'" loading-mode)
-          (eldev-verbose "Preparing to load local dependency `%s' in mode `%s'" dependency-name loading-mode))
+          (eldev-verbose "Preparing to load local-source package `%s' in mode `%s'" dependency-name loading-mode))
         (let ((default-directory dependency-dir))
           (dolist (command commands)
             (let* ((packaging      (string= (car command) "package"))
@@ -3421,7 +3430,7 @@ Returns nil if it is neither a project nor a local dependency."
                 :trace-command-line (eldev-format-message "Full command line (in directory `%s')" default-directory)
                 :die-on-error       (if project-itself
                                         "child Eldev process"
-                                      (eldev-format-message "child Eldev process for local dependency `%s'" dependency-name))
+                                      (eldev-format-message "child Eldev process for local sources `%s'" dependency-name))
                 (unless display-stdout
                   (if (= (point-min) (point-max))
                       (eldev-verbose "Child Eldev process produced no output (other than maybe on stderr)")
@@ -3437,7 +3446,7 @@ Returns nil if it is neither a project nor a local dependency."
                       (forward-line)
                       (unless (looking-at (rx bol (or "up-to-date" "generated") eol))
                         (error "Unable to parse child Eldev process output:\n%s" (buffer-string)))
-                      (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-dependency-packages)))))))))
+                      (push `(,dependency-name ,file ,(string= (match-string 0) "up-to-date")) eldev--local-source-packages)))))))))
       (push `(,dependency-name . (,dependency)) package-alist))))
 
 ;; This is a hackish function only working for packages loaded in `as-is' and similar
@@ -5308,8 +5317,8 @@ least one warning."
             (message "%s:%d:%d: %s: %s" file line col type message)))))))
 
 (defun eldev--linter-package-present-archives ()
-  ;; Issue #19: otherwise the linter will complain about local dependencies that are not
-  ;; available from "normal" package archives.
+  ;; Issue #19: otherwise the linter will complain about packages findable in local
+  ;; sources that are not available from "normal" package archives.
   (push `(,eldev--internal-pseudoarchive . ,(file-name-as-directory (eldev--internal-pseudoarchive-dir))) package-archives)
   (when eldev--vc-repositories
     (push `(,eldev--internal-vc-pseudoarchive . ,(file-name-as-directory (eldev--internal-vc-pseudoarchive-dir))) package-archives))
@@ -5913,21 +5922,21 @@ See `eldev-docker-rootless' for more information.  Since 1.10.")
       img-string
     (format "docker.io/silex/emacs:%s" img-string)))
 
-(defun eldev--container-local-dep-mounts (type home)
-  "Return mount arguments for local dependencies for container commands.
+(defun eldev--container-local-source-mounts (type home)
+  "Return mount arguments for local sources for container commands.
 
 TYPE must be either `docker' or `podman', HOME is the home
 directory of the container user."
   (ignore type)
   (eldev-flatten-tree
-   (mapcar (lambda (local-dep)
-             (let* ((dir           (nth 3 local-dep))
+   (mapcar (lambda (sources)
+             (let* ((dir           (nth 3 sources))
                     (dir-rel       (file-relative-name dir (expand-file-name "~")))
                     (container-dir (if (eldev-external-filename dir-rel)
                                        dir
                                      (concat (file-name-as-directory home) dir-rel))))
                (list "-v" (format "%s:%s" (expand-file-name dir) container-dir))))
-           eldev--local-dependencies)))
+           eldev--local-sources)))
 
 (defun eldev--container-make-directories (type)
   "Make directories required for `eldev docker' or `eldev podman'.
@@ -6017,7 +6026,7 @@ will contain a mount of it at `/eldev'."
               (list "-v" (format "%s:%s/config"
                                  eldev-user-config-file
                                  container-eldev-cache-dir)))
-            (eldev--container-local-dep-mounts type container-home)
+            (eldev--container-local-source-mounts type container-home)
             (eldev-pcase-exhaustive type
               (`docker eldev-docker-run-extra-args)
               (`podman eldev-podman-run-extra-args))
@@ -6113,7 +6122,7 @@ See `eldev helper docker' for more information."
             (let ((failure-output (save-excursion (goto-char (point-max)) (forward-line -5) (buffer-substring-no-properties (point) (point-max)))))
               (signal 'eldev-error `(:hint ,(cond ((string-match-p "no such file or directory" failure-output)
                                                    `(,(concat "When running inside a %s container, using files outside the project,\n"
-                                                              "including via symbol links, might not work properly.  Local dependencies should\n"
+                                                              "including via symbol links, might not work properly.  Local sources should\n"
                                                               "still work, though.")
                                                      ,type-name))
                                                   ((string-match-p "unavailable, simulating -nw" failure-output)

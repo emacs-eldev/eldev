@@ -15,9 +15,9 @@
                                           `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir))
                               "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
           :description (if from-pa "Using package archive to resolve `dependency-a'" "Using Git repository to resolve `dependency-a'")
-          ;; Unlike with local dependencies, exchanging archives must not affect installed
-          ;; packages: they will remain untouched until you issue `upgrade' or `clean
-          ;; ...'.  So, the expected output is determined by the first run.
+          ;; Unlike with local package sources, exchanging archives must not affect
+          ;; installed packages: they will remain untouched until you issue `upgrade' or
+          ;; `clean ...'.  So, the expected output is determined by the first run.
           (should (string= (nth 0 (eldev--test-line-list stdout)) "\"Hello\""))
           (should (string= (nth 1 (eldev--test-line-list stdout)) (if from-pa-first "t" "nil")))
           (if from-pa-first

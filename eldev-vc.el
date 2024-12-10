@@ -242,9 +242,9 @@ Since 1.2."
       package)))
 
 (defun eldev--vc-install-as-package (repository)
-  ;; Unlike with local dependencies, for VC-fetched we generate and install Emacs package
-  ;; here rather than when loading.  The reason is that the source checkout is controlled
-  ;; by Eldev and thus shouldn't outside.
+  ;; Unlike with local sources, for VC-fetched projects we generate and install Emacs
+  ;; packages here rather than when loading.  The reason is that the source checkout is
+  ;; controlled by Eldev and thus shouldn't ever be changed outside.
   (let ((tmp-package-dir (make-temp-file "eldev-vc-" t))
         (package         (cdr (assq (car repository) eldev--vc-repository-packages))))
     (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name repository))

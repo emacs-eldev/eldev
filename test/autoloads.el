@@ -25,28 +25,28 @@
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-autoloads-3 ()
-  ;; Test that when using local dependencies for `project-i', its autoloads are still
+  ;; Test that when using local sources for `project-i', its autoloads are still
   ;; available.
   (let ((eldev--test-project "project-j"))
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-i") "eval" `(project-j-hello))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../project-i") "eval" `(project-j-hello))
       (should (string= stdout "\"Hello\"\n"))
       (should (= exit-code 0)))
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-i") "eval" `(project-j-hello-to "world"))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../project-i") "eval" `(project-j-hello-to "world"))
       (should (string= stdout "\"Hello, world!\"\n"))
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-autoloads-4 ()
   ;; Like the previous test, only with a different loading mode.
   (let ((eldev--test-project "project-j"))
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-i" 'packaged) "eval" `(project-j-hello))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../project-i" 'packaged) "eval" `(project-j-hello))
       (should (string= stdout "\"Hello\"\n"))
       (should (= exit-code 0)))
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-i" 'packaged) "eval" `(project-j-hello-to "world"))
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../project-i" 'packaged) "eval" `(project-j-hello-to "world"))
       (should (string= stdout "\"Hello, world!\"\n"))
       (should (= exit-code 0)))))
 
 (ert-deftest eldev-autoloads-5 ()
-  ;; Test that when `project-j' is used as a local dependency, its autoloads file is still
+  ;; Test that when `project-j' is loaded from local sources, its autoloads file is still
   ;; generated automatically.
   (dolist (loading-mode '(as-is source byte-compiled))
     (let ((eldev--test-project "project-j"))
@@ -56,7 +56,7 @@
     (let ((eldev--test-project "project-a"))
       (eldev--test-delete-cache)
       (eldev--test-run nil ("--setup" `(eldev-add-extra-dependencies 'eval 'project-j)
-                            "--setup" `(eldev-use-local-dependency "../project-j" ',loading-mode)
+                            "--setup" `(eldev-use-local-sources "../project-j" ',loading-mode)
                             "eval" `(project-j-hello))
         (should (string= stdout "\"Hello\"\n"))
         (should (= exit-code 0))))))
@@ -75,8 +75,8 @@
     (eldev--test-run nil ("eval" "--dont-require" `(dependency-d-autoloaded) `(dependency-d-stable))
       (should (string= stdout (eldev--test-lines "\"Loaded automatically\"" "t")))
       (should (= exit-code 0)))
-    ;; Make sure this works also with local dependencies.
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-d")
+    ;; Make sure this works also with local sources.
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../dependency-d")
                           "eval" "--dont-require" `(dependency-d-autoloaded) `(dependency-d-stable))
       (should (string= stdout (eldev--test-lines "\"Loaded automatically\"" "nil")))
       (should (= exit-code 0)))))

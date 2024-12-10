@@ -30,12 +30,12 @@
 
 ;; https://github.com/emacs-eldev/eldev/issues/19
 ;;
-;; `package-lint' would deem local dependencies uninstallable if they were not available
-;; from "normal" archives.
-(ert-deftest eldev-package-lint-local-dependencies-1 ()
+;; `package-lint' would deem local-sourced packages uninstallable if they were not
+;; available from "normal" archives.
+(ert-deftest eldev-package-lint-local-sources-1 ()
   (let ((eldev--test-project "missing-dependency-a"))
     (eldev--test-delete-cache)
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../dependency-a")
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../dependency-a")
                           "lint" "package" "--required")
       (eldev--test-skip-if-missing-linter exit-code stderr)
       (should (= exit-code 0)))))

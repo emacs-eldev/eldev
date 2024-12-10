@@ -36,13 +36,13 @@ org-pseudoarchive/
 dependency-*/
 
     Test "projects" also available from the local test archives above.
-    Used to test local dependencies.
+    Used to test local sources.
 
 missing-dependency-*/
 
     Projects that don't provide a way to look up at least one
-    dependency.  Can only be repaired using local dependencies.  Used
-    to test that certain Eldev commands work anyway.
+    dependency.  Can only be repaired using local sources.  Used to
+    test that certain Eldev commands work anyway.
 
 */
 

@@ -9,7 +9,7 @@
 ;; often report dependencies as required by wrong packages, if they were required by
 ;; several, but in different versions.
 (ert-deftest eldev-issue-29 ()
-  (eldev--test-run "issue-29-project" ("--setup" `(eldev-use-local-dependency "../issue-29-insane-dependency") "prepare")
+  (eldev--test-run "issue-29-project" ("--setup" `(eldev-use-local-sources "../issue-29-insane-dependency") "prepare")
     (should (string-match-p "issue-29-insane-dependency" stderr))
     (should (= exit-code 1))))
 
@@ -49,8 +49,8 @@
     (eldev--test-run nil ("eval" `(progn (require 'org) (bound-and-true-p org-is-fake)))
       (should (string= stdout "nil\n"))
       (should (= exit-code 0)))
-    ;; Must load the local dependency if requested, even if Org is a built-in.
-    (eldev--test-run nil ("--setup" `(eldev-use-local-dependency "../project-fake-org")
+    ;; Must load the local-sourced dependency package if requested, even if Org is a built-in.
+    (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../project-fake-org")
                           "eval" `(progn (require 'org) (bound-and-true-p org-is-fake)))
       (should (string= stdout "t\n"))
       (should (= exit-code 0)))))
