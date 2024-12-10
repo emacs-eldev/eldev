@@ -25,6 +25,62 @@
             (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 2 (eldev--test-line-list stdout)))))
           (should (= exit-code 0)))))))
 
+(eldev-ert-defargtest eldev-vc-repositories-2 (remove-installed-package)
+                      (nil t)
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let ((dependency-a-dir    eldev--test-project)
+          (eldev--test-project "vc-dep-project-a"))
+      (eldev--test-delete-cache)
+      ;; Simply do this twice to make sure nothing gets broken.
+      (dotimes (pass 2)
+        (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                              "eval" `(dependency-a-stable))
+          :description (format "Pass #%d" (1+ pass))
+          (should (string= stdout (eldev--test-lines "nil")))
+          (should (= exit-code 0)))
+        (when (and remove-installed-package (= pass 0))
+          (eldev--test-run nil ("clean" "dependencies")
+            (should (= exit-code 0))))))))
+
+;; A project with two dependencies.  Test all possible combinations of getting them from
+;; an archive or VC repository.
+(eldev-ert-defargtest eldev-vc-repositories-3 (dependency-a-from-pa dependency-e-from-pa)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    :enabled (not dependency-a-from-pa)
+    (let ((dependency-a-dir eldev--test-project))
+      (eldev--test-with-temp-copy "dependency-e" 'Git
+        :enabled (not dependency-e-from-pa)
+        (let ((dependency-e-dir eldev--test-project)
+              (eldev--test-project "vc-dep-project-b"))
+          (eldev--test-delete-cache)
+          (eldev--test-run nil ("--setup" (if dependency-a-from-pa
+                                            `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
+                                          `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir))
+                                ;; The dependency is multifile, which might be an additional test for handling of VC repositories.
+                                "--setup" (if dependency-e-from-pa
+                                            `(eldev-use-package-archive `("archive-e" . ,(expand-file-name "../package-archive-e")))
+                                          `(eldev-use-vc-repository 'dependency-e :git ,dependency-e-dir))
+                                "eval"
+                                `(vc-dep-project-b-hello-to "world")
+                                `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a))
+                                `(dependency-e-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-e)))
+            (should (string= (nth 0 (eldev--test-line-list stdout)) "\"Hello, world!\""))
+            (should (string= (nth 1 (eldev--test-line-list stdout)) (if dependency-a-from-pa "t" "nil")))
+            ;; Check dependency A.
+            (if dependency-a-from-pa
+                (should (string= (nth 2 (eldev--test-line-list stdout)) "(1 0)"))
+              (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 2 (eldev--test-line-list stdout)))))
+            (should (string= (nth 3 (eldev--test-line-list stdout)) (if dependency-e-from-pa "t" "nil")))
+            ;; And dependency E.
+            (if dependency-e-from-pa
+                (should (string= (nth 4 (eldev--test-line-list stdout)) "(1 0)"))
+              (should (string-match-p (eldev--test-unstable-version-rx (version-to-list "1.1alpha") t) (nth 4 (eldev--test-line-list stdout)))))
+            (should (= exit-code 0))))))))
+
 
 (eldev-ert-defargtest eldev-vc-repositories-upgrade-1 (command)
                       ('("upgrade") '("upgrade" "dependency-a"))

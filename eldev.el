@@ -2723,7 +2723,9 @@ Since 0.2."
                        (signal 'eldev-error `(:hint ,(unless self `("Check output of `%s dependency-tree'" ,(eldev-shell-command t)))
                                                     "Cannot upgrade %s: `%s' has no such dependencies" ,(eldev-message-enumerate "package" (nreverse unknown-packages)) ,package-name))))
                    (dolist (dependency planned-packages)
-                     (when (or self (null (eldev--loading-mode (car dependency))))
+                     ;; Warning: can fall into infinite loop if we don't skip VC-fetched
+                     ;; packages here.  Not sure how to test...
+                     (when (or self (null (eldev--loading-mode (car dependency) t)))
                        (setf non-local-plan-size (1+ non-local-plan-size))
                        ;; If we determine that archive X has to be used for installing or
                        ;; upgrading, always fetch more prioritized archives first: maybe we
@@ -3251,7 +3253,9 @@ for all archives instead."
     (when include-vc
       (dolist (repository eldev--vc-repositories)
         (let (up-to-date)
-          (when (file-exists-p (expand-file-name ".git/config" (eldev--vc-clone-dir repository)))
+          ;; Don't check if the repository clone already exists: check if a package out of
+          ;; it has been created and installed.
+          (when (eldev-find-package-descriptor (car repository))
             (if refetch-contents
                 (eldev-trace "Will refetch VC repository `%s' in case it has changed" (eldev--vc-repository-name repository))
               (setf up-to-date t)

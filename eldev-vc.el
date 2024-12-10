@@ -210,13 +210,14 @@ Since 1.2."
                            :discard-ansi t
                            :die-on-error t
                            (string-trim (buffer-string))))
-            (when update
-              (eldev-trace "Reusing existing Git clone of `%s'..." dir)
-              (eldev-verbose "Fetching upgrades from `%s'..." url)
-              (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
-                :die-on-error t)
-              (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
-                :die-on-error t)
+            (progn
+              (when update
+                (eldev-trace "Reusing existing Git clone of `%s'..." dir)
+                (eldev-verbose "Fetching upgrades from `%s'..." url)
+                (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
+                  :die-on-error t)
+                (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
+                  :die-on-error t))
               (setf reused-existing t))
           (eldev-trace "Discarding existing Git clone at `%s': wrong remote URL" dir)
           (ignore-errors (delete-directory dir t)))))

@@ -227,17 +227,21 @@ available, test is skipped automatically.
 Inside BODY, `eldev--test-project' will be bound to the temporary
 copied directory, not to the one specified by TEST-PROJECT."
   (declare (indent 2) (debug (stringp sexp body)))
-  (let ((ignores :std)
+  (let ((enabled t)
+        (ignores :std)
         after-copy)
     (while (keywordp (car body))
       (eldev-pcase-exhaustive (pop body)
+        (:enabled    (setf enabled    (pop body)))
         (:ignores    (setf ignores    (pop body)))
         (:after-copy (push (pop body) after-copy))))
-    `(let* ((vc-backend          ,vc-backend)
-            (eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores
-                                                             ,(when after-copy `(lambda () ,@(reverse after-copy))))))
-       (unless eldev--test-project
-         (ert-skip (eldev-format-message "%s couldn't be found" (eldev-vc-full-name vc-backend))))
+    `(let ((vc-backend ,vc-backend)
+           eldev--test-project)
+       (if ,enabled
+           (unless (setf eldev--test-project (eldev--test-make-temp-copy ,test-project vc-backend ,ignores
+                                                                         ,(when after-copy `(lambda () ,@(reverse after-copy)))))
+             (ert-skip (eldev-format-message "%s couldn't be found" (eldev-vc-full-name vc-backend))))
+         (setf vc-backend nil))
        (eldev--test-and-delete-temp-directory eldev--test-project (format "%s copy" (eldev-vc-full-name vc-backend))
          :directory-form (eldev--test-file-name-parent-directory eldev--test-project)
          ,@body))))
