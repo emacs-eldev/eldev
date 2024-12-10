@@ -69,8 +69,8 @@ also registered as a dependency to all `.elc` targets in the project;
 this way, byte-compiling always has access to up-to-date list of
 autoloaded functions.
 
-This plugin can also be activated in projects you use as
-<<local-dependencies,local dependencies>> for other projects.  Eldev
+This plugin can also be activated in projects used as
+<<local-sources,local-source dependencies>> for other projects.  Eldev
 knows how to keep the autoloads file up-to-date in all local
 dependencies, regardless of their <<loading-modes,loading mode>>.
 

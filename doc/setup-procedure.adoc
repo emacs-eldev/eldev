@@ -36,8 +36,9 @@ File `Eldev-local` is _working directory_ or _user/project-specific_.
 Unlike `Eldev`, it _should not_ be added to VCS: it is meant to be
 created by each developer (should he want to do so) to customize how
 Eldev behaves in this specific directory.  The most common use is to
-define local dependencies.  A good practice is to instruct your VSC to
-ignore this file, e.g. list it in `.gitignore` for Git.
+define <<local-sources,local sources>> to build project’s
+dependencies.  A good practice is to instruct your VSC to ignore this
+file, e.g. list it in `.gitignore` for Git.
 
 Finally, it is possible to specify some (short) setup forms on the
 command line using `--setup` (`-S`) option.  This is not supposed to
@@ -90,10 +91,10 @@ anything.  In all such cases, i.e. when required dependencies are not
 correctly preinstalled in the specified external directory, Eldev will
 simply fail.
 
-<<local-dependencies,Local dependencies>> discussed later take
-precedence even in this mode: anything declared as local will override
-dependencies available from an external directory, just like it will
-in usual full isolation mode.
+<<local-sources,Local sources>> discussed later take precedence even
+in this mode: anything declared as local will override dependencies
+available from an external directory, just like it will in usual full
+isolation mode.
 
 This mode can be useful to load exactly the same dependency versions
 as those installed in your normal Emacs.  However, it is not suitable

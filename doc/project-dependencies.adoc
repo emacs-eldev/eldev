@@ -12,7 +12,7 @@ and keep track that they remain in sync.
 However, you do need to tell Eldev how to _find_ these dependencies.
 There are three ways of locating packages: <<package-archives,using
 Elisp package archives>>, <<vc-repositories,using VC (Git)
-repositories>> and <<local-dependencies,on your local file system>>.
+repositories>> and <<local-sources,on your local file system>>.
 
 [#package-archives]
 === From Elisp package archives
@@ -118,8 +118,8 @@ and create file `Eldev` in it with required contents
 created file, convert its contents into an Elisp form (use `progn` if
 needed) and pass it as a value of `:setup` in your _main_ project.
 
-[#local-dependencies]
-=== Local dependencies
+[#local-sources]
+=== From your file system (local sources)
 
 Imagine you are developing more than one project at once and they
 depend on each other.  You’d typically want to test the changes you
@@ -127,30 +127,34 @@ make in one of them from another right away.  If you are familiar with
 Cask, this is solved by linking projects in it.
 
 Eldev provides a more flexible approach to this problem called _local
-dependencies_.  Let’s assume you develop project `foo` in directory
-`~/foo` and also a library called `barlib` in `~/barlib`.  And `foo`
-uses the library.  To have Eldev use your local copy of `barlib`
-instead of downloading it e.g. from MELPA, add the following form in
-file `~/foo/Eldev-local`:
+sources_.  Let’s assume you develop project `foo` in directory `~/foo`
+and also a library called `barlib` in `~/barlib`.  And `foo` uses the
+library.  To have Eldev use your local copy of `barlib` instead of
+downloading it e.g. from MELPA, add the following form in file
+`~/foo/Eldev-local`:
 
 [source]
 ----
-(eldev-use-local-dependency "~/barlib")
+(eldev-use-local-sources "~/barlib")
 ----
+
+NOTE: Before 1.11 the function was named `eldev-use-local-dependency`.
+This name is still available for backward compatibility.
 
 Note that the form _must not_ be added to `Eldev`: other developers
 who check out your project probably don’t even have a local copy of
 `barlib` or maybe have it in some other place.  In other words, this
 should really remain your own private setting and go to `Eldev-local`.
 
-Local dependencies have _loading modes_, just as the project’s package
+Local sources have _loading modes_, just as the project’s package
 itself.  Those will be discussed <<loading-modes,later>>.
 
-Eldev correctly handles situations with changing definitions of local
-dependencies.  I.e. by simply commenting out or uncommenting
-`eldev-use-local-dependency` call, you can quickly test your project
-both with a MELPA-provided package and with a local dependency — Eldev
-will adapt without any additional work from you.
+Eldev correctly handles situations with adding, removing or otherwise
+changing local source definitions.  I.e. by simply commenting out or
+uncommenting `eldev-use-local-sources` call, you can quickly test your
+project both with a MELPA-provided package and with local (and
+presumably just changed) copy of its dependency sources — Eldev will
+adapt without any additional work from you.
 
 [#additional-dependencies]
 === Additional dependencies

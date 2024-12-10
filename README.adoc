@@ -59,10 +59,10 @@ provides only a brief overview.
 * {uri-documentation}#dependencies[Project dependency] downloading,
   installation etc. is fully automated, you only need to specify which
   Elisp package archive(s) to use.
-* You can also use {uri-documentation}#local-dependencies[local
-  dependencies], even those that don’t use Eldev (some restrictions
-  still apply).  This is similar to Cask linking, but with more
-  flexibility.
+* You can also use {uri-documentation}#local-sources[package sources
+  local to your machine], even those that don’t use Eldev (some
+  restrictions still apply).  This is similar to Cask linking, but
+  with more flexibility.
 * Full support for {uri-documentation}#autoloads[autoloads] during
   development.
 * Miscellaneous operations useful during development:
