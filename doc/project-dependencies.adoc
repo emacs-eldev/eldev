@@ -10,10 +10,17 @@ you don’t need to declare these dependencies second time in `Eldev`
 and keep track that they remain in sync.
 
 However, you do need to tell Eldev how to _find_ these dependencies.
-Like Cask, by default it doesn’t use any package archives.  To tell it
-to use an archive, call function `eldev-use-package-archive` in
-`Eldev` (you have such forms already in place if you have used `eldev
-init`).  For example:
+There are three ways of locating packages: <<package-archives,using
+Elisp package archives>>, <<vc-repositories,using VC (Git)
+repositories>> and <<local-dependencies,on your local file system>>.
+
+[#package-archives]
+=== From Elisp package archives
+
+By default Eldev doesn’t use any package archives.  To instruct it to
+use an archive to locate packages, call function
+`eldev-use-package-archive` in file `Eldev` (you have such forms
+already in place if you have used `eldev init`).  For example:
 
 [source]
 ----
@@ -61,6 +68,55 @@ install the dependencies: any command that needs them will make sure
 they are installed first.  However, if you want to check if package
 archives have been specified correctly and all dependencies can be
 looked up without problems, you can explicitly use command `prepare`.
+
+[#vc-repositories]
+=== From VC (Git) repositories
+
+{since-1-11} If a package you depend on isn’t available from a package
+archive (e.g. MELPA), this is still not a problem as long as there is
+a Git repository for it.  Simply add to file `Eldev` a form like this:
+
+[source]
+----
+(eldev-use-vc-repository 'dep-name :git "FULL-URL")
+----
+
+If the package is available on GitHub, you can avoid specifying the
+full URL by using the shortened form:
+
+[source]
+----
+(eldev-use-vc-repository 'dep-name :github "USER/REPOSITORY")
+----
+
+Now, whenever a package called `dep-name` is needed, Eldev will first
+fetch given Git repository, build an Elisp package from it and provide
+it to the standard Emacs package manager for use.
+
+Like <<package-archives,with package archives>>, function
+`eldev-use-vc-repository` itself doesn’t describe _how_ you intend to
+use given package.  It merely tells Eldev where to find it.  Only if
+the package is listed as a <<dependencies,regular dependency>> of your
+project or you register it as <<additional-dependencies,an additional
+dependency>>, will the repository actually get fetched.
+
+If the project fetched from a repository doesn’t use Eldev itself, the
+tool might have problems building a package from it.  In this case you
+can pass a <<setup-procedure,setup form>> to it:
+
+[source]
+----
+(eldev-use-vc-repository ... :setup FORM)
+----
+
+This form will be given to child Eldev processes whenever a package
+needs to be created out of the VC-fetched project.  Most likely you
+will need to tell child Eldev how to locate dependencies of _that_
+project.  The best way to figure it out is to check out the repository
+and create file `Eldev` in it with required contents
+(<<initializing,`eldev init`>> might help).  Instead of committing the
+created file, convert its contents into an Elisp form (use `progn` if
+needed) and pass it as a value of `:setup` in your _main_ project.
 
 [#local-dependencies]
 === Local dependencies
