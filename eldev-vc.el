@@ -195,14 +195,16 @@ Since 1.2."
 
 ;; Working with VC repositories to fetch packages.
 
-(defun eldev--vc-fetch-repository (vc-backend url dir &optional update)
+(defvar eldev--vc-default-release-tag-regexp (rx bos (| "" "v" "ver") (group digit (0+ any)) eos))
+
+
+(defun eldev--vc-fetch-repository (vc-backend url dir &optional update release-tag-regexp)
   (unless (eq vc-backend 'Git)
     (error "Only Git is supported currently"))
   ;; Git ignores `--depth' for local clones, but we need a consistent behavior, if only for tests.
   (when (file-name-absolute-p url)
     (setf url (format "file://%s" url)))
-  (let (reused-existing
-        stable)
+  (let (reuse-existing)
     (when (file-exists-p (expand-file-name ".git/config" dir))
       (let ((default-directory dir))
         (if (string= url (eldev-call-process (eldev-git-executable) '("config" "--get" "remote.origin.url")
@@ -210,37 +212,42 @@ Since 1.2."
                            :discard-ansi t
                            :die-on-error t
                            (string-trim (buffer-string))))
-            (progn
-              (when update
-                (eldev-trace "Reusing existing Git clone of `%s'..." dir)
-                (eldev-verbose "Fetching upgrades from `%s'..." url)
-                (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "origin" "HEAD")
-                  :die-on-error t)
-                (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
-                  :die-on-error t))
-              (setf reused-existing t))
+            (setf reuse-existing t)
           (eldev-trace "Discarding existing Git clone at `%s': wrong remote URL" dir)
           (ignore-errors (delete-directory dir t)))))
-    (unless reused-existing
+    (if reuse-existing
+        (eldev-trace "Reusing existing Git clone of `%s'..." dir)
       (eldev-verbose "Cloning Git repository `%s'..." url)
-      (eldev-call-process (eldev-git-executable) `("clone" ,url "--single-branch" "--depth=1" ,dir)
+      (eldev-call-process (eldev-git-executable) `("clone" ,url "--single-branch" "--depth=1" "--no-checkout" ,dir)
         :die-on-error t))
-    ;; FIXME: Try to build stable versions from tags.
-    (when t
-      (setf stable nil))
-    (let ((package (eldev-package-descriptor dir)))
-      (unless stable
-        (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
-          :destination  '(t nil)
-          :discard-ansi t
-          :die-on-error t
-          (let ((date-string (string-trim (buffer-string))))
-            ;; Don't match the whole, but just a bit of assertion here.
-            (when (string-match (rx bos (group (= 4 num)) "-" (group (= 2 num)) "-" (group (= 2 num)) "T" (group (= 2 num)) ":" (group (= 2 num))) date-string)
-              (setf (package-desc-version package)
-                    (append (package-desc-version package) `(,(string-to-number (format "%s%s%s" (match-string 1 date-string) (match-string 2 date-string) (match-string 3 date-string)))
-                                                             ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
-      package)))
+    (let ((default-directory dir)
+          tag+version)
+      (if (and reuse-existing (not update))
+          (setf tag+version (eldev--vc-current-commit-release-tag release-tag-regexp))
+        (when update
+          (eldev-verbose "Fetching updates from `%s'..." url))
+        (setf tag+version (when eldev-prefer-stable-archives (eldev--vc-pick-release-tag release-tag-regexp)))
+        ;; Without `--tags' below, `eldev--vc-current-commit-release-tag' wouldn't be able
+        ;; to do its job later, because the commit in the clone wouldn't be tagged.
+        (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "--tags" "origin" ,(or (car tag+version) "HEAD"))
+          :die-on-error t)
+        (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
+          :die-on-error t))
+      (eldev-dump reuse-existing update tag+version)
+      (let ((package (eldev-package-descriptor dir)))
+        (if tag+version
+            (setf (package-desc-version package) (cdr tag+version))
+          (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
+            :destination  '(t nil)
+            :discard-ansi t
+            :die-on-error t
+            (let ((date-string (string-trim (buffer-string))))
+              ;; Don't match the whole, but just a bit of assertion here.
+              (when (string-match (rx bos (group (= 4 num)) "-" (group (= 2 num)) "-" (group (= 2 num)) "T" (group (= 2 num)) ":" (group (= 2 num))) date-string)
+                (setf (package-desc-version package)
+                      (append (package-desc-version package) `(,(string-to-number (format "%s%s%s" (match-string 1 date-string) (match-string 2 date-string) (match-string 3 date-string)))
+                                                               ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
+        package))))
 
 (defun eldev--vc-install-as-package (repository)
   ;; Unlike with local sources, for VC-fetched projects we generate and install Emacs
@@ -280,6 +287,45 @@ Since 1.2."
             (insert-file-contents (car generated))
             (package-unpack tmp-package))))
       (ignore-errors (delete-directory tmp-package-dir t)))))
+
+(defun eldev--vc-pick-release-tag (&optional release-tag-regexp)
+  "Pick the most recent release tag from the repository.
+Current directory must be a clone with a remote named `origin'.
+Returns a cons cell of (TAG-NAME . VERSION).  If there are no
+appropriate tags at all, returns nil."
+  (eldev-call-process (eldev-git-executable) `("ls-remote" "--tags" "origin")
+    :die-on-error t
+    (let ((case-fold-search nil)
+          tags)
+      (while (let ((from (search-forward "refs/tags/" nil t)))
+               (when from
+                 (end-of-line)
+                 (push (buffer-substring from (point)) tags))))
+      (let ((result (eldev--vc-most-recent-release-tag tags release-tag-regexp)))
+        (if result
+            (eldev-trace "Most recent stable release in the repository is tagged `%s'" (car result))
+          (eldev-trace "There are apparently no stable releases in the repository; using HEAD instead"))
+        result))))
+
+(defun eldev--vc-current-commit-release-tag (&optional release-tag-regexp)
+  (eldev-call-process (eldev-git-executable) `("--no-pager" "tag" "--no-color" "--points-at" "HEAD")
+    :die-on-error t
+    (eldev--vc-most-recent-release-tag (split-string (string-trim (buffer-string)) "\n") release-tag-regexp)))
+
+(defun eldev--vc-most-recent-release-tag (tags &optional release-tag-regexp)
+  (unless release-tag-regexp
+    (setf release-tag-regexp eldev--vc-default-release-tag-regexp))
+  (let (most-recent-tag
+        most-recent-version)
+    (dolist (tag tags)
+      (when (let ((case-fold-search t))
+              (string-match release-tag-regexp tag))
+        (let ((version (ignore-errors (version-to-list (match-string 1 tag)))))
+          (when (and version (or (null most-recent-version) (version-list-< most-recent-version version)))
+            (setf most-recent-tag     tag
+                  most-recent-version version)))))
+    (when most-recent-tag
+      (cons most-recent-tag most-recent-version))))
 
 
 

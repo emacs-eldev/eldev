@@ -3,26 +3,31 @@
 (require 'test/common)
 
 
-(eldev-ert-defargtest eldev-vc-repositories-1 (from-pa-first)
-                      (nil t)
+(eldev-ert-defargtest eldev-vc-repositories-1 (stable from-pa-first)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
   (eldev--test-with-temp-copy "dependency-a" 'Git
     (let ((dependency-a-dir    eldev--test-project)
           (eldev--test-project "vc-dep-project-a"))
+      (when stable
+        (eldev-vc-create-tag "1.1" dependency-a-dir))
       (eldev--test-delete-cache)
       (dolist (from-pa (if from-pa-first '(t nil) '(nil t)))
         (eldev--test-run nil ("--setup" (if from-pa
                                             `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
                                           `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir))
-                              "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+                              "eval" `(dependency-a-hello) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
           :description (if from-pa "Using package archive to resolve `dependency-a'" "Using Git repository to resolve `dependency-a'")
-          ;; Unlike with local package sources, exchanging archives must not affect
-          ;; installed packages: they will remain untouched until you issue `upgrade' or
-          ;; `clean ...'.  So, the expected output is determined by the first run.
+          ;; Unlike with local package sources, exchanging archives and VC repositories
+          ;; must not affect installed packages: they will remain untouched until you
+          ;; issue `upgrade' or `clean ...'.  So, the expected output is determined by the
+          ;; first run.
           (should (string= (nth 0 (eldev--test-line-list stdout)) "\"Hello\""))
-          (should (string= (nth 1 (eldev--test-line-list stdout)) (if from-pa-first "t" "nil")))
-          (if from-pa-first
-              (should (string= (nth 2 (eldev--test-line-list stdout)) "(1 0)"))
-            (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 2 (eldev--test-line-list stdout)))))
+          (cond (from-pa-first (should (string= (nth 1 (eldev--test-line-list stdout)) "(1 0)")))
+                (stable        (should (string= (nth 1 (eldev--test-line-list stdout)) "(1 1)")))
+                (t             (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 1 (eldev--test-line-list stdout))))))
           (should (= exit-code 0)))))))
 
 (eldev-ert-defargtest eldev-vc-repositories-2 (remove-installed-package)
@@ -81,6 +86,40 @@
               (should (string-match-p (eldev--test-unstable-version-rx (version-to-list "1.1alpha") t) (nth 4 (eldev--test-line-list stdout)))))
             (should (= exit-code 0))))))))
 
+(eldev-ert-defargtest eldev-vc-repositories-stable/unstable (stable remove-installed-package)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let ((dependency-a-dir    eldev--test-project)
+          (eldev--test-project "vc-dep-project-a"))
+      (eldev-vc-create-tag "1.1" dependency-a-dir)
+      (let ((default-directory dependency-a-dir))
+        (eldev-with-file-buffer "dependency-a.el"
+          (re-search-forward (rx "1.0.99"))
+          (replace-match "1.0.100"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+      (eldev--test-delete-cache)
+      ;; Simply do this twice to make sure nothing gets broken.  For example, that the
+      ;; stable version is still properly recognized on the second pass, when the
+      ;; repository clone doesn't have to be modified.
+      (dotimes (pass 2)
+        (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                              (if stable "--stable" "--unstable")
+                              "eval" `(dependency-a-hello) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+          :description (format "Pass #%d" (1+ pass))
+          (should (string= (nth 0 (eldev--test-line-list stdout)) "\"Hello\""))
+          (if stable
+              ;; Must use the stable version when `--stable' (default), even if this is
+              ;; not the latest version overall.
+              (should (string= (nth 1 (eldev--test-line-list stdout)) "(1 1)"))
+            (should (string-match-p (eldev--test-unstable-version-rx '(1 0 100) t) (nth 1 (eldev--test-line-list stdout)))))
+          (should (= exit-code 0)))
+        (when (and remove-installed-package (= pass 0))
+          (eldev--test-run nil ("clean" "dependencies")
+            (should (= exit-code 0))))))))
+
 
 (eldev-ert-defargtest eldev-vc-repositories-upgrade-1 (command)
                       ('("upgrade") '("upgrade" "dependency-a"))
@@ -99,7 +138,7 @@
         (eldev-with-file-buffer "dependency-a.el"
           (re-search-forward (rx "1.0.99"))
           (replace-match "1.0.100"))
-        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=whatever")))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
       (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                             "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
         :description "After creating `dependency-a' 1.0.100, but before upgrading"

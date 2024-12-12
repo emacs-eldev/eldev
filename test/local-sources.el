@@ -68,6 +68,36 @@
       (should (string= stdout (eldev--test-lines "t" "(1 0)")))
       (should (= exit-code 0)))))
 
+(ert-deftest eldev-local-sources-4 ()
+  ;; This is similar t- `eldev-local-sources-1', except that local sources hide (or not) a
+  ;; VC-fetched dependency, not one from a package archive.
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let ((dependency-a-dir    eldev--test-project)
+          (eldev--test-project "vc-dep-project-a"))
+      (let ((default-directory dependency-a-dir))
+        (eldev-with-file-buffer "dependency-a.el"
+          (re-search-forward (rx "1.0.99"))
+          (replace-match "1.0.100"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+      (eldev--test-delete-cache)
+      ;; Run all commands in the same test to make sure that the various setups don't
+      ;; influence each other in some way.
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "--quiet" "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+        :description "First run with a VC-fetched dependency"
+        (should (string-match-p (eldev--test-unstable-version-rx '(1 0 100) t) (eldev--test-first-line stdout)))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-local-sources "../dependency-a")
+                            "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+        :description "A run with local sources shadowing the VC-fetched dependency"
+        (should (string= stdout (eldev--test-lines "(1 0 99)")))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "--quiet" "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+        :description "Second run with a VC-fetched dependency"
+        (should (string-match-p (eldev--test-unstable-version-rx '(1 0 100) t) (eldev--test-first-line stdout)))
+        (should (= exit-code 0))))))
+
 
 (ert-deftest eldev-local-sources-fix-missing-dependency-1 ()
   (eldev--test-run "dependency-a" ("clean")
