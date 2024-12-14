@@ -163,7 +163,7 @@
         :description "Using original version of `dependency-a'"
         (should (equal (butlast (eldev--test-line-list stdout)) '("\"Hello\"" "nil")))
         (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 2 (eldev--test-line-list stdout))))
-        (should (string-match-p (format "Installing.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
+        (should (string-match-p (format "1/1.+Installing.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
         (should (= exit-code 0)))
       (let ((default-directory dependency-a-dir))
         (eldev-with-file-buffer "dependency-a.el"
@@ -180,7 +180,7 @@
       (eldev--test-run nil (:eval `("--setup" ,`(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                                     ,@command))
         :description "Upgrading"
-        (should (string-match-p (format "Upgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
+        (should (string-match-p (format "1.1.+Upgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
         (should (= exit-code 0)))
       (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                             "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
