@@ -86,6 +86,37 @@
               (should (string-match-p (eldev--test-unstable-version-rx (version-to-list "1.1alpha") t) (nth 4 (eldev--test-line-list stdout)))))
             (should (= exit-code 0))))))))
 
+(eldev-ert-defargtest eldev-vc-repositories-fixed-commit (tag-it remove-installed-package)
+                      ((nil nil)
+                       (nil t)
+                       (t   nil)
+                       (t   t))
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let* ((dependency-a-dir    eldev--test-project)
+           (eldev--test-project "vc-dep-project-a")
+           (commit              (if tag-it
+                                    (progn (eldev-vc-create-tag "1.1" dependency-a-dir) "1.1")
+                                  ;; Short identifier won't do it in this case!
+                                  (eldev-vc-commit-id nil dependency-a-dir))))
+      (let ((default-directory dependency-a-dir))
+        (eldev-with-file-buffer "dependency-a.el"
+          (re-search-forward (rx "1.0.99"))
+          (replace-match "1.0.100"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+      (eldev--test-delete-cache)
+      ;; Simply do this twice to make sure nothing gets broken.
+      (dotimes (pass 2)
+        (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir :commit ,commit)
+                              "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+          :description (format "Pass #%d" (1+ pass))
+          (if tag-it
+              (should (string= stdout (eldev--test-lines "(1 1)")))
+            (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (eldev--test-first-line stdout))))
+          (should (= exit-code 0)))
+        (when (and remove-installed-package (= pass 0))
+          (eldev--test-run nil ("clean" "dependencies")
+            (should (= exit-code 0))))))))
+
 (eldev-ert-defargtest eldev-vc-repositories-stable/unstable (stable remove-installed-package)
                       ((nil nil)
                        (nil t)

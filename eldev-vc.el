@@ -195,10 +195,10 @@ Since 1.2."
 
 ;; Working with VC repositories to fetch packages.
 
-(defvar eldev--vc-default-release-tag-regexp (rx bos (| "" "v" "ver") (group digit (0+ any)) eos))
+(defvar eldev-vc-default-release-tag-regexp (rx bos (| "" "v") (group digit (0+ any)) eos))
 
 
-(defun eldev--vc-fetch-repository (vc-backend url dir &optional update release-tag-regexp)
+(defun eldev--vc-fetch-repository (vc-backend url commit dir &optional update release-tag-regexp)
   (unless (eq vc-backend 'Git)
     (error "Only Git is supported currently"))
   ;; Git ignores `--depth' for local clones, but we need a consistent behavior, if only for tests.
@@ -226,14 +226,16 @@ Since 1.2."
           (setf tag+version (eldev--vc-current-commit-release-tag release-tag-regexp))
         (when update
           (eldev-verbose "Fetching updates from `%s'..." url))
-        (setf tag+version (when eldev-prefer-stable-archives (eldev--vc-pick-release-tag release-tag-regexp)))
+        (when (and eldev-prefer-stable-archives (null commit))
+          (setf tag+version  (eldev--vc-pick-release-tag release-tag-regexp)))
         ;; Without `--tags' below, `eldev--vc-current-commit-release-tag' wouldn't be able
         ;; to do its job later, because the commit in the clone wouldn't be tagged.
-        (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "--tags" "origin" ,(or (car tag+version) "HEAD"))
+        (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "--tags" "origin" ,(or commit (car tag+version) "HEAD"))
           :die-on-error t)
         (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
-          :die-on-error t))
-      (eldev-dump reuse-existing update tag+version)
+          :die-on-error t)
+        (when commit
+          (setf tag+version (eldev--vc-pick-release-tag release-tag-regexp))))
       (let ((package (eldev-package-descriptor dir)))
         (if tag+version
             (setf (package-desc-version package) (cdr tag+version))
@@ -314,7 +316,7 @@ appropriate tags at all, returns nil."
 
 (defun eldev--vc-most-recent-release-tag (tags &optional release-tag-regexp)
   (unless release-tag-regexp
-    (setf release-tag-regexp eldev--vc-default-release-tag-regexp))
+    (setf release-tag-regexp eldev-vc-default-release-tag-regexp))
   (let (most-recent-tag
         most-recent-version)
     (dolist (tag tags)

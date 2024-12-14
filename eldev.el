@@ -1805,12 +1805,18 @@ in `package-archives', it returns VALUE-IF-NOT-USED."
                    (setf (car (assoc counterpart priorities)) name)))))))))
 
 
-(cl-defun eldev-use-vc-repository (package &key git github setup &allow-other-keys)
+(cl-defun eldev-use-vc-repository (package &key git github commit setup &allow-other-keys)
   "Use a VC repository for fetching given PACKAGE.
 Currently only Git is supported, so either GIT or GITHUB
 parameter is required.  If GIT is specified, it must be the full
 URL to the repository, as a string.  You can specify GITHUB
 instead, which must be in the format \"USERNAME/REPONAME\".
+
+By default, Eldev will use the latest tagged release in the
+repository or, with `--unstable', its latest commit.  You can
+also specify COMMIT parameter if you want to always check out
+certain release.  It may be Git tag name or a _full_ commit hash
+(i.e. not a shortened one; must be 40 characters long).
 
 Form SETUP, if used, will be passed to the child Eldev process
 (see option `--setup') whenever the package needs to be built.
@@ -1828,7 +1834,7 @@ Since 1.11."
   (unless eldev-normal-dependency-management
     ;; But still add it into the list in case dependency management get reenabled in time somehow.
     (eldev-warn "Normal dependency management is disabled; VC repositories will not be used"))
-  (push `(,package :git ,git :github ,github :setup ,setup) eldev--vc-repositories))
+  (push `(,package :git ,git :github ,github :commit ,commit :setup ,setup) eldev--vc-repositories))
 
 
 ;; Don't remove, just keep the old name working indefinitely.
@@ -2665,7 +2671,7 @@ Since 0.2."
                          (pcase (car next-archive)
                            (`(:vc ,repository)
                             (eldev--assq-set (car repository)
-                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr repository) :git) (eldev--vc-clone-dir repository)
+                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr repository) :git) (plist-get (cdr repository) :commit) (eldev--vc-clone-dir repository)
                                                                          (or (eq to-be-upgraded t) (memq (car repository) to-be-upgraded)))
                                              eldev--vc-repository-packages)
                             (eldev--create-or-update-internal-vc-pseudoarchive-descriptor))
