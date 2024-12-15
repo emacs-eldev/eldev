@@ -118,6 +118,16 @@ and create file `Eldev` in it with required contents
 created file, convert its contents into an Elisp form (use `progn` if
 needed) and pass it as a value of `:setup` in your _main_ project.
 
+By default, Eldev will check out the repository at the latest stable
+tagged release.  If there are none, however, it will just use the HEAD
+commit.  Eldev respects the options `--stable`/`--unstable` described
+in the previous section also for VC repositories.  For example, the
+latter makes it ignore the releases and always use the latest commit.
+Finally, if you _always_ want to build from a specific commit, e.g. to
+make build process more stable, you can pass optional argument
+`:commit` to `eldev-use-vc-repository`.  Its value must be a string:
+either a tag name or a _full_ (not shortened) Git commit hash.
+
 [#local-sources]
 === From your file system (local sources)
 

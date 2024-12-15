@@ -398,4 +398,4 @@ function Elisp documentation for the syntax.
 
 === Custom test runners
 
-FIXME
+NOTE: _This feature is present in Eldev, but is not documented yet._

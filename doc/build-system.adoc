@@ -86,7 +86,7 @@ And a short explanation of various elements:
 
 ==== Target cross-dependencies
 
-FIXME
+NOTE: _This feature is present in Eldev, but is not documented yet._
 
 [#target-sets]
 ==== Target sets

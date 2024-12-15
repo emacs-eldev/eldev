@@ -15,11 +15,12 @@ Eldev features:
   customize most aspects of Eldev for your project needs and personal
   preferences.
 * <<dependencies,Project dependency>> downloading, installation etc.
-  is fully automated, you only need to specify which Elisp package
-  archive(s) to use.
-* You can also use <<local-sources,package sources local to your
-  machine>>, even those that don’t use Eldev (some restrictions still
-  apply).  This is similar to Cask linking, but with more flexibility.
+  is fully automated, you only need to tell the tool where to find
+  them:
+** <<package-archives,in package archives>> (MELPA, GNU ELPA, etc.);
+** <<vc-repositories,in VC (Git) repositories>>;
+** <<local-sources,in a local directory on your machine>> (this is
+   similar to Cask linking, but with more flexibility).
 * Full support for <<autoloads,autoloads>> during development.
 * Miscellaneous operations useful during development:
   <<running-emacs,running Emacs>> with only your project,

@@ -53,16 +53,18 @@ provides only a brief overview.
   Emacs version] even on the same machine; can also use
   {uri-documentation}#docker[Docker] or
   {uri-documentation}#podman[Podman] for that.
-* There are {uri-documentation}#setup-procedure[_four_ levels of
+* There are {uri-documentation}#setup-procedure[four levels of
   configuration] — you can customize most aspects of Eldev for your
   project needs and personal preferences.
 * {uri-documentation}#dependencies[Project dependency] downloading,
-  installation etc. is fully automated, you only need to specify which
-  Elisp package archive(s) to use.
-* You can also use {uri-documentation}#local-sources[package sources
-  local to your machine], even those that don’t use Eldev (some
-  restrictions still apply).  This is similar to Cask linking, but
-  with more flexibility.
+  installation etc. is fully automated, you only need to tell the tool
+  where to find them:
+** {uri-documentation}#package-archives[in package archives] (MELPA,
+   GNU ELPA, etc.);
+** {uri-documentation}#vc-repositories[in VC (Git) repositories];
+** {uri-documentation}#local-sources[in a local directory on your
+   machine] (this is similar to Cask linking, but with more
+   flexibility).
 * Full support for {uri-documentation}#autoloads[autoloads] during
   development.
 * Miscellaneous operations useful during development:
