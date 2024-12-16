@@ -224,14 +224,16 @@ Since 1.2."
           tag+version)
       (if (and reuse-existing (not update))
           (setf tag+version (eldev--vc-current-commit-release-tag release-tag-regexp))
-        (when update
-          (eldev-verbose "Fetching updates from `%s'..." url))
         (when (and eldev-prefer-stable-archives (null commit))
           (setf tag+version  (eldev--vc-pick-release-tag release-tag-regexp)))
         ;; Without `--tags' below, `eldev--vc-current-commit-release-tag' wouldn't be able
         ;; to do its job later, because the commit in the clone wouldn't be tagged.
-        (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "--tags" "origin" ,(or commit (car tag+version) "HEAD"))
-          :die-on-error t)
+        (let ((to-fetch (or commit (car tag+version) "HEAD")))
+          (if update
+              (eldev-verbose "Fetching updates from `%s', commit `%s'..." url to-fetch)
+            (eldev-trace "Initially switching to commit `%s'..." to-fetch))
+          (eldev-call-process (eldev-git-executable) `("fetch" "--depth=1" "--tags" "origin" ,to-fetch)
+            :die-on-error t))
         (eldev-call-process (eldev-git-executable) `("checkout" "FETCH_HEAD")
           :die-on-error t)
         (when commit

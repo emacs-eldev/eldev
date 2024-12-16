@@ -101,8 +101,8 @@
       (let ((default-directory dependency-a-dir))
         (eldev-with-file-buffer "dependency-a.el"
           (re-search-forward (rx "1.0.99"))
-          (replace-match "1.0.100"))
-        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+          (replace-match "1.1.99"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.1.99")))
       (eldev--test-delete-cache)
       ;; Simply do this twice to make sure nothing gets broken.
       (dotimes (pass 2)
@@ -129,8 +129,8 @@
       (let ((default-directory dependency-a-dir))
         (eldev-with-file-buffer "dependency-a.el"
           (re-search-forward (rx "1.0.99"))
-          (replace-match "1.0.100"))
-        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+          (replace-match "1.1.99"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.1.99")))
       (eldev--test-delete-cache)
       ;; Simply do this twice to make sure nothing gets broken.  For example, that the
       ;; stable version is still properly recognized on the second pass, when the
@@ -145,7 +145,7 @@
               ;; Must use the stable version when `--stable' (default), even if this is
               ;; not the latest version overall.
               (should (string= (nth 1 (eldev--test-line-list stdout)) "(1 1)"))
-            (should (string-match-p (eldev--test-unstable-version-rx '(1 0 100) t) (nth 1 (eldev--test-line-list stdout)))))
+            (should (string-match-p (eldev--test-unstable-version-rx '(1 1 99) t) (nth 1 (eldev--test-line-list stdout)))))
           (should (= exit-code 0)))
         (when (and remove-installed-package (= pass 0))
           (eldev--test-run nil ("clean" "dependencies")
@@ -168,11 +168,11 @@
       (let ((default-directory dependency-a-dir))
         (eldev-with-file-buffer "dependency-a.el"
           (re-search-forward (rx "1.0.99"))
-          (replace-match "1.0.100"))
-        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.0.100")))
+          (replace-match "1.1.99"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.1.99")))
       (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                             "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
-        :description "After creating `dependency-a' 1.0.100, but before upgrading"
+        :description "After creating `dependency-a' 1.1.99, but before upgrading"
         ;; Upgrading VC dependencies must be explicit, just like for regular dependencies.
         (should (equal (butlast (eldev--test-line-list stdout)) '("\"Hello\"" "nil")))
         (should (string-match-p (eldev--test-unstable-version-rx '(1 0 99) t) (nth 2 (eldev--test-line-list stdout))))
@@ -180,18 +180,60 @@
       (eldev--test-run nil (:eval `("--setup" ,`(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                                     ,@command))
         :description "Upgrading"
-        (should (string-match-p (format "1.1.+Upgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
+        (should (string-match-p (format "1/1.+Upgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
         (should (= exit-code 0)))
       (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                             "eval" `(dependency-a-hello) `(dependency-a-stable) `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
-        :description "Using `dependency-a' 1.0.100"
+        :description "Using `dependency-a' 1.1.99"
         (should (equal (butlast (eldev--test-line-list stdout)) '("\"Hello\"" "nil")))
-        (should (string-match-p (eldev--test-unstable-version-rx '(1 0 100) t) (nth 2 (eldev--test-line-list stdout))))
+        (should (string-match-p (eldev--test-unstable-version-rx '(1 1 99) t) (nth 2 (eldev--test-line-list stdout))))
         (should (= exit-code 0)))
       (eldev--test-run nil (:eval `("--setup" ,`(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
                                     ,@command))
         :description "Upgrading for the second time, must be a no-op"
         (should (string= stdout (eldev--test-lines "All dependencies are up-to-date")))
+        (should (= exit-code 0))))))
+
+(ert-deftest eldev-vc-repositories-stable/unstable-upgrade ()
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let ((dependency-a-dir    eldev--test-project)
+          (eldev--test-project "vc-dep-project-a"))
+      (eldev-vc-create-tag "1.1" dependency-a-dir)
+      (let ((default-directory dependency-a-dir))
+        (eldev-with-file-buffer "dependency-a.el"
+          (re-search-forward (rx "1.0.99"))
+          (replace-match "1.1.99"))
+        (eldev-call-process (eldev-git-executable) `("commit" "--all" "--message=1.0.99->1.1.99")))
+      (eldev--test-delete-cache)
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+        :description "Initial installation: must be stable"
+        (should (string= (eldev--test-first-line stdout) "(1 1)"))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "upgrade")
+        :description "Upgrading: nothing to do"
+        (should (string= stdout (eldev--test-lines "All dependencies are up-to-date")))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "--unstable" "upgrade")
+        :description "Upgrading to unstable version"
+        (should (string-match-p (format "1.1.+Upgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "eval" `(package-desc-version (eldev-find-package-descriptor 'dependency-a)))
+        :description "Must be unstable now"
+        (should (string-match-p (eldev--test-unstable-version-rx '(1 1 99) t) (eldev--test-first-line stdout)))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "upgrade")
+        :description "Must not downgrade if not specifically asked to"
+        (should (string= stdout (eldev--test-lines "All dependencies are up-to-date")))
+        (should (= exit-code 0)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "upgrade" "--downgrade")
+        :description "Downgrading back to stable version"
+        (should (string-match-p (format "1.1.+Downgrading.+dependency-a.+from.+%s" (regexp-quote dependency-a-dir)) stderr))
         (should (= exit-code 0))))))
 
 
