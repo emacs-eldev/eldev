@@ -89,7 +89,7 @@
                                         eldev-release-test-project eldev-release-maybe-fail)
                        ("eldev-vc"      eldev-vc-root-dir eldev-vc-executable eldev-vc-full-name eldev-with-vc eldev-with-vc-buffer eldev--vc-set-up-buffer eldev-vc-synchronize-dir
                                         eldev-vc-detect eldev-vc-commit-id eldev-vc-branch-name
-                                        eldev--vc-fetch-repository eldev--vc-install-as-package)
+                                        eldev--vc-repository-package eldev--vc-fetch-repository eldev--vc-install-as-package)
                        ("eldev-doctor"  eldev-defdoctest)))
     (dolist (function (cdr autoloads))
       (autoload function (car autoloads)))))
@@ -953,9 +953,6 @@ Since 1.7.")
 
 (defvar eldev--vc-repositories nil
   "Alist of package names to plists describing used VC repositories.")
-
-(defvar eldev--vc-repository-packages nil
-  "Alist of `(NAME . PKG-DESCRIPTOR).")
 
 
 (defun eldev-start-up ()
@@ -2670,10 +2667,7 @@ Since 0.2."
                        (unless (cdr next-archive)
                          (pcase (car next-archive)
                            (`(:vc ,repository)
-                            (eldev--assq-set (car repository)
-                                             (eldev--vc-fetch-repository 'Git (plist-get (cdr repository) :git) (plist-get (cdr repository) :commit) (eldev--vc-clone-dir repository)
-                                                                         (or (eq to-be-upgraded t) (memq (car repository) to-be-upgraded)))
-                                             eldev--vc-repository-packages)
+                            (eldev--vc-fetch-repository repository (or (eq to-be-upgraded t) (memq (car repository) to-be-upgraded)))
                             (eldev--create-or-update-internal-vc-pseudoarchive-descriptor))
                            (_
                             (eldev--fetch-archive-contents `(,(car next-archive)) to-be-upgraded)))
@@ -3226,7 +3220,7 @@ Since 0.2."
                ,@(let (entries)
                    (dolist (repository eldev--vc-repositories)
                      (let* ((name    (car repository))
-                            (package (cdr (assq name eldev--vc-repository-packages))))
+                            (package (eldev--vc-repository-package name)))
                        (if package
                            (push `(,(package-desc-name package) . ,(package-make-ac-desc (package-desc-version package) (package-desc-reqs package) nil 'single nil)) entries)
                          (let ((previous (assq name previous-contents)))

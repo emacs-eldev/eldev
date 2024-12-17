@@ -197,14 +197,24 @@ Since 1.2."
 
 (defvar eldev-vc-default-release-tag-regexp (rx bos (| "" "v") (group digit (0+ any)) eos))
 
+(defvar eldev--vc-repository-packages nil
+  "Alist of `(NAME . PKG-DESCRIPTOR).")
 
-(defun eldev--vc-fetch-repository (vc-backend url commit dir &optional update release-tag-regexp)
-  (unless (eq vc-backend 'Git)
-    (error "Only Git is supported currently"))
-  ;; Git ignores `--depth' for local clones, but we need a consistent behavior, if only for tests.
-  (when (file-name-absolute-p url)
-    (setf url (format "file://%s" url)))
-  (let (reuse-existing)
+
+(defun eldev--vc-repository-package (name)
+  "Return VC-fetched package with given NAME.
+Will be nil if no such repository was registered or
+`eldev--vc-fetch-repository' has not been called for it yet."
+  (cdr (assq name eldev--vc-repository-packages)))
+
+(defun eldev--vc-fetch-repository (repository &optional update release-tag-regexp)
+  (let ((url    (plist-get (cdr repository) :git))
+        (commit (plist-get (cdr repository) :commit))
+        (dir    (eldev--vc-clone-dir repository))
+        reuse-existing)
+    ;; Git ignores `--depth' for local clones, but we need a consistent behavior, if only for tests.
+    (when (file-name-absolute-p url)
+      (setf url (format "file://%s" url)))
     (when (file-exists-p (expand-file-name ".git/config" dir))
       (let ((default-directory dir))
         (if (string= url (eldev-call-process (eldev-git-executable) '("config" "--get" "remote.origin.url")
@@ -251,6 +261,7 @@ Since 1.2."
                 (setf (package-desc-version package)
                       (append (package-desc-version package) `(,(string-to-number (format "%s%s%s" (match-string 1 date-string) (match-string 2 date-string) (match-string 3 date-string)))
                                                                ,(string-to-number (format "%s%s"   (match-string 4 date-string) (match-string 5 date-string))))))))))
+        (eldev--assq-set (car repository) package eldev--vc-repository-packages)
         package))))
 
 (defun eldev--vc-install-as-package (repository)
@@ -258,7 +269,11 @@ Since 1.2."
   ;; packages here rather than when loading.  The reason is that the source checkout is
   ;; controlled by Eldev and thus shouldn't ever be changed outside.
   (let ((tmp-package-dir (make-temp-file "eldev-vc-" t))
-        (package         (cdr (assq (car repository) eldev--vc-repository-packages))))
+        (package         (eldev--vc-repository-package (car repository))))
+    (unless package
+      ;; It might happen that the package descriptor is not known yet, see e.g. test
+      ;; `eldev-vc-repositories-4'.
+      (setf package (eldev--vc-fetch-repository repository)))
     (eldev-verbose "Creating a package from `%s'" (eldev--vc-repository-name repository))
     (let ((default-directory (eldev--vc-clone-dir repository))
           (display-stdout    eldev-display-indirect-build-stdout)

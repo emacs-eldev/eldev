@@ -86,6 +86,30 @@
               (should (string-match-p (eldev--test-unstable-version-rx (version-to-list "1.1alpha") t) (nth 4 (eldev--test-line-list stdout)))))
             (should (= exit-code 0))))))))
 
+;; Like the previous test, but add a second VC repository as a separate step, after the
+;; first is already fetched.
+(ert-deftest eldev-vc-repositories-4 ()
+  (eldev--test-with-temp-copy "dependency-a" 'Git
+    (let ((dependency-a-dir eldev--test-project)
+          (eldev--test-project "vc-dep-project-b"))
+      (eldev--test-delete-cache)
+      ;; This is expected to fail: we don't explain where to find `dependency-e'.
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                            "eval"
+                            `(vc-dep-project-b-hello-to "world"))
+        (should (string-match-p "dependency-e.+not available" stderr))
+        (should (/= exit-code 0)))
+      (eldev--test-with-temp-copy "dependency-e" 'Git
+        (let ((dependency-e-dir eldev--test-project)
+              (eldev--test-project "vc-dep-project-b"))
+          ;; Make sure that adding more repositories works without clearing the cache.
+          (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-a-dir)
+                                "--setup" `(eldev-use-vc-repository 'dependency-e :git ,dependency-e-dir)
+                                "eval"
+                                `(vc-dep-project-b-hello-to "world"))
+            (should (string= stdout (eldev--test-lines "\"Hello, world!\"")))
+            (should (= exit-code 0))))))))
+
 (eldev-ert-defargtest eldev-vc-repositories-fixed-commit (tag-it remove-installed-package)
                       ((nil nil)
                        (nil t)
