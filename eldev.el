@@ -4,7 +4,7 @@
 
 ;; Author:     Paul Pogonyshev <pogonyshev@gmail.com>
 ;; Maintainer: Paul Pogonyshev <pogonyshev@gmail.com>
-;; Version:    1.10.4snapshot
+;; Version:    1.11
 ;; Keywords:   maint, tools
 ;; Homepage:   https://github.com/emacs-eldev/eldev
 ;; Package-Requires: ((emacs "24.4"))
