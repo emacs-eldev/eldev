@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="generator" content="Asciidoctor 2.0.16">
+<meta name="generator" content="Asciidoctor 2.0.20">
 <title>Eldev documentation</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
 <style>
@@ -84,10 +84,10 @@ code{font-family:"Droid Sans Mono","DejaVu Sans Mono",monospace;font-weight:400;
 ul,ol,dl{line-height:1.6;margin-bottom:1.25em;list-style-position:outside;font-family:inherit}
 ul,ol{margin-left:1.5em}
 ul li ul,ul li ol{margin-left:1.25em;margin-bottom:0}
-ul.square li ul,ul.circle li ul,ul.disc li ul{list-style:inherit}
-ul.square{list-style-type:square}
 ul.circle{list-style-type:circle}
 ul.disc{list-style-type:disc}
+ul.square{list-style-type:square}
+ul.circle ul:not([class]),ul.disc ul:not([class]),ul.square ul:not([class]){list-style:inherit}
 ol li ul,ol li ol{margin-left:1.25em;margin-bottom:0}
 dl dt{margin-bottom:.3125em;font-weight:bold}
 dl dd{margin-bottom:1.25em}
@@ -193,7 +193,8 @@ body.toc2.toc-right{padding-left:0;padding-right:20em}}
 #content h1>a.link:hover,h2>a.link:hover,h3>a.link:hover,#toctitle>a.link:hover,.sidebarblock>.content>.title>a.link:hover,h4>a.link:hover,h5>a.link:hover,h6>a.link:hover{color:#a53221}
 details,.audioblock,.imageblock,.literalblock,.listingblock,.stemblock,.videoblock{margin-bottom:1.25em}
 details{margin-left:1.25rem}
-details>summary{cursor:pointer;display:block;position:relative;line-height:1.6;margin-bottom:.625rem;-webkit-tap-highlight-color:transparent}
+details>summary{cursor:pointer;display:block;position:relative;line-height:1.6;margin-bottom:.625rem;outline:none;-webkit-tap-highlight-color:transparent}
+details>summary::-webkit-details-marker{display:none}
 details>summary::before{content:"";border:solid transparent;border-left:solid;border-width:.3em 0 .3em .5em;position:absolute;top:.5em;left:-1.25rem;transform:translateX(15%)}
 details[open]>summary::before{border:solid transparent;border-top:solid;border-width:.5em .3em 0;transform:translateY(15%)}
 details>summary::after{content:"";width:1.25rem;height:1em;position:absolute;top:.3em;left:-1.25rem}
@@ -207,13 +208,10 @@ table.tableblock.fit-content>caption.title{white-space:nowrap;width:0}
 .admonitionblock>table td.content{padding-left:1.125em;padding-right:1.25em;border-left:1px solid #dddddf;color:rgba(0,0,0,.6);word-wrap:anywhere}
 .admonitionblock>table td.content>:last-child>:last-child{margin-bottom:0}
 .exampleblock>.content{border:1px solid #e6e6e6;margin-bottom:1.25em;padding:1.25em;background:#fff;border-radius:4px}
-.exampleblock>.content>:first-child{margin-top:0}
-.exampleblock>.content>:last-child{margin-bottom:0}
 .sidebarblock{border:1px solid #dbdbd6;margin-bottom:1.25em;padding:1.25em;background:#f3f3f2;border-radius:4px}
-.sidebarblock>:first-child{margin-top:0}
-.sidebarblock>:last-child{margin-bottom:0}
 .sidebarblock>.content>.title{color:#7a2518;margin-top:0;text-align:center}
-.exampleblock>.content>:last-child>:last-child,.exampleblock>.content .olist>ol>li:last-child>:last-child,.exampleblock>.content .ulist>ul>li:last-child>:last-child,.exampleblock>.content .qlist>ol>li:last-child>:last-child,.sidebarblock>.content>:last-child>:last-child,.sidebarblock>.content .olist>ol>li:last-child>:last-child,.sidebarblock>.content .ulist>ul>li:last-child>:last-child,.sidebarblock>.content .qlist>ol>li:last-child>:last-child{margin-bottom:0}
+.exampleblock>.content>:first-child,.sidebarblock>.content>:first-child{margin-top:0}
+.exampleblock>.content>:last-child,.exampleblock>.content>:last-child>:last-child,.exampleblock>.content .olist>ol>li:last-child>:last-child,.exampleblock>.content .ulist>ul>li:last-child>:last-child,.exampleblock>.content .qlist>ol>li:last-child>:last-child,.sidebarblock>.content>:last-child,.sidebarblock>.content>:last-child>:last-child,.sidebarblock>.content .olist>ol>li:last-child>:last-child,.sidebarblock>.content .ulist>ul>li:last-child>:last-child,.sidebarblock>.content .qlist>ol>li:last-child>:last-child{margin-bottom:0}
 .literalblock pre,.listingblock>.content>pre{border-radius:4px;overflow-x:auto;padding:1em;font-size:.8125em}
 @media screen and (min-width:768px){.literalblock pre,.listingblock>.content>pre{font-size:.90625em}}
 @media screen and (min-width:1280px){.literalblock pre,.listingblock>.content>pre{font-size:1em}}
@@ -235,9 +233,8 @@ pre.prettyprint li:not(:first-child) code[data-lang]::before{display:none}
 table.linenotable{border-collapse:separate;border:0;margin-bottom:0;background:none}
 table.linenotable td[class]{color:inherit;vertical-align:top;padding:0;line-height:inherit;white-space:normal}
 table.linenotable td.code{padding-left:.75em}
-table.linenotable td.linenos{border-right:1px solid;opacity:.35;padding-right:.5em}
-pre.pygments .lineno{border-right:1px solid;opacity:.35;display:inline-block;margin-right:.75em}
-pre.pygments .lineno::before{content:"";margin-right:-.125em}
+table.linenotable td.linenos,pre.pygments .linenos{border-right:1px solid;opacity:.35;padding-right:.5em;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}
+pre.pygments span.linenos{display:inline-block;margin-right:.75em}
 .quoteblock{margin:0 1em 1.25em 1.5em;display:table}
 .quoteblock:not(.excerpt)>.title{margin-left:-1.5em;margin-bottom:.75em}
 .quoteblock blockquote,.quoteblock p{color:rgba(0,0,0,.85);font-size:1.15rem;line-height:1.75;word-spacing:.1em;letter-spacing:0;font-style:italic;text-align:justify}
@@ -274,7 +271,7 @@ table.frame-none>colgroup+*>:first-child>*,table.frame-sides>colgroup+*>:first-c
 table.frame-none>:last-child>:last-child>*,table.frame-sides>:last-child>:last-child>*{border-bottom-width:0}
 table.frame-none>*>tr>:first-child,table.frame-ends>*>tr>:first-child{border-left-width:0}
 table.frame-none>*>tr>:last-child,table.frame-ends>*>tr>:last-child{border-right-width:0}
-table.stripes-all tr,table.stripes-odd tr:nth-of-type(odd),table.stripes-even tr:nth-of-type(even),table.stripes-hover tr:hover{background:#f8f8f7}
+table.stripes-all>*>tr,table.stripes-odd>*>tr:nth-of-type(odd),table.stripes-even>*>tr:nth-of-type(even),table.stripes-hover>*>tr:hover{background:#f8f8f7}
 th.halign-left,td.halign-left{text-align:left}
 th.halign-right,td.halign-right{text-align:right}
 th.halign-center,td.halign-center{text-align:center}
@@ -290,10 +287,11 @@ ol{margin-left:1.75em}
 ul li ol{margin-left:1.5em}
 dl dd{margin-left:1.125em}
 dl dd:last-child,dl dd:last-child>:last-child{margin-bottom:0}
-ol>li p,ul>li p,ul dd,ol dd,.olist .olist,.ulist .ulist,.ulist .olist,.olist .ulist{margin-bottom:.625em}
+li p,ul dd,ol dd,.olist .olist,.ulist .ulist,.ulist .olist,.olist .ulist{margin-bottom:.625em}
 ul.checklist,ul.none,ol.none,ul.no-bullet,ol.no-bullet,ol.unnumbered,ul.unstyled,ol.unstyled{list-style-type:none}
 ul.no-bullet,ol.no-bullet,ol.unnumbered{margin-left:.625em}
 ul.unstyled,ol.unstyled{margin-left:0}
+li>p:empty:only-child::before{content:"";display:inline-block}
 ul.checklist>li>p:first-child{margin-left:-1em}
 ul.checklist>li>p:first-child>.fa-square-o:first-child,ul.checklist>li>p:first-child>.fa-check-square-o:first-child{width:1.25em;font-size:.8em;position:relative;bottom:.125em}
 ul.checklist>li>p:first-child>input[type=checkbox]:first-child{margin-right:.25em}
@@ -336,8 +334,6 @@ sup.footnote a:active,sup.footnoteref a:active{text-decoration:underline}
 #footnotes .footnote a:first-of-type{font-weight:bold;text-decoration:none;margin-left:-1.05em}
 #footnotes .footnote:last-of-type{margin-bottom:0}
 #content #footnotes{margin-top:-.625em;margin-bottom:0;padding:.75em 0}
-.gist .file-data>table{border:0;background:#fff;width:100%;margin-bottom:0}
-.gist .file-data>table td.line-data{width:99%}
 div.unbreakable{page-break-inside:avoid}
 .big{font-size:larger}
 .small{font-size:smaller}
@@ -394,7 +390,7 @@ b.conum *{color:inherit!important}
 dt,th.tableblock,td.content,div.footnote{text-rendering:optimizeLegibility}
 h1,h2,p,td.content,span.alt,summary{letter-spacing:-.01em}
 p strong,td.content strong,div.footnote strong{letter-spacing:-.005em}
-p,blockquote,dt,td.content,span.alt,summary{font-size:1.0625rem}
+p,blockquote,dt,td.content,td.hdlist1,span.alt,summary{font-size:1.0625rem}
 p{margin-bottom:1.25rem}
 .sidebarblock p,.sidebarblock dt,.sidebarblock td.content,p.tableblock{font-size:1em}
 .exampleblock>.content{background:#fffef7;border-color:#e0e0dc;box-shadow:0 1px 4px #e0e0dc}
@@ -457,7 +453,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#_safety_concerns">Safety concerns</a></li>
 <li><a href="#_getting_started">Getting started</a></li>
-<li><a href="#_initializing_a_project">Initializing a project</a>
+<li><a href="#initializing">Initializing a project</a>
 <ul class="sectlevel2">
 <li><a href="#githooks">Initializing a checkout</a></li>
 </ul>
@@ -470,7 +466,9 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#dependencies">Project dependencies</a>
 <ul class="sectlevel2">
-<li><a href="#local-dependencies">Local dependencies</a></li>
+<li><a href="#package-archives">From Elisp package archives</a></li>
+<li><a href="#vc-repositories">From VC (Git) repositories</a></li>
+<li><a href="#local-sources">From your file system (local sources)</a></li>
 <li><a href="#additional-dependencies">Additional dependencies</a></li>
 <li><a href="#_examining_dependencies">Examining dependencies</a></li>
 <li><a href="#_upgrading_dependencies">Upgrading dependencies</a></li>
@@ -609,19 +607,28 @@ on the same machine; can also use <a href="#docker">Docker</a> or
 <a href="#podman">Podman</a> for that.</p>
 </li>
 <li>
-<p>There are <a href="#setup-procedure"><em>four</em> levels of configuration</a> — you
-can customize most aspects of Eldev for your project needs and
-personal preferences.</p>
+<p>There are <a href="#setup-procedure">four levels of configuration</a> — you can
+customize most aspects of Eldev for your project needs and personal
+preferences.</p>
 </li>
 <li>
 <p><a href="#dependencies">Project dependency</a> downloading, installation etc.
-is fully automated, you only need to specify which Elisp package
-archive(s) to use.</p>
+is fully automated, you only need to tell the tool where to find
+them:</p>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="#package-archives">in package archives</a> (MELPA, GNU ELPA, etc.);</p>
 </li>
 <li>
-<p>You can also use <a href="#local-dependencies">local dependencies</a>, even
-those that don’t use Eldev (some restrictions still apply).  This
-is similar to Cask linking, but with more flexibility.</p>
+<p><a href="#vc-repositories">in VC (Git) repositories</a>;</p>
+</li>
+<li>
+<p><a href="#local-sources">in a local directory on your machine</a> (this is
+similar to Cask linking, but with more flexibility).</p>
+</li>
+</ul>
+</div>
 </li>
 <li>
 <p>Full support for <a href="#autoloads">autoloads</a> during development.</p>
@@ -1085,7 +1092,7 @@ name and command-specific options — after it.</p>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_initializing_a_project">Initializing a project</h2>
+<h2 id="initializing">Initializing a project</h2>
 <div class="sectionbody">
 <div class="paragraph">
 <p>When Eldev starts up, it configures itself for the project in the
@@ -1210,8 +1217,9 @@ source.</p>
 Unlike <code>Eldev</code>, it <em>should not</em> be added to VCS: it is meant to be
 created by each developer (should he want to do so) to customize how
 Eldev behaves in this specific directory.  The most common use is to
-define local dependencies.  A good practice is to instruct your VSC to
-ignore this file, e.g. list it in <code>.gitignore</code> for Git.</p>
+define <a href="#local-sources">local sources</a> to build project’s
+dependencies.  A good practice is to instruct your VSC to ignore this
+file, e.g. list it in <code>.gitignore</code> for Git.</p>
 </div>
 <div class="paragraph">
 <p>Finally, it is possible to specify some (short) setup forms on the
@@ -1278,10 +1286,10 @@ correctly preinstalled in the specified external directory, Eldev will
 simply fail.</p>
 </div>
 <div class="paragraph">
-<p><a href="#local-dependencies">Local dependencies</a> discussed later take
-precedence even in this mode: anything declared as local will override
-dependencies available from an external directory, just like it will
-in usual full isolation mode.</p>
+<p><a href="#local-sources">Local sources</a> discussed later take precedence even
+in this mode: anything declared as local will override dependencies
+available from an external directory, just like it will in usual full
+isolation mode.</p>
 </div>
 <div class="paragraph">
 <p>This mode can be useful to load exactly the same dependency versions
@@ -1315,10 +1323,17 @@ and keep track that they remain in sync.</p>
 </div>
 <div class="paragraph">
 <p>However, you do need to tell Eldev how to <em>find</em> these dependencies.
-Like Cask, by default it doesn’t use any package archives.  To tell it
-to use an archive, call function <code>eldev-use-package-archive</code> in
-<code>Eldev</code> (you have such forms already in place if you have used <code>eldev
-init</code>).  For example:</p>
+There are three ways of locating packages: <a href="#package-archives">using
+Elisp package archives</a>, <a href="#vc-repositories">using VC (Git)
+repositories</a> and <a href="#local-sources">on your local file system</a>.</p>
+</div>
+<div class="sect2">
+<h3 id="package-archives">From Elisp package archives</h3>
+<div class="paragraph">
+<p>By default Eldev doesn’t use any package archives.  To instruct it to
+use an archive to locate packages, call function
+<code>eldev-use-package-archive</code> in file <code>Eldev</code> (you have such forms
+already in place if you have used <code>eldev init</code>).  For example:</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -1373,8 +1388,75 @@ they are installed first.  However, if you want to check if package
 archives have been specified correctly and all dependencies can be
 looked up without problems, you can explicitly use command <code>prepare</code>.</p>
 </div>
+</div>
 <div class="sect2">
-<h3 id="local-dependencies">Local dependencies</h3>
+<h3 id="vc-repositories">From VC (Git) repositories</h3>
+<div class="paragraph">
+<p><span class="image right"><img src="https://img.shields.io/badge/since-1.11-8be" alt="Since 1.11"></span> If a package you depend on isn’t available from a package
+archive (e.g. MELPA), this is still not a problem as long as there is
+a Git repository for it.  Simply add to file <code>Eldev</code> a form like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-vc-repository 'dep-name :git "FULL-URL")</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the package is available on GitHub, you can avoid specifying the
+full URL by using the shortened form:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-vc-repository 'dep-name :github "USER/REPOSITORY")</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, whenever a package called <code>dep-name</code> is needed, Eldev will first
+fetch given Git repository, build an Elisp package from it and provide
+it to the standard Emacs package manager for use.</p>
+</div>
+<div class="paragraph">
+<p>Like <a href="#package-archives">with package archives</a>, function
+<code>eldev-use-vc-repository</code> itself doesn’t describe <em>how</em> you intend to
+use given package.  It merely tells Eldev where to find it.  Only if
+the package is listed as a <a href="#dependencies">regular dependency</a> of your
+project or you register it as <a href="#additional-dependencies">an additional
+dependency</a>, will the repository actually get fetched.</p>
+</div>
+<div class="paragraph">
+<p>If the project fetched from a repository doesn’t use Eldev itself, the
+tool might have problems building a package from it.  In this case you
+can pass a <a href="#setup-procedure">setup form</a> to it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-vc-repository ... :setup FORM)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This form will be given to child Eldev processes whenever a package
+needs to be created out of the VC-fetched project.  Most likely you
+will need to tell child Eldev how to locate dependencies of <em>that</em>
+project.  The best way to figure it out is to check out the repository
+and create file <code>Eldev</code> in it with required contents
+(<a href="#initializing"><code>eldev init</code></a> might help).  Instead of committing the
+created file, convert its contents into an Elisp form (use <code>progn</code> if
+needed) and pass it as a value of <code>:setup</code> in your <em>main</em> project.</p>
+</div>
+<div class="paragraph">
+<p>By default, Eldev will check out the repository at the latest stable
+tagged release.  If there are none, however, it will just use the HEAD
+commit.  Eldev respects the options <code>--stable</code>/<code>--unstable</code> described
+in the previous section also for VC repositories.  For example, the
+latter makes it ignore the releases and always use the latest commit.
+Finally, if you <em>always</em> want to build from a specific commit, e.g. to
+make build process more stable, you can pass optional argument
+<code>:commit</code> to <code>eldev-use-vc-repository</code>.  Its value must be a string:
+either a tag name or a <em>full</em> (not shortened) Git commit hash.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="local-sources">From your file system (local sources)</h3>
 <div class="paragraph">
 <p>Imagine you are developing more than one project at once and they
 depend on each other.  You’d typically want to test the changes you
@@ -1383,16 +1465,29 @@ Cask, this is solved by linking projects in it.</p>
 </div>
 <div class="paragraph">
 <p>Eldev provides a more flexible approach to this problem called <em>local
-dependencies</em>.  Let’s assume you develop project <code>foo</code> in directory
-<code>~/foo</code> and also a library called <code>barlib</code> in <code>~/barlib</code>.  And <code>foo</code>
-uses the library.  To have Eldev use your local copy of <code>barlib</code>
-instead of downloading it e.g. from MELPA, add the following form in
-file <code>~/foo/Eldev-local</code>:</p>
+sources</em>.  Let’s assume you develop project <code>foo</code> in directory <code>~/foo</code>
+and also a library called <code>barlib</code> in <code>~/barlib</code>.  And <code>foo</code> uses the
+library.  To have Eldev use your local copy of <code>barlib</code> instead of
+downloading it e.g. from MELPA, add the following form in file
+<code>~/foo/Eldev-local</code>:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-local-dependency "~/barlib")</code></pre>
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-local-sources "~/barlib")</code></pre>
 </div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Before 1.11 the function was named <code>eldev-use-local-dependency</code>.
+This name is still available for backward compatibility.
+</td>
+</tr>
+</table>
 </div>
 <div class="paragraph">
 <p>Note that the form <em>must not</em> be added to <code>Eldev</code>: other developers
@@ -1401,15 +1496,16 @@ who check out your project probably don’t even have a local copy of
 should really remain your own private setting and go to <code>Eldev-local</code>.</p>
 </div>
 <div class="paragraph">
-<p>Local dependencies have <em>loading modes</em>, just as the project’s package
+<p>Local sources have <em>loading modes</em>, just as the project’s package
 itself.  Those will be discussed <a href="#loading-modes">later</a>.</p>
 </div>
 <div class="paragraph">
-<p>Eldev correctly handles situations with changing definitions of local
-dependencies.  I.e. by simply commenting out or uncommenting
-<code>eldev-use-local-dependency</code> call, you can quickly test your project
-both with a MELPA-provided package and with a local dependency — Eldev
-will adapt without any additional work from you.</p>
+<p>Eldev correctly handles situations with adding, removing or otherwise
+changing local source definitions.  I.e. by simply commenting out or
+uncommenting <code>eldev-use-local-sources</code> call, you can quickly test your
+project both with a MELPA-provided package and with local (and
+presumably just changed) copy of its dependency sources — Eldev will
+adapt without any additional work from you.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1766,26 +1862,27 @@ cached copies of <code>archive-contents</code> stay valid.</p>
 <h2 id="loading-modes">Loading modes</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>In Eldev the project’s package and its local dependencies have
-<em>loading modes</em>.  This affects exactly how the package (that of the
-project or of its local dependency) becomes loadable by Emacs.</p>
+<p>In Eldev the project’s package and its <a href="#local-sources">local-source
+dependencies</a> have <em>loading modes</em>.  This affects exactly how the
+package (that of the project or of its local-source dependency)
+becomes loadable by Emacs.</p>
 </div>
 <div class="paragraph">
 <p>Default loading mode is called <code>as-is</code>.  It means the directory where
-project (or local dependency) is located is simply added to Emacs
-varible <code>load-path</code> and normal Emacs loading should be able to find
-required features from there on.  This is the fastest mode, since it
-requires no preparation and in most cases is basically what you want
-during development.</p>
+the project (or local sources of its dependency) is located is simply
+added to Emacs varible <code>load-path</code> and normal Emacs loading should be
+able to find required features from there on.  This is the fastest
+mode, since it requires no preparation and in most cases is basically
+what you want during development.</p>
 </div>
 <div class="paragraph">
 <p>However, users won’t have your project loaded like that.  To emulate
 the way that most of the people will use it, you can use loading mode
 <code>packaged</code>.  In this mode, Eldev will first build a package out of
-your project (or local dependency), then install and activate it using
-Emacs’ packaging system.  This is quite a bit slower than <code>as-is</code>,
-because it involves several preparation steps.  However, this is
-almost exactly the way normal users will use your project after
+your project (or local-source dependency), then install and activate
+it using Emacs’ packaging system.  This is quite a bit slower than
+<code>as-is</code>, because it involves several preparation steps.  However, this
+is almost exactly the way normal users will use your project after
 e.g. installing it from MELPA.  For this reason, this mode is
 recommended for <a href="#continuous-integration">continuous integration</a> and
 other forms of automated testing.</p>
@@ -1857,12 +1954,12 @@ this to your <code>Eldev-local</code>:</p>
 </div>
 </div>
 <div class="paragraph">
-<p>For local dependencies the mode can be chosen when calling
-<code>eldev-use-local-dependency</code>.  For example:</p>
+<p>For dependencies built from sources local to your machine the mode can
+be chosen when calling <code>eldev-use-local-sources</code>.  For example:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-local-dependency "~/barlib" 'packaged)</code></pre>
+<pre class="highlight"><code class="language-lisp" data-lang="lisp">(eldev-use-local-sources "~/barlib" 'packaged)</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1881,11 +1978,11 @@ You can always ask Eldev for a full list:</p>
 <h3 id="indirect-builds">Indirect build information</h3>
 <div class="paragraph">
 <p>When a loading mode require Eldev to do something in order to prepare
-the project or its local dependencies for loading, it tries to do so
-silently in that only stderr is normally displayed.  The purpose is to
-prevent secondary and partially unpredictable (more precisely,
-depending on previous builds) output from interfering with normal
-output.  For example, if you run</p>
+the project or its <a href="#local-sources">local-source dependencies</a> for
+loading, it tries to do so silently in that only stderr is normally
+displayed.  The purpose is to prevent secondary and partially
+unpredictable (more precisely, depending on previous builds) output
+from interfering with normal output.  For example, if you run</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1914,10 +2011,11 @@ a helper non-Elisp program.</p>
 </div>
 <div class="paragraph">
 <p>Unlike with some other settings, the main project ignores values in
-local dependencies.  Instead, <code>eldev-display-indirect-build-stdout</code> as
-defined in the main project affects both the project itself and all
-local dependencies at once: only the main project “knows” if it is
-important to avoid indirect build output for it or not.</p>
+its local-source dependencies.  Instead,
+<code>eldev-display-indirect-build-stdout</code> as defined in the main project
+affects both the project itself and all local sources at once: only
+the main project “knows” if it is important to avoid indirect build
+output for it or not.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1974,10 +2072,11 @@ functionality, or those that consist of a single file — don’t have any
 autoloading functions or other forms.</p>
 </div>
 <div class="paragraph">
-<p>Local dependencies also have their autoloads activated regardless of
-loading mode.  If the autoloads file is kept up-to-date using
-<a href="#autoloads-plugin">the plugin</a>, Eldev will take care to do this as
-needed in local dependencies too.</p>
+<p>Dependencies built from <a href="#local-sources">local sources</a> also have
+their autoloads activated regardless of loading mode.  If the
+autoloads file is kept up-to-date using <a href="#autoloads-plugin">the
+plugin</a>, Eldev will take care to do this as needed in these
+dependencies too.</p>
 </div>
 </div>
 </div>
@@ -2087,8 +2186,17 @@ printed.</p>
 </div>
 <div class="sect3">
 <h4 id="_target_cross_dependencies">Target cross-dependencies</h4>
-<div class="paragraph">
-<p>FIXME</p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<em>This feature is present in Eldev, but is not documented yet.</em>
+</td>
+</tr>
+</table>
 </div>
 </div>
 <div class="sect3">
@@ -2219,8 +2327,9 @@ can also reuse previous package file if Eldev says “up-to-date”.</p>
 <div class="paragraph">
 <p>You can use Eldev to byte-compile your project.  Indirectly, this can
 be done by <a href="#loading-modes">selecting appropriate loading mode</a> for
-the project or its local dependencies.  However, sometimes you might
-want to do this explicitly.  For this, use command <code>compile</code>:</p>
+the project or <a href="#local-sources">local-source dependencies</a>.  However,
+sometimes you might want to do this explicitly.  For this, use command
+<code>compile</code>:</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -4151,8 +4260,8 @@ this way, byte-compiling always has access to up-to-date list of
 autoloaded functions.</p>
 </div>
 <div class="paragraph">
-<p>This plugin can also be activated in projects you use as
-<a href="#local-dependencies">local dependencies</a> for other projects.  Eldev
+<p>This plugin can also be activated in projects used as
+<a href="#local-sources">local-source dependencies</a> for other projects.  Eldev
 knows how to keep the autoloads file up-to-date in all local
 dependencies, regardless of their <a href="#loading-modes">loading mode</a>.</p>
 </div>
@@ -5129,8 +5238,17 @@ function Elisp documentation for the syntax.</p>
 </div>
 <div class="sect2">
 <h3 id="_custom_test_runners">Custom test runners</h3>
-<div class="paragraph">
-<p>FIXME</p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<em>This feature is present in Eldev, but is not documented yet.</em>
+</td>
+</tr>
+</table>
 </div>
 </div>
 </div>
@@ -5251,7 +5369,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2024-12-07 21:09:37 UTC
+Last updated 2024-12-17 12:32:45 UTC
 </div>
 </div>
 </body>
