@@ -1,3 +1,4 @@
+[#initializing]
 == Initializing a project
 
 When Eldev starts up, it configures itself for the project in the

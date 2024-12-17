@@ -86,7 +86,7 @@ And a short explanation of various elements:
 
 ==== Target cross-dependencies
 
-FIXME
+NOTE: _This feature is present in Eldev, but is not documented yet._
 
 [#target-sets]
 ==== Target sets
@@ -187,8 +187,9 @@ can also reuse previous package file if Eldev says “up-to-date”.
 
 You can use Eldev to byte-compile your project.  Indirectly, this can
 be done by <<loading-modes,selecting appropriate loading mode>> for
-the project or its local dependencies.  However, sometimes you might
-want to do this explicitly.  For this, use command `compile`:
+the project or <<local-sources,local-source dependencies>>.  However,
+sometimes you might want to do this explicitly.  For this, use command
+`compile`:
 
     $ eldev compile
 

@@ -76,6 +76,7 @@
 :since-1-8: image:https://img.shields.io/badge/since-1.8-8be[Since 1.8,float=right]
 :since-1-9: image:https://img.shields.io/badge/since-1.9-8be[Since 1.9,float=right]
 :since-1-10: image:https://img.shields.io/badge/since-1.10-8be[Since 1.10,float=right]
+:since-1-11: image:https://img.shields.io/badge/since-1.11-8be[Since 1.11,float=right]
 
 
 toc::[]

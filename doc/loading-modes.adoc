@@ -1,24 +1,25 @@
 [#loading-modes]
 == Loading modes
 
-In Eldev the project’s package and its local dependencies have
-_loading modes_.  This affects exactly how the package (that of the
-project or of its local dependency) becomes loadable by Emacs.
+In Eldev the project’s package and its <<local-sources,local-source
+dependencies>> have _loading modes_.  This affects exactly how the
+package (that of the project or of its local-source dependency)
+becomes loadable by Emacs.
 
 Default loading mode is called `as-is`.  It means the directory where
-project (or local dependency) is located is simply added to Emacs
-varible `load-path` and normal Emacs loading should be able to find
-required features from there on.  This is the fastest mode, since it
-requires no preparation and in most cases is basically what you want
-during development.
+the project (or local sources of its dependency) is located is simply
+added to Emacs varible `load-path` and normal Emacs loading should be
+able to find required features from there on.  This is the fastest
+mode, since it requires no preparation and in most cases is basically
+what you want during development.
 
 However, users won’t have your project loaded like that.  To emulate
 the way that most of the people will use it, you can use loading mode
 `packaged`.  In this mode, Eldev will first build a package out of
-your project (or local dependency), then install and activate it using
-Emacs’ packaging system.  This is quite a bit slower than `as-is`,
-because it involves several preparation steps.  However, this is
-almost exactly the way normal users will use your project after
+your project (or local-source dependency), then install and activate
+it using Emacs’ packaging system.  This is quite a bit slower than
+`as-is`, because it involves several preparation steps.  However, this
+is almost exactly the way normal users will use your project after
 e.g. installing it from MELPA.  For this reason, this mode is
 recommended for <<continuous-integration,continuous integration>> and
 other forms of automated testing.
@@ -79,12 +80,12 @@ this to your `Eldev-local`:
 (setf eldev-project-loading-mode 'byte-compiled)
 ----
 
-For local dependencies the mode can be chosen when calling
-`eldev-use-local-dependency`.  For example:
+For dependencies built from sources local to your machine the mode can
+be chosen when calling `eldev-use-local-sources`.  For example:
 
 [source]
 ----
-(eldev-use-local-dependency "~/barlib" 'packaged)
+(eldev-use-local-sources "~/barlib" 'packaged)
 ----
 
 As mentioned above, loading mode defaults to `as-is`.
@@ -98,11 +99,11 @@ You can always ask Eldev for a full list:
 === Indirect build information
 
 When a loading mode require Eldev to do something in order to prepare
-the project or its local dependencies for loading, it tries to do so
-silently in that only stderr is normally displayed.  The purpose is to
-prevent secondary and partially unpredictable (more precisely,
-depending on previous builds) output from interfering with normal
-output.  For example, if you run
+the project or its <<local-sources,local-source dependencies>> for
+loading, it tries to do so silently in that only stderr is normally
+displayed.  The purpose is to prevent secondary and partially
+unpredictable (more precisely, depending on previous builds) output
+from interfering with normal output.  For example, if you run
 
     $ eldev eval "(some-project-function)"
 
@@ -121,10 +122,11 @@ involves some custom non-trivial build steps, like e.g. compilation of
 a helper non-Elisp program.
 
 Unlike with some other settings, the main project ignores values in
-local dependencies.  Instead, `eldev-display-indirect-build-stdout` as
-defined in the main project affects both the project itself and all
-local dependencies at once: only the main project “knows” if it is
-important to avoid indirect build output for it or not.
+its local-source dependencies.  Instead,
+`eldev-display-indirect-build-stdout` as defined in the main project
+affects both the project itself and all local sources at once: only
+the main project “knows” if it is important to avoid indirect build
+output for it or not.
 
 [#source-directory]
 === Project source directory
@@ -174,7 +176,8 @@ that many projects — especially those not providing user-visible
 functionality, or those that consist of a single file — don’t have any
 autoloading functions or other forms.
 
-Local dependencies also have their autoloads activated regardless of
-loading mode.  If the autoloads file is kept up-to-date using
-<<autoloads-plugin,the plugin>>, Eldev will take care to do this as
-needed in local dependencies too.
+Dependencies built from <<local-sources,local sources>> also have
+their autoloads activated regardless of loading mode.  If the
+autoloads file is kept up-to-date using <<autoloads-plugin,the
+plugin>>, Eldev will take care to do this as needed in these
+dependencies too.
