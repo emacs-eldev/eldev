@@ -552,7 +552,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#extending-eldev">Extending Eldev</a>
 <ul class="sectlevel2">
 <li><a href="#hooks">Hooks</a></li>
-<li><a href="#_writing_builders">Writing builders</a></li>
+<li><a href="#custom-builders">Writing builders</a></li>
 <li><a href="#_adding_commands_and_options">Adding commands and options</a></li>
 <li><a href="#_custom_test_runners">Custom test runners</a></li>
 </ul>
@@ -706,10 +706,10 @@ former to automatically use proper dependencies in Eldev projects.
 <h3 id="example-projects">Example projects</h3>
 <div class="paragraph">
 <p>Here is a non-exhaustive list of projects that use Eldev and can serve
-as examples.  I intentionally list only my own projects, even if there
-are others, because this way it’s easier to ensure that the comments
-below stay valid.  Eldev source code itself comes with no examples: I
-think real-world usage provides better models.</p>
+as examples.  I intentionally list mostly my own projects, even if
+there are plenty of others, because this way it’s easier to ensure
+that the comments below stay valid.  Eldev source code itself comes
+with no examples: I think real-world usage provides better models.</p>
 </div>
 <div class="dlist">
 <dl>
@@ -742,6 +742,17 @@ extracting information from Java core libraries; and 2) comparing
 <code>datetime</code>’s results against a Java implementation during
 testing.  It also uses <code>extmap</code> to generate resource files that
 are later included in its package.</p>
+</dd>
+<dt class="hdlist1"><a href="https://github.com/szermatt/mistty">MisTTY</a>; its file <a href="https://github.com/szermatt/mistty/blob/master/Eldev"><code>Eldev</code></a>; its file <a href="https://github.com/szermatt/mistty/blob/master/.github/workflows/CI.yml"><code>.github/workflows/CI.yml</code></a></dt>
+<dd>
+<p>A relatively large external project that uses lots of Eldev
+features, including <a href="#additional-dependencies">additional
+dependencies</a>, <a href="#autoloads-plugin"><code>autoloads</code></a> and
+<a href="#maintainer-plugin"><code>maintainer</code></a> plugins (with advanced
+configuration), custom <a href="#custom-options">options</a> and
+<a href="#custom-builders">builders</a> and likely something else I didn’t
+notice.  As of January 2025, its file <code>Eldev</code> is over 130 lines
+long!</p>
 </dd>
 </dl>
 </div>
@@ -4839,7 +4850,7 @@ can <code>require</code> features from the project.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_writing_builders">Writing builders</h3>
+<h3 id="custom-builders">Writing builders</h3>
 <div class="paragraph">
 <p>Eldev build system provides standard builders that cover all basic
 needs of Elisp packages.  However, some projects have uncommon build
@@ -5128,7 +5139,7 @@ strings.  The example command above just parrots the parameters back
 at user, in accordance to its name.</p>
 </div>
 <div class="sect3">
-<h4 id="_defining_options">Defining options</h4>
+<h4 id="custom-options">Defining options</h4>
 <div class="paragraph">
 <p>You have probably noticed that the command function we’ve defined
 doesn’t accept any options.  In fact, this is true for all commands in
@@ -5369,7 +5380,7 @@ reports for Elisp code; also see Coveralls above.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2024-12-17 12:32:45 UTC
+Last updated 2025-01-01 22:08:32 UTC
 </div>
 </div>
 </body>
