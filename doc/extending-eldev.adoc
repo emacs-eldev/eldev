@@ -62,6 +62,7 @@ Functions for many of the hooks listed below do receive arguments.
     additional set `test` will have been loaded already, so functions
     can `require` features from the project.
 
+[#custom-builders]
 === Writing builders
 
 Eldev build system provides standard builders that cover all basic
@@ -304,6 +305,7 @@ corresponding function, passing all remaining parameters to it as
 strings.  The example command above just parrots the parameters back
 at user, in accordance to its name.
 
+[#custom-options]
 ==== Defining options
 
 You have probably noticed that the command function we’ve defined

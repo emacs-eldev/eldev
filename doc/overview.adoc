@@ -61,10 +61,10 @@ former to automatically use proper dependencies in Eldev projects.
 === Example projects
 
 Here is a non-exhaustive list of projects that use Eldev and can serve
-as examples.  I intentionally list only my own projects, even if there
-are others, because this way it’s easier to ensure that the comments
-below stay valid.  Eldev source code itself comes with no examples: I
-think real-world usage provides better models.
+as examples.  I intentionally list mostly my own projects, even if
+there are plenty of others, because this way it’s easier to ensure
+that the comments below stay valid.  Eldev source code itself comes
+with no examples: I think real-world usage provides better models.
 
 {uri-extmap}[`extmap`]; its file {uri-extmap}/blob/master/Eldev[`Eldev`]; its file {uri-extmap}/blob/master/.github/workflows/test.yml[`.github/workflows/test.yml`]::
 
@@ -95,6 +95,17 @@ think real-world usage provides better models.
     ``datetime``’s results against a Java implementation during
     testing.  It also uses `extmap` to generate resource files that
     are later included in its package.
+
+{uri-mistty}[MisTTY]; its file {uri-mistty}/blob/master/Eldev[`Eldev`]; its file {uri-mistty}/blob/master/.github/workflows/CI.yml[`.github/workflows/CI.yml`]::
+
+    A relatively large external project that uses lots of Eldev
+    features, including <<#additional-dependencies,additional
+    dependencies>>, <<#autoloads-plugin,`autoloads`>> and
+    <<#maintainer-plugin,`maintainer`>> plugins (with advanced
+    configuration), custom <<#custom-options,options>> and
+    <<#custom-builders,builders>> and likely something else I didn’t
+    notice.  As of January 2025, its file `Eldev` is over 130 lines
+    long!
 
 All these projects also use <<continuous-integration,continuous
 integration>> on <<github-workflows,GitHub>> for automated testing.

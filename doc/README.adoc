@@ -47,6 +47,7 @@
 :uri-iter2: https://github.com/doublep/iter2
 :uri-logview: https://github.com/doublep/logview
 :uri-datetime: https://github.com/doublep/datetime
+:uri-mistty: https://github.com/szermatt/mistty
 :uri-docker-emacs: https://github.com/Silex/docker-emacs
 :uri-docker-emacs-images: https://github.com/Silex/docker-emacs#images
 :uri-release-it: https://github.com/release-it/release-it
