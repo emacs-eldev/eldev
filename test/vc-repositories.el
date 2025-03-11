@@ -282,5 +282,23 @@
                             "prepare")
         (should (= exit-code 0))))))
 
+(eldev-ert-defargtest eldev-vc-repositories-with-source-dirs (set-using-setup)
+                      (nil t)
+  (eldev--test-with-temp-copy "dependency-d" 'Git
+    (let* ((dependency-d-dir    eldev--test-project)
+           (eldev--test-project "vc-dep-project-d"))
+      ;; `dependency-d' actually has file `Eldev', where it declares that the sources can be found in
+      ;; subdirectory `lisp'.  Optionally, we also test that this information can be supplied via `:setup'
+      ;; form passed through `eldev-use-vc-repository', see issue #114.
+      (when set-using-setup
+        (let ((default-directory dependency-d-dir))
+          (delete-file "Eldev")
+          (eldev-call-process (eldev-git-executable) `("commit" "Eldev" "--message=remove file 'Eldev'"))))
+      (eldev--test-delete-cache)
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-d :git ,dependency-d-dir
+                                                                ,@(when set-using-setup `(:setup `(setf eldev-project-source-dirs "lisp"))))
+                            "prepare")
+        (should (= exit-code 0))))))
+
 
 (provide 'test/vc-repositories)
