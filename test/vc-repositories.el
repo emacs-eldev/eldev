@@ -261,4 +261,26 @@
         (should (= exit-code 0))))))
 
 
+(ert-deftest eldev-vc-repositories-setup-form ()
+  (eldev--test-with-temp-copy "dependency-b" 'Git
+    (let* ((dependency-b-dir    eldev--test-project)
+           (eldev--test-project "vc-dep-project-c"))
+      (eldev--test-delete-cache)
+      ;; It's not enough to provide `dependency-b', because it doesn't explain where to find its own
+      ;; dependencies (it needs `dependency-a'), so Eldev cannot build a package out of it.
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-b :git ,dependency-b-dir)
+                            ;; This `eldev-use-package-archive' call applies to outer Eldev (for
+                            ;; `vc-dep-project-c'), so it doesn't help the inner Eldev.
+                            "--setup" `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
+                            "prepare")
+        (should (string-match-p "dependency-a.+not available" stderr))
+        (should (= exit-code 1)))
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-b :git ,dependency-b-dir
+                                                                ;; But this can be resolved by providing `:setup' to `eldev-use-vc-repository' call.
+                                                                :setup `(eldev-use-package-archive '("archive-a" . ,(expand-file-name "../package-archive-a"))))
+                            "--setup" `(eldev-use-package-archive `("archive-a" . ,(expand-file-name "../package-archive-a")))
+                            "prepare")
+        (should (= exit-code 0))))))
+
+
 (provide 'test/vc-repositories)
