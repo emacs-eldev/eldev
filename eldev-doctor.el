@@ -1,6 +1,6 @@
 ;;; eldev-doctor.el --- Elisp development tool  -*- lexical-binding: t -*-
 
-;;; Copyright (C) 2022, 2023, 2024 Paul Pogonyshev
+;;; Copyright (C) 2022, 2023, 2024, 2025 Paul Pogonyshev
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
