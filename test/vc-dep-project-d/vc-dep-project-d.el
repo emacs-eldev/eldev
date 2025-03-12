@@ -1,4 +1,4 @@
-;;; vc-dep-project-c.el --- Test project with one dependency fetched from Git  -*- lexical-binding: t -*-
+;;; vc-dep-project-d.el --- Test project with one dependency fetched from Git  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/
