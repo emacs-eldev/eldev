@@ -53,6 +53,12 @@
   ;; And only now gone completely.
   (should (equal (eldev--test-internals-inc 5) 6)))
 
+(ert-deftest eldev--ensure-function ()
+  (let ((have-lisp-data-mode (fboundp 'lisp-data-mode)))
+    (eldev--ensure-function lisp-data-mode (lambda ())
+      (should (fboundp 'lisp-data-mode)))
+    (should (eq (fboundp 'lisp-data-mode) have-lisp-data-mode))))
+
 
 (defmacro eldev--test-target-dependencies (&rest body)
   (declare (indent 0))

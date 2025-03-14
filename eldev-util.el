@@ -190,6 +190,18 @@ Since 1.2."
          (when ,fn
            (remove-hook 'kill-emacs-hook ,fn))))))
 
+;; May later make public, like `eldev-advised'.  For now only on usecase.
+(defmacro eldev--ensure-function (function if-missing &rest body)
+  (declare (indent 2) (debug (symbolp sexp body)))
+  (let ((present (make-symbol "$present")))
+    `(let ((,present (fboundp ',function)))
+       (unless ,present
+         (fset ',function ,if-missing))
+       (unwind-protect
+           ,(macroexp-progn body)
+         (unless ,present
+           (fmakunbound ',function))))))
+
 
 (defsubst eldev-listify (x)
   "Make a list out of X.

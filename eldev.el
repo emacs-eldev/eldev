@@ -2801,7 +2801,11 @@ Since 0.2."
                                                                                                                                 (when (and flag (not (file-symlink-p filename)))
                                                                                                                                   (setf flag nil))
                                                                                                                                 (funcall original filename mode flag))))
-                                                                                      (package-install-from-archive dependency)))
+                                                                                      ;; GNU ELPA (e.g. in March 2025) itself provides packages that are not installable on older
+                                                                                      ;; Emacs versions because those lack `lisp-data-mode' and the mode is referred to in
+                                                                                      ;; e.g. `dash-pkg.el'.  Work around by temporarily providing a dummy function with that name.
+                                                                                      (eldev--ensure-function lisp-data-mode (lambda ())
+                                                                                        (package-install-from-archive dependency))))
                                                                                 (when (eq dependency-name 'eldev)
                                                                                   ;; Reload the current package again, so that we
                                                                                   ;; don't mix old and new function invocations.
