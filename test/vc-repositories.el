@@ -301,4 +301,18 @@
         (should (= exit-code 0))))))
 
 
+(ert-deftest eldev-vc-repositories-wrong-package ()
+  (eldev--test-with-temp-copy "dependency-e" 'Git
+    (let ((dependency-e-dir    eldev--test-project)
+          (eldev--test-project "vc-dep-project-a"))
+      (eldev--test-delete-cache)
+      ;; Make sure that such misconfiguration, i.e. when the repository doesn't provide the "promised"
+      ;; package, are caught early and result in an understandable failure.
+      (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-e-dir)
+                            "prepare")
+        (should (string-match-p (rx-to-string `(seq ,dependency-e-dir (0+ any) "failed to provide" (0+ any) "dependency-a")) stderr))
+        (should (string-match-p (rx "repository contains package" (0+ any) "dependency-e") stderr))
+        (should (= exit-code 1))))))
+
+
 (provide 'test/vc-repositories)

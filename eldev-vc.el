@@ -249,6 +249,10 @@ Will be nil if no such repository was registered or
         (when commit
           (setf tag+version (eldev--vc-pick-release-tag release-tag-regexp))))
       (let ((package (eldev-package-descriptor dir)))
+        (unless (eq (package-desc-name package) (car repository))
+          (signal 'eldev-error `(:hint ("This package was expected due to a call to `eldev-use-vc-repository'
+However, the repository contains package `%s' instead" ,(package-desc-name package))
+                                 "VC repository `%s' failed to provide package `%s'" ,(eldev--vc-repository-name repository) ,(car repository))))
         (if tag+version
             (setf (package-desc-version package) (cdr tag+version))
           (eldev-call-process (eldev-git-executable) `("--no-pager" "log" "-1" "--no-color" "--format=%cI" "--no-patch")
