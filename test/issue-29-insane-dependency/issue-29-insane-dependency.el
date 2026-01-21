@@ -1,4 +1,4 @@
-;;; issue-29-insane-dependency.el --- A dependency that wants insanely new Emacs
+;;; issue-29-insane-dependency.el --- A dependency that wants insanely new Emacs  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

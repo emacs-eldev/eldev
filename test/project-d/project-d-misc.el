@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'project-d-util)
 
 (defun project-d-misc-hello ()

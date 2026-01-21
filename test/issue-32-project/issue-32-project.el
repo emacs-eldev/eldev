@@ -1,4 +1,4 @@
-;;; issue-32-project.el --- A project that needs Org newer than what is built into Emacs
+;;; issue-32-project.el --- A project that needs Org newer than what is built into Emacs  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

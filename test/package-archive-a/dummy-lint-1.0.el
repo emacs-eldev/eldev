@@ -1,4 +1,4 @@
-;;; dummy-lint-a.el --- Dummy linter
+;;; dummy-lint-a.el --- Dummy linter  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 

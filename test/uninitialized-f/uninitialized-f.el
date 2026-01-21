@@ -1,4 +1,4 @@
-;;; uninitialized-f.el --- Uninitialized project without dependencies and with autoloads
+;;; uninitialized-f.el --- Uninitialized project without dependencies and with autoloads  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

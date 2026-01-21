@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'project-l-util)
 
 ;;;###autoload

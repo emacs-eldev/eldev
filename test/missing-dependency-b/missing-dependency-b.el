@@ -1,4 +1,4 @@
-;;; missing-dependency-b.el --- Test project with an unavailable dependency
+;;; missing-dependency-b.el --- Test project with an unavailable dependency  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-b)

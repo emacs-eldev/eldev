@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t -*-
 (require 'missing-dependency-a)
 (require 'ert)
 

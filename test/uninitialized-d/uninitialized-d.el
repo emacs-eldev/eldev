@@ -1,4 +1,4 @@
-;;; uninitialized-d.el --- Uninitialized project with three dependencies
+;;; uninitialized-d.el --- Uninitialized project with three dependencies  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

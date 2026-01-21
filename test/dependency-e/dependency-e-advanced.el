@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t -*-
 (defun dependency-e-hello-to (whom)
   (format "Hello, %s!" whom))
 

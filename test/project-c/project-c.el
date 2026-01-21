@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t -*-
 ;;; Copyright (C) 2000 John Doe
 (require 'dependency-a)
 

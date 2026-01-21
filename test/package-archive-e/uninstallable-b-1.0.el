@@ -1,4 +1,4 @@
-;;; uninstallable-b.el --- Uninstallable package B
+;;; uninstallable-b.el --- Uninstallable package B  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (unknown-dependency)

@@ -1,4 +1,4 @@
-;;; project-l.el --- Test project where source code is contained in a subdirectory of project root; and with autoloads
+;;; project-l.el --- Test project where source code is contained in a subdirectory of project root; and with autoloads  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: ((dependency-a "0.1") (dependency-d "1.0"))

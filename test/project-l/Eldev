@@ -1,3 +1,5 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 (setf eldev-project-source-dirs '("src" "resources")
       eldev-files-to-package `(:or ,eldev-files-to-package '("resources/**/*.txt")))
 

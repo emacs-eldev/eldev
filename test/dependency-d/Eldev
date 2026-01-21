@@ -1,3 +1,5 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 (setf eldev-project-source-dirs "lisp")
 
 (eldev-use-plugin 'autoloads)

@@ -1,4 +1,4 @@
-;;; org.el --- Fake of an Org snapshot
+;;; org.el --- Fake of an Org snapshot  -*- lexical-binding: t -*-
 
 ;; Version: 99999999.9999
 

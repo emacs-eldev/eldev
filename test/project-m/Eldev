@@ -1,1 +1,3 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 (setf eldev-test-framework 'doctest)

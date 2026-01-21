@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'project-e-util)
 
 ;; This macro and the next function are only needed so that the file

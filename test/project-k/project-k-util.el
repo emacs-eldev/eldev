@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (defun project-k-util-hello ()
   "Hello")
 

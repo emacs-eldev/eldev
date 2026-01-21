@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (defmacro project-f-with-errors-2-identity (x)
   x)
 

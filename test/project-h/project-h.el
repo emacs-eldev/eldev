@@ -1,4 +1,4 @@
-;;; project-h.el --- Test project with one dependency, a stable/unstable archive and Ecukes tests
+;;; project-h.el --- Test project with one dependency, a stable/unstable archive and Ecukes tests  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

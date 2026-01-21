@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'test-g-util)
 
 (ert-deftest project-g-1 ()

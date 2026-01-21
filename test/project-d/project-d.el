@@ -1,4 +1,4 @@
-;;; project-d.el --- Test project with several cross-depending `.el' files
+;;; project-d.el --- Test project with several cross-depending `.el' files  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: ((dependency-a "0.1"))

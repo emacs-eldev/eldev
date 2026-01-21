@@ -1,4 +1,4 @@
-;;; dependency-c.el --- Dependency test package C
+;;; dependency-c.el --- Dependency test package C  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-a)

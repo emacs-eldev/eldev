@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'f)
 
 (defvar project-h-support-path

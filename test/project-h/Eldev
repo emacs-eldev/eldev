@@ -1,3 +1,5 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 ;; This tests stable/unstable archives like MELPA, without needing to access the internet.
 (eldev-use-package-archive `(:stable   ("archive-a" . ,(expand-file-name "../package-archive-a"))
                              :unstable ("archive-b" . ,(expand-file-name "../package-archive-b"))))

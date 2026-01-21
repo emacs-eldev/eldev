@@ -1,4 +1,4 @@
-;;; project-e.el --- Test project with several cross-depending `.el' files and macros; and with Buttercup tests
+;;; project-e.el --- Test project with several cross-depending `.el' files and macros; and with Buttercup tests  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-a)

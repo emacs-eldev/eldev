@@ -1,3 +1,5 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 ;; This tests Eldev forwarding to spawned Emacs processes, see `eldev emacs'.  In real use
 ;; e.g. `eldev-require-version' needs this.
 (unless (eldev-find-package-descriptor 'eldev nil t)

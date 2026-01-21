@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 ;;;###autoload
 (defun project-i-hello-to (whom)
   (format "Hello, %s!" whom))

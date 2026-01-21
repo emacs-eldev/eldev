@@ -1,1 +1,3 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
 ;; Not using any archives, so the dependency cannot be found normally.

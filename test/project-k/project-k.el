@@ -1,4 +1,4 @@
-;;; project-k.el --- Test project with two files that both make byte-compiler issue warnings.
+;;; project-k.el --- Test project with two files that both make byte-compiler issue warnings.  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 

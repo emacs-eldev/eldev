@@ -1,4 +1,4 @@
-;;; uninitialized-c.el --- Uninitialized project with one dependency
+;;; uninitialized-c.el --- Uninitialized project with one dependency  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

@@ -1,4 +1,4 @@
-;;; dependency-d.el --- Dependency test package D with a special source directory
+;;; dependency-d.el --- Dependency test package D with a special source directory  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 

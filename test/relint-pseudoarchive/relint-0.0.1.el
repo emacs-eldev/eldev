@@ -1,4 +1,4 @@
-;;; relint.el --- Fake of `relint' tool
+;;; relint.el --- Fake of `relint' tool  -*- lexical-binding: t -*-
 
 ;; Version: 0.0.1
 

@@ -1,4 +1,4 @@
-;;; misc-a.el --- Miscellaneous package A
+;;; misc-a.el --- Miscellaneous package A  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 

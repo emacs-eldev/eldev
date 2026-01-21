@@ -1,4 +1,4 @@
-;;; uninitialized-a.el --- Uninitialized project without dependencies
+;;; uninitialized-a.el --- Uninitialized project without dependencies  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'dependency-a)
 
 ;; This macro and the next function are only needed so that the file

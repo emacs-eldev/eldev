@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'dependency-a)
 
 (defun project-l-util-hello ()

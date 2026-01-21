@@ -1,4 +1,4 @@
-;;; project-f.el --- Test project with several erroneous `.el' files
+;;; project-f.el --- Test project with several erroneous `.el' files  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (dependency-a)

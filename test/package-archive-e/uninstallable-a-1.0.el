@@ -1,4 +1,4 @@
-;;; uninstallable-a.el --- Uninstallable package A
+;;; uninstallable-a.el --- Uninstallable package A  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: ((emacs "999999"))

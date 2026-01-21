@@ -1,4 +1,4 @@
-;;; dependency-org.el --- A dummy package that depends on Org
+;;; dependency-org.el --- A dummy package that depends on Org  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Package-Requires: (org)

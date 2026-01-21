@@ -1,4 +1,4 @@
-;;; project-g.el --- Test project with circular but valid `require's
+;;; project-g.el --- Test project with circular but valid `require's  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 

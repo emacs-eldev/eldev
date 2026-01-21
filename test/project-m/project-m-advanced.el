@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (defvar project-m-hello-to-verb "Hello")
 
 (defun project-m-hello-to (whom)

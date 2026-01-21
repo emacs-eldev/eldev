@@ -1,4 +1,4 @@
-;;; issue-18-project.el --- A project that wants insanely new `Org'
+;;; issue-18-project.el --- A project that wants insanely new `Org'  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

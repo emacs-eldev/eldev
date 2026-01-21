@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (require 'vc-dep-project-b)
 (require 'ert)
 

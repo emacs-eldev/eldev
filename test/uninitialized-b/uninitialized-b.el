@@ -1,4 +1,4 @@
-;;; uninitialized-b.el --- Uninitialized project with two dependencies
+;;; uninitialized-b.el --- Uninitialized project with two dependencies  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
 ;; Homepage: https://example.com/

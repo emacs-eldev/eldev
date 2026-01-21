@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t -*-
+
 (defun project-f-no-errors-2 ()
   2)
 

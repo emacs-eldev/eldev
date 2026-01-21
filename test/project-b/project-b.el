@@ -1,4 +1,4 @@
-;;; project-b.el --- Test project with one dependency that has its own dependency in turn; also with "manual"!
+;;; project-b.el --- Test project with one dependency that has its own dependency in turn; also with "manual"!  -*- lexical-binding: t -*-
 
 ;;; Copyright (C) 2999 John Doe
 
