@@ -1,7 +1,7 @@
 ;;; project-d.el --- Test project with several cross-depending `.el' files  -*- lexical-binding: t -*-
 
 ;; Version: 1.0
-;; Package-Requires: ((dependency-a "0.1"))
+;; Package-Requires: ((emacs "24.1") (dependency-a "0.1"))
 ;; Homepage: https://example.com/
 
 ;;; Commentary:
