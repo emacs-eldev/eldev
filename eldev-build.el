@@ -598,13 +598,13 @@ possible to build arbitrary targets this way."
            (puthash target (if succeeded 'built 'failed) eldev--build-results)))))))
 
 
+(require 'bytecomp)
 (defconst eldev--have-byte-compile-warning-function (boundp 'byte-compile-log-warning-function))
 
 (defvar eldev--recursive-byte-compilation   nil)
 (defvar eldev--recursive-elevated-errors-in nil)
 
 (defun eldev--byte-compile-.el (source target)
-  (eval-and-compile (require 'bytecomp))
   (let* ((recursive                           eldev--recursive-byte-compilation)
          (eldev--recursive-byte-compilation   t)
          (eldev--recursive-elevated-errors-in (if recursive eldev--recursive-elevated-errors-in (list nil)))

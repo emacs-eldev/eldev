@@ -76,6 +76,14 @@
                                       (if indent `(eldev-nest-debugging-output this-variable-is-not-bound) `this-variable-is-not-bound))
     (let ((lines (eldev--test-backtrace-lines stderr)))
       (should (string= stdout ""))
+      ;; Up until Emacs 30 it would terminate on "debugging" an error in noninteractive mode, i.e. the
+      ;; backtrace was the only thing in the output.  Starting with Emacs 31 control is given back to
+      ;; `condition-case' handler (which is actually useful), and the handler prints the error message and
+      ;; some hints.  Trim such output, `--backtrace=30' is not supposed to limit its width.
+      (let ((num-trimmed 0))
+        (while (and (<= num-trimmed 5) (>= (length (car (last lines))) 30))
+          (setf lines       (butlast lines)
+                num-trimmed (1+ num-trimmed))))
       (should (eldev-all-p (<  (length it) 30) lines))
       (should (eldev-any-p (>= (length it) 29) lines))
       ;; Backtraces that are a result of an error must never be indented.
