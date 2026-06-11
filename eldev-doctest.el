@@ -39,6 +39,9 @@
   "Run Doctest tests in specified FILES."
   (when eldev-test-stop-on-unexpected
     (eldev-warn "Option `--stop-on-unexpected' (`-s') is not supported with Doctest framework"))
+  ;; At least on Emacs 31 Doctest fails otherwise.  Of course, it's rather the tester that should do this, not
+  ;; us, but I doubt its development is alive anyway.
+  (require 'bytecomp)
   ;; Unlike with other testing frameworks, the feature here is not required by the test
   ;; files: those files are the same as program's source.
   (eldev--require-external-feature 'doctest)
