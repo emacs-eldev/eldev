@@ -474,7 +474,7 @@ afterwards, directory creation is skipped."
   ;; up) to avoid making tests depend on its correctness.
   (let (files)
     (if (fboundp #'directory-files-recursively)
-        (dolist (file (directory-files-recursively directory (rx (1+ any))))
+        (dolist (file (directory-files-recursively directory (rx (1+ nonl))))
           (let ((relative-name (file-relative-name file directory)))
             (unless (string-match-p (rx "." (or "eldev" "git") "/") relative-name)
               (push relative-name files))))
@@ -565,14 +565,14 @@ afterwards, directory creation is skipped."
     (let ((lines (eldev--test-line-list stderr)))
       (while lines
         (let ((line (pop lines)))
-          (when (and (string-match-p (rx "Emacs version" (+ any) "required" (+ any)) line)
+          (when (and (string-match-p (rx "Emacs version" (+ nonl) "required" (+ nonl)) line)
                      (and lines (string-match-p "required as a development tool" (car lines))))
             (ert-skip line)))))))
 
 (defun eldev--test-skip-if-missing-linter (exit-code stderr)
   (unless (= exit-code 0)
     (dolist (line (eldev--test-line-list stderr))
-      (when (string-match-p (rx "Emacs version" (+ any) "required" (+ any) "cannot use linter") line)
+      (when (string-match-p (rx "Emacs version" (+ nonl) "required" (+ nonl) "cannot use linter") line)
         (ert-skip line)))))
 
 

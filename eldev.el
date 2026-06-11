@@ -2870,7 +2870,7 @@ Since 0.2."
   ;; to hooks etc., even if we don't directly call any functions before loading again.
   ;; However, the intent is not really to unload, but rather to _reload_ the package, so
   ;; just removing the features from the list of loaded ones should be enough.
-  (setf features (eldev-filter (not (string-match-p (rx bol "eldev" (? "-" (1+ any)) eol) (symbol-name it))) features)))
+  (setf features (eldev-filter (not (string-match-p (rx bol "eldev" (? "-" (1+ nonl)) eol) (symbol-name it))) features)))
 
 (defun eldev--do-activate-dependencies (package-name dependencies additional-sets no-error-if-missing)
   ;; Also add the additional loading roots here.

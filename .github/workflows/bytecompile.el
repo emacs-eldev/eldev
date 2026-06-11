@@ -1,3 +1,4 @@
+;;  -*- lexical-binding: t -*-
 (progn
   (require 'bytecomp)
   (let ((byte-compile-warnings      '(not docstrings))

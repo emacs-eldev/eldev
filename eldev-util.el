@@ -1172,7 +1172,7 @@ Since 0.11."
       (condition-case error
           (push (read (current-buffer)) forms)
         (error (signal 'eldev-error `("When reading %s: %s" ,description ,(error-message-string error)))))
-      (while (looking-at (rx (: (or (1+ whitespace) (: ";" (1+ any))))))
+      (while (looking-at (rx (: (or (1+ whitespace) (: ";" (1+ nonl))))))
         (goto-char (match-end 0))
         (when (eolp)
           (forward-line))))

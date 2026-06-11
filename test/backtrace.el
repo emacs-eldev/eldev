@@ -97,7 +97,7 @@
                       (0 1000)
   (let ((message "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."))
     (eldev--test-run "trivial-project" ("--debug" (format "--backtrace=%d" limit) "eval" `(error ,message))
-      (should (string-match-p (rx-to-string `(seq bol "Debugger entered" (1+ any) ,message)) stderr))
+      (should (string-match-p (rx-to-string `(seq bol "Debugger entered" (1+ nonl) ,message)) stderr))
       (should (/= exit-code 0)))))
 
 

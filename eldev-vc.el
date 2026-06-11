@@ -173,7 +173,7 @@ Since 1.2."
           (setf branch (replace-regexp-in-string (rx bol "^/") "" branch))
           ;; Relative URL can be e.g. `^/myfaces/core/branches/1.2.x/api', because
           ;; Subversion has a pretty insane notion of a "branch".
-          (setf branch (replace-regexp-in-string (rx bol (0+ any) "/" (group (| "trunk" "branches" "tags") (| "/" eos))) "\\1" branch)))
+          (setf branch (replace-regexp-in-string (rx bol (0+ nonl) "/" (group (| "trunk" "branches" "tags") (| "/" eos))) "\\1" branch)))
         branch))))
 
 (defun eldev-vc-create-tag (name &optional project-dir)
@@ -195,7 +195,7 @@ Since 1.2."
 
 ;; Working with VC repositories to fetch packages.
 
-(defvar eldev-vc-default-release-tag-regexp (rx bos (| "" "v") (group digit (0+ any)) eos))
+(defvar eldev-vc-default-release-tag-regexp (rx bos (| "" "v") (group digit (0+ nonl)) eos))
 
 (defvar eldev--vc-repository-packages nil
   "Alist of `(NAME . PKG-DESCRIPTOR).")

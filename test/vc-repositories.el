@@ -310,8 +310,8 @@
       ;; package, are caught early and result in an understandable failure.
       (eldev--test-run nil ("--setup" `(eldev-use-vc-repository 'dependency-a :git ,dependency-e-dir)
                             "prepare")
-        (should (string-match-p (rx-to-string `(seq ,dependency-e-dir (0+ any) "failed to provide" (0+ any) "dependency-a")) stderr))
-        (should (string-match-p (rx "repository contains package" (0+ any) "dependency-e") stderr))
+        (should (string-match-p (rx-to-string `(seq ,dependency-e-dir (0+ nonl) "failed to provide" (0+ nonl) "dependency-a")) stderr))
+        (should (string-match-p (rx "repository contains package" (0+ nonl) "dependency-e") stderr))
         (should (= exit-code 1))))))
 
 
