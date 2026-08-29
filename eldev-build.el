@@ -110,41 +110,46 @@ information past the list of sources.  For this, use function
     standard-filesets))
 
 (defun eldev--build-find-builder-invocations (sources builder builder-name)
-  (let ((target-rule (eldev-get builder :targets))
-        invocations
-        ignored-targets)
-    (when (functionp target-rule)
-      (setf target-rule (funcall target-rule sources)))
-    (dolist (invocation (pcase target-rule
-                          ((pred stringp)
-                           `((,sources . (,target-rule))))
-                          ((pred eldev-string-list-p)
-                           `((,sources . ,target-rule)))
-                          (`(,(and (or (pred stringp) (pred eldev-string-list-p)) source-suffixes) -> ,(and (pred stringp) target-suffix))
-                           (setf source-suffixes (eldev-listify source-suffixes))
-                           (let (result)
-                             (dolist (source sources)
-                               (let ((scan source-suffixes)
-                                     found)
-                                 (while scan
-                                   (let ((source-suffix (pop scan)))
-                                     (when (string-suffix-p source-suffix source)
-                                       (push `((,source) . (,(eldev-replace-suffix source source-suffix target-suffix))) result)
-                                       (setf scan  nil
-                                             found t))))
-                                 (unless found
-                                   (error "Builder `%s': name of source file `%s' doesn't end with %s as `:targets' wants"
-                                          builder-name source (eldev-message-enumerate nil source-suffixes nil nil "or")))))
-                             (nreverse result)))
-                          (_ (error "Invalid `:targets' (or its return value) %S in builder `%s'" target-rule builder-name))))
-      ;; Discard builder's wishes that match `eldev-build-ignored-target-fileset'.
-      (let* ((targets (cdr invocation))
-             (ignored (when eldev-build-ignored-target-fileset
-                        (eldev-filter-files targets eldev-build-ignored-target-fileset))))
-        (when ignored
-          (setf ignored-targets (append ignored-targets ignored)))
-        (when (> (length targets) (length ignored))
-          (push `(,(car invocation) . ,(eldev-filter (not (member it ignored)) targets)) invocations))))
+  (let* ((target-rule (eldev-get builder :targets))
+         (function    (functionp target-rule))
+         invocations
+         ignored-targets)
+    (eldev-named-step nil (eldev-format-message "finding targets of builder `%s'" builder-name)
+      (when function
+        (setf target-rule (funcall target-rule sources)))
+      (dolist (invocation (pcase target-rule
+                            ((pred stringp)
+                             `((,sources . (,target-rule))))
+                            ((pred eldev-string-list-p)
+                             `((,sources . ,target-rule)))
+                            (`(,(and (or (pred stringp) (pred eldev-string-list-p)) source-suffixes) -> ,(and (pred stringp) target-suffix))
+                             (setf source-suffixes (eldev-listify source-suffixes))
+                             (let (result)
+                               (dolist (source sources)
+                                 (let ((scan source-suffixes)
+                                       found)
+                                   (while scan
+                                     (let ((source-suffix (pop scan)))
+                                       (when (string-suffix-p source-suffix source)
+                                         (push `((,source) . (,(eldev-replace-suffix source source-suffix target-suffix))) result)
+                                         (setf scan  nil
+                                               found t))))
+                                   (unless found
+                                     (error "Name of source file `%s' doesn't end with %s as `:targets' wants"
+                                            source (eldev-message-enumerate nil source-suffixes nil nil "or")))))
+                               (nreverse result)))
+                            (_ (error (if function
+                                          "Invalid return value %S of the function specified in `:targets' in the builder"
+                                        "Invalid `:targets' %S (did you mean to specify a lambda-form instead?)")
+                                      target-rule))))
+        ;; Discard builder's wishes that match `eldev-build-ignored-target-fileset'.
+        (let* ((targets (cdr invocation))
+               (ignored (when eldev-build-ignored-target-fileset
+                          (eldev-filter-files targets eldev-build-ignored-target-fileset))))
+          (when ignored
+            (setf ignored-targets (append ignored-targets ignored)))
+          (when (> (length targets) (length ignored))
+            (push `(,(car invocation) . ,(eldev-filter (not (member it ignored)) targets)) invocations)))))
     (when ignored-targets
       (eldev-trace "%s" (eldev-message-enumerate-files "Ignored potential target%s: %s (%d)" ignored-targets)))
     (nreverse invocations)))
