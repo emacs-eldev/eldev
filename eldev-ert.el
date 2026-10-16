@@ -43,7 +43,7 @@
 
 (defun eldev-test-ert-load-results ()
   "Load previous ERT test results if they are present."
-  (eldev-test-do-load-results "ert" "previous ERT test results" 1
+  (eldev-test-do-load-results "ert" "ERT test results" 2
     (let ((results (cdr (assq 'results contents))))
       (dolist (result results)
         (when (ert-test-boundp (car result))
@@ -52,23 +52,25 @@
 
 (defun eldev-test-ert-save-results ()
   "Save ERT test results for future use."
-  (eldev-test-do-save-results "ert" "ERT test results" 1
+  (eldev-test-do-save-results "ert" "ERT test results" 2
     (let (results)
       (mapatoms (lambda (symbol)
                   (when (ert-test-boundp symbol)
                     (let ((result (ert-test-most-recent-result (ert-get-test symbol))))
                       (when result
                         (setf result (copy-sequence result))
-                        (cond ((ert-test-passed-p result)
-                               ;; These can be huge in some tests that contain `(should ...)' forms in a loop
-                               ;; and apparently serve no purpose.  Remove them to reduce file size.
-                               (setf (ert-test-result-should-forms result) '(...)))
-                              ((not (ert-test-aborted-with-non-local-exit-p result))
-                               ;; Of course we cannot print-read the backtraces (and probably something else)
-                               ;; directly.  Lisp...
-                               (setf (ert-test-result-with-condition-condition result) '(...)
-                                     (ert-test-result-with-condition-backtrace result) '(...)
-                                     (ert-test-result-with-condition-infos     result) '(...)))))
+                        ;; These can be huge in some tests that contain `(should ...)' forms in a loop and
+                        ;; apparently serve no purpose.  Remove them to reduce file size.  Also see issue
+                        ;; #124: now removing even for failing tests, because apparently there is no use for
+                        ;; these forms in Eldev's case, yet they can prevent serialization/unserialization
+                        ;; from working.
+                        (setf (ert-test-result-should-forms result) '(...))
+                        (when (ert-test-result-with-condition-p result)
+                          ;; Of course we cannot print-read the backtraces (and probably something else)
+                          ;; directly.  Lisp...
+                          (setf (ert-test-result-with-condition-condition result) '(...)
+                                (ert-test-result-with-condition-backtrace result) '(...)
+                                (ert-test-result-with-condition-infos     result) '(...))))
                       (push `(,symbol . ,result) results)))))
       ;; Use `eldev--test-ert-results' to not forget results of tests that were not loaded
       ;; this time.

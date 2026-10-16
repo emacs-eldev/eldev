@@ -4,11 +4,12 @@
 
 
 (ert-deftest eldev-test-project-b-1 ()
-  ;; Two tests, one of them fails.
+  ;; Three tests, two of them fail.
   (eldev--test-run "project-b" ("test")
     (should (string-match-p "passed.+project-b-test-hello" stdout))
     (should (string-match-p "FAILED.+project-b-test-triviality-failing" stdout))
-    (should (string-match-p "Ran 2 tests" stdout))
+    (should (string-match-p "FAILED.+project-b-test-unserializable-form-failing" stdout))
+    (should (string-match-p "Ran 3 tests" stdout))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-test-project-b-2 ()
@@ -19,9 +20,9 @@
     (should (= exit-code 0))))
 
 (ert-deftest eldev-test-project-b-3 ()
-  ;; Only one failing test.
+  ;; Two failing tests.
   (eldev--test-run "project-b" ("test" "failing")
-    (should (string-match-p "Ran 1 test" stdout))
+    (should (string-match-p "Ran 2 tests" stdout))
     (should (= exit-code 1))))
 
 (ert-deftest eldev-test-project-b-4 ()
@@ -129,11 +130,13 @@
 (eldev-ert-defargtest eldev-test-read-ert-results (inject-cyclic-list)
                       (nil t)
   (let ((eldev--test-project "project-b")
-        ;; Previously Eldev would fail to read back ERT results because
-        ;; `eldev-do-save-cache-file' explicitly disabled proper circular structure saving
-        ;; by setting `print-circle' to nil for whatever reason.  This would cause
-        ;; `test-ert :failed' to be no-op below, so the process would succeed, making this
+        ;; Previously Eldev would fail to read back ERT results because `eldev-do-save-cache-file' explicitly
+        ;; disabled proper circular structure saving by setting `print-circle' to nil for whatever reason.
+        ;; This would cause `test-ert :failed' to be no-op below, so the process would succeed, making this
         ;; test (`eldev-test-read-ert-results') fail.
+        ;;
+        ;; Additionally see issue #124: would fail with certain assertion forms (one such got added to the
+        ;; test project itself: see `project-b-test-unserializable-form-failing').
         (test-injection      (when inject-cyclic-list
                                '("--setup" (with-eval-after-load 'ert
                                              (ert-deftest project-b-injected ()
