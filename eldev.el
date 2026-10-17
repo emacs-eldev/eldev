@@ -325,7 +325,7 @@ Since 0.5")
 (defvar eldev-known-tool-packages
   '((buttercup    :version "1.24"   :archive  melpa)
     (doctest                        :archive  melpa)
-    (ecukes       :version "0.6.18" :archive  melpa)
+    (ecukes       :version "0.6.19" :archive  melpa)
     ;; Need GNU ELPA for `let-alist' on older Emacs versions.
     (package-lint :version "0.14"   :archives (melpa gnu-elpa))
     (relint       :version "2.0"    :archive  gnu-elpa)
