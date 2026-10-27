@@ -209,7 +209,7 @@ Additionally, `eldev-dist-dir' is excluded.")
 The two default filesets `main' and `test' are enough for most
 purposes, but you can define more if you need.  Special name
 `all' is reserved for union (i.e. as with `:or') of all other
-standar filesets and must not be mapped here.
+standard filesets and must not be mapped here.
 
 Additionally, whenever any of these filesets is resolved,
 `eldev-standard-excludes' is always “subtracted” from the
@@ -538,7 +538,7 @@ BODY can contain the following keywords:
     :hidden-if FORM or :hidden-if :default
 
         Certain options are not interesting, unless someone sets
-        a really unconvential default value.  Typical examples
+        a really unconventional default value.  Typical examples
         are negation of `--dry-run' options."
   (declare (doc-string 3) (indent 2))
   (let* ((parsed-body (eldev-macroexp-parse-body body))
@@ -3000,7 +3000,7 @@ Since 0.2."
          (required-by-hint    (lambda (&optional upcase)
                                 (let (hints)
                                   (when runtime-dependency
-                                    (push "required as a development tool, not as a dependecy of the project" hints))
+                                    (push "required as a development tool, not as a dependency of the project" hints))
                                   (when required-by
                                     (push (eldev-format-message "required by package %s"
                                                                 (mapconcat (lambda (package) (eldev-format-message "`%s'" package)) real-required-by " <- "))
@@ -3876,7 +3876,7 @@ or evaluating (`eval') registered in the project's `Eldev' file."
             important-remarks)
         (cond ((package-built-in-p package-name)
                (push (if descriptor
-                         (eldev-format-message "built-in is overriden by installed %s" (eldev-message-version descriptor t))
+                         (eldev-format-message "built-in is overridden by installed %s" (eldev-message-version descriptor t))
                        (let ((available (eldev-find-built-in-version package-name)))
                          (if available
                              (let ((message (eldev-format-message "built-in version is %s" (eldev-message-version available))))
@@ -5061,7 +5061,7 @@ BODY can contain the following keywords:
 
     :name NAME
 
-        Linter name (a symbol) for ther command line.  Default
+        Linter name (a symbol) for the command line.  Default
         value is derived from function name by removing `eldev-'
         prefix (or a prefix for any other project) and word
         `linter-'.
@@ -6571,7 +6571,7 @@ declares"
   ("Print absolute package filename and word “generated” or “up-to-date”
 as two last lines of output"
    :options       --print-filename)
-  ("Don't add special ouput"
+  ("Don't add special output"
    :options       --dont-print-filename
    :hidden-if     :default)
   :for-command    package)
@@ -6772,7 +6772,7 @@ default configuration.
 
 Each function is called with one argument: VERSION to be
 released, as a list.  Its return value is ignored.  If it wants
-to prevent release from occuring, it should signal an error,
+to prevent release from occurring, it should signal an error,
 preferably an `eldev-error'.")
 
 (defvar eldev-release-preparators nil

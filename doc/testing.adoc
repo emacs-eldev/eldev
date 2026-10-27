@@ -315,7 +315,7 @@ selectors] — other “special” selectors (e.g. `:new` or `:unexpected`)
 also work.
 
 For <<ecukes,Ecukes>> there is a comparable feature, though only for
-failing scenarios.  Internally it is implemted differently, as it is
+failing scenarios.  Internally it is implemented differently, as it is
 built into the framework itself, but from the interface point of view
 it works almost exactly the same: specify selector `:failed` or
 `:failing` on the command line:

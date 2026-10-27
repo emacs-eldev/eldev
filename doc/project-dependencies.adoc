@@ -55,7 +55,7 @@ from a package with a lower priority is installed only if there are no
 other options.
 
 If dependencies for your project are only available from some other
-archive, you can still use the same function.  Just substite the
+archive, you can still use the same function.  Just substitute the
 symbolic archive name with a cons cell of name and URL as strings:
 
 [source]

@@ -1182,7 +1182,7 @@ Since 0.11."
 (defmacro eldev-output-reroute-messages (&rest body)
   "Execute BODY while rerouting standard Emacs messages.
 Messages are reformatted through `eldev-output' and sent to
-`eldev-message-rerouting-destination'.  Can be termporarily
+`eldev-message-rerouting-destination'.  Can be temporarily
 disabled by setting `eldev-disable-message-rerouting' inside
 BODY."
   (declare (indent 0) (debug (body)))

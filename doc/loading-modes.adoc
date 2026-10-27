@@ -8,7 +8,7 @@ becomes loadable by Emacs.
 
 Default loading mode is called `as-is`.  It means the directory where
 the project (or local sources of its dependency) is located is simply
-added to Emacs varible `load-path` and normal Emacs loading should be
+added to Emacs variable `load-path` and normal Emacs loading should be
 able to find required features from there on.  This is the fastest
 mode, since it requires no preparation and in most cases is basically
 what you want during development.
