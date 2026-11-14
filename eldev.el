@@ -498,7 +498,7 @@ BODY can contain the following keywords:
 
     :options OPTIONS (required)
 
-        Invokable from command line using any of listed strings.
+        Invocable from command line using any of listed strings.
         OPTIONS can be either a string or a list of strings.
         Each must be either in form \"-X\" (one-letter short option)
         or \"--long-option\".

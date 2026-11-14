@@ -107,7 +107,7 @@ arguments.
 Let’s skip the keywords for a bit and have a look at the body.  It
 works exactly like in a normal Elisp function.  Its job is to generate
 `target` from `source` using builder-specific means.  This particular
-builder calls function `eldev-substite` that does the actual work
+builder calls function `eldev-substitute` that does the actual work
 (this function is available also to your project, should you need it).
 But your builders could do whatever you want, including launching
 external processes (C/C++ compiler, a Python script, etc.) and using
