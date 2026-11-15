@@ -553,7 +553,7 @@ in the VERSION as unknown back then."
   "Optionally test the project before creating a release.
 Exact behavior depends on many configuration variables: this
 function can test with various Emacs executables, in Docker
-images or check status on continous integration servers."
+images or check status on continuous integration servers."
   (if eldev-release-skip-testing
       (eldev-verbose "Skipping project testing step as requested")
     (let ((any-tests (or eldev-release-test-local eldev-release-test-other-emacses eldev-release-test-docker-images)))

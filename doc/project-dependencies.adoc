@@ -55,7 +55,7 @@ from a package with a lower priority is installed only if there are no
 other options.
 
 If dependencies for your project are only available from some other
-archive, you can still use the same function.  Just substite the
+archive, you can still use the same function.  Just substitute the
 symbolic archive name with a cons cell of name and URL as strings:
 
 [source]
@@ -250,7 +250,7 @@ _direct_ dependencies of the project being built.  By default, it
 omits any built-in packages, most importantly `emacs`.  If you want to
 check those too, add option `-b` (`--list-built-ins`).
 
-Second is `dependecy-tree` (short alias: `dtree`).  It prints a tree
+Second is `dependency-tree` (short alias: `dtree`).  It prints a tree
 of project direct dependencies, direct dependencies of those, and so
 on — recursively.  Like with the first command, use option `-b` if you
 want to see built-ins in the tree.

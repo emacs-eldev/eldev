@@ -1,7 +1,7 @@
 [#build-system]
 == Build system
 
-Eldev comes with quite a sofisticated build system.  While by default
+Eldev comes with quite a sophisticated build system.  While by default
 it only knows how to build packages, byte-compile `.el` files and make
 `.info` from `.texi`, you can extend it with custom _builders_ that
 can do anything you want.  For example, generate resource files that
